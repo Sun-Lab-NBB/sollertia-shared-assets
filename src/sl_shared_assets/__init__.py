@@ -21,16 +21,10 @@ from .data_classes import (
     ProcedureData,
     ProcessedData,
     ZaberPositions,
-    DatasetTrackers,
     SessionMetadata,
-    ManagingTrackers,
-    ProcessingStatus,
-    ProcessingTracker,
     DatasetSessionData,
     MesoscopePositions,
-    ProcessingTrackers,
     DatasetTrackingData,
-    ProcessingPipelines,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
@@ -64,12 +58,6 @@ from .configuration import (
     get_system_configuration_data,
     create_experiment_configuration,
 )
-from .data_transfer import (
-    delete_directory,
-    transfer_directory,
-    calculate_directory_checksum,
-)
-from .data_processing import interpolate_data
 
 # Ensures console is enabled when this library is imported.
 if not console.enabled:
@@ -81,7 +69,6 @@ __all__ = [
     "Cue",
     "DatasetData",
     "DatasetSessionData",
-    "DatasetTrackers",
     "DatasetTrackingData",
     "DrugData",
     "ExperimentState",
@@ -89,7 +76,6 @@ __all__ = [
     "ImplantData",
     "InjectionData",
     "LickTrainingDescriptor",
-    "ManagingTrackers",
     "MesoscopeCameras",
     "MesoscopeExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
@@ -102,10 +88,6 @@ __all__ = [
     "MesoscopeSystemConfiguration",
     "ProcedureData",
     "ProcessedData",
-    "ProcessingPipelines",
-    "ProcessingStatus",
-    "ProcessingTracker",
-    "ProcessingTrackers",
     "RawData",
     "RunTrainingDescriptor",
     "Segment",
@@ -123,14 +105,10 @@ __all__ = [
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
     "ZaberPositions",
-    "calculate_directory_checksum",
     "create_experiment_configuration",
-    "delete_directory",
     "get_google_credentials_path",
     "get_server_configuration",
     "get_system_configuration_data",
     "get_task_templates_directory",
     "get_working_directory",
-    "interpolate_data",
-    "transfer_directory",
 ]

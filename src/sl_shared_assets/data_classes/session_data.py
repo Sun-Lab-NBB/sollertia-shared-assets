@@ -149,8 +149,8 @@ class ProcessedData:
 
 @dataclass
 class TrackingData:
-    """Provides the path to the directory that stores the .yaml and .lock files used by ProcessingTracker instances to
-    track the runtime status of the data processing pipelines working with the session's data.
+    """Provides the path to the directory that stores the .yaml and .lock files used by ataraxis_data_structures.ProcessingTracker instances to track the runtime status of the data processing
+    pipelines working with the session's data.
     """
 
     tracking_data_path: Path = Path()

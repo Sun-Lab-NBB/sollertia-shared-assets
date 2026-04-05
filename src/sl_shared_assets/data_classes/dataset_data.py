@@ -29,8 +29,8 @@ class SessionMetadata:
 
 @dataclass
 class DatasetTrackingData:
-    """Provides the path to the directory that stores the .yaml and .lock files used by ProcessingTracker instances to
-    track the runtime status of the dataset forging and multi-day processing pipelines.
+    """Provides the path to the directory that stores the .yaml and .lock files used by ataraxis_data_structures.ProcessingTracker instances to track the runtime status of the dataset forging and
+    multi-day processing pipelines.
     """
 
     tracking_data_path: Path = Path()
