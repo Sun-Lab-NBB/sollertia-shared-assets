@@ -11,7 +11,6 @@ from .session_data import (
     RawData,
     SessionData,
     SessionTypes,
-    TrackingData,
     ProcessedData,
 )
 from .surgery_data import (
@@ -38,6 +37,5 @@ __all__ = [
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
-    "TrackingData",
     "WindowCheckingDescriptor",
 ]

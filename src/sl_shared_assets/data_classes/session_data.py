@@ -10,7 +10,7 @@ from dataclasses import field, dataclass
 
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
-from ataraxis_time.time_helpers import TimestampFormats, get_timestamp
+from ataraxis_time import TimestampFormats, get_timestamp
 
 from ..configuration import AcquisitionSystems, get_system_configuration_data
 
@@ -32,51 +32,32 @@ class SessionTypes(StrEnum):
 
 @dataclass
 class RawData:
-    """Provides the paths to the directories and files that store the data acquired and losslessly preprocessed during
-    the session's data acquisition runtime.
+    """Provides the paths to the root directory and shared metadata files that store the data acquired during the
+    session's data acquisition runtime.
+
+    Notes:
+        Only paths to files consumed by multiple sl libraries are exposed as fields. Internal files (session_data.yaml,
+        nk.bin, system_configuration.yaml) and data subdirectories (camera_data, mesoscope_data, behavior_data) are
+        resolved at runtime by the libraries that own them.
     """
 
     raw_data_path: Path = Path()
     """The path to the root directory that stores the session's raw data."""
-    camera_data_path: Path = Path()
-    """The path to the directory that contains the video camera data acquired during the session's runtime."""
-    mesoscope_data_path: Path = Path()
-    """The path to the directory that contains the Mesoscope data acquired during the session's runtime."""
-    behavior_data_path: Path = Path()
-    """The path to the directory that contains the non-video behavior data acquired during the session's runtime."""
-    zaber_positions_path: Path = Path()
-    """The path to the zaber_positions.yaml file that contains the snapshot of all Zaber motor positions 
-    at the end of the session's runtime."""
     session_descriptor_path: Path = Path()
-    """The path to the session_descriptor.yaml file that contains session-specific information, such as the specific 
+    """The path to the session_descriptor.yaml file that contains session-specific information, such as the specific
     task parameters and the notes made by the experimenter during the session's runtime."""
     hardware_state_path: Path = Path()
-    """The path to the hardware_state.yaml file that contains the partial snapshot of the configuration parameters used 
+    """The path to the hardware_state.yaml file that contains the partial snapshot of the configuration parameters used
     by the data acquisition system's hardware modules during the session's runtime."""
     surgery_metadata_path: Path = Path()
-    """The path to the surgery_metadata.yaml file that contains the information about the surgical intervention(s) 
+    """The path to the surgery_metadata.yaml file that contains the information about the surgical intervention(s)
     performed on the animal prior to the session's runtime."""
-    session_data_path: Path = Path()
-    """The path to the session_data.yaml file. This path is used by the SessionData instance to save itself to disk as 
-    a .yaml file."""
     experiment_configuration_path: Path = Path()
-    """The path to the experiment_configuration.yaml file that contains the snapshot of the experiment's configuration 
+    """The path to the experiment_configuration.yaml file that contains the snapshot of the experiment's configuration
     used during the session's runtime. This file is only created for experiment sessions."""
-    mesoscope_positions_path: Path = Path()
-    """The path to the mesoscope_positions.yaml file that contains the snapshot of the imaging axes positions used
-    by the Mesoscope at the end of the session's runtime."""
     window_screenshot_path: Path = Path()
-    """The path to the .png screenshot of the ScanImagePC screen that communicates the visual snapshot of the 
+    """The path to the .png screenshot of the ScanImagePC screen that communicates the visual snapshot of the
     cranial window alignment and cell appearance at the beginning of the session's runtime."""
-    system_configuration_path: Path = Path()
-    """The path to the system_configuration.yaml file that contains the exact snapshot of the data acquisition system 
-    configuration parameters used to acquire the session's data."""
-    checksum_path: Path = Path()
-    """The path to the ax_checksum.txt file that stores the xxHash-128 checksum of the data used to verify its 
-    integrity during transmission."""
-    nk_path: Path = Path()
-    """The path to the nk.bin file used by the sl-experiment library to mark sessions undergoing runtime initialization.
-    """
 
     def resolve_paths(self, root_directory_path: Path) -> None:
         """Resolves all paths managed by the class instance based on the input root directory path.
@@ -84,90 +65,37 @@ class RawData:
         Args:
             root_directory_path: The path to the top-level raw data directory of the session's data hierarchy.
         """
-        # Generates the managed paths
         self.raw_data_path = root_directory_path
-        self.camera_data_path = self.raw_data_path.joinpath("camera_data")
-        self.mesoscope_data_path = self.raw_data_path.joinpath("mesoscope_data")
-        self.behavior_data_path = self.raw_data_path.joinpath("behavior_data")
-        self.zaber_positions_path = self.raw_data_path.joinpath("zaber_positions.yaml")
         self.session_descriptor_path = self.raw_data_path.joinpath("session_descriptor.yaml")
         self.hardware_state_path = self.raw_data_path.joinpath("hardware_state.yaml")
         self.surgery_metadata_path = self.raw_data_path.joinpath("surgery_metadata.yaml")
-        self.session_data_path = self.raw_data_path.joinpath("session_data.yaml")
         self.experiment_configuration_path = self.raw_data_path.joinpath("experiment_configuration.yaml")
-        self.mesoscope_positions_path = self.raw_data_path.joinpath("mesoscope_positions.yaml")
         self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
-        self.checksum_path = self.raw_data_path.joinpath("ax_checksum.txt")
-        self.system_configuration_path = self.raw_data_path.joinpath("system_configuration.yaml")
-        self.nk_path = self.raw_data_path.joinpath("nk.bin")
 
     def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
+        """Ensures that the root raw data directory exists, creating it if missing."""
         ensure_directory_exists(self.raw_data_path)
-        ensure_directory_exists(self.camera_data_path)
-        ensure_directory_exists(self.mesoscope_data_path)
-        ensure_directory_exists(self.behavior_data_path)
 
 
 @dataclass
 class ProcessedData:
-    """Provides the paths to the directories and files that store the data generated by the processing pipelines from
-    the raw data.
+    """Provides the path to the root directory that stores the session's processed data.
+
+    Notes:
+        Each data processing library (axvs, axci, cindra) creates its own output subdirectory under this root at
+        runtime. The specific subdirectory layout is owned by the processing libraries.
     """
 
     processed_data_path: Path = Path()
     """The path to the root directory that stores the session's processed data."""
-    camera_data_path: Path = Path()
-    """The path to the directory that contains video tracking data generated by the Sun lab DeepLabCut-based 
-    video processing pipeline(s)."""
-    mesoscope_data_path: Path = Path()
-    """The path to the directory that contains processed brain activity (cell) data generated by sl-suite2p 
-    processing pipelines (single-day and multi-day)."""
-    behavior_data_path: Path = Path()
-    """The path to the directory that contains the non-video behavior data extracted from the .npz log archives by the 
-    sl-behavior log processing pipeline."""
 
     def resolve_paths(self, root_directory_path: Path) -> None:
-        """Resolves all paths managed by the class instance based on the input root directory path.
+        """Resolves the processed data root path.
 
         Args:
             root_directory_path: The path to the top-level processed data directory of the session's data hierarchy.
         """
-        # Generates the managed paths
         self.processed_data_path = root_directory_path
-        self.camera_data_path = self.processed_data_path.joinpath("camera_data")
-        self.mesoscope_data_path = self.processed_data_path.joinpath("mesoscope_data")
-        self.behavior_data_path = self.processed_data_path.joinpath("behavior_data")
-
-    def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
-        ensure_directory_exists(self.processed_data_path)
-        ensure_directory_exists(self.camera_data_path)
-        ensure_directory_exists(self.behavior_data_path)
-        ensure_directory_exists(self.mesoscope_data_path)
-
-
-@dataclass
-class TrackingData:
-    """Provides the path to the directory that stores the .yaml and .lock files used by ataraxis_data_structures.ProcessingTracker instances to track the runtime status of the data processing
-    pipelines working with the session's data.
-    """
-
-    tracking_data_path: Path = Path()
-    """The path to the root directory that stores the session's tracking data."""
-
-    def resolve_paths(self, root_directory_path: Path) -> None:
-        """Resolves all paths managed by the class instance based on the input root directory path.
-
-        Args:
-            root_directory_path: The path to the top-level tracking data directory of the session's data hierarchy.
-        """
-        # Generates the managed paths
-        self.tracking_data_path = root_directory_path
-
-    def make_directories(self) -> None:
-        """Ensures that all major subdirectories and the root directory exist, creating any missing directories."""
-        ensure_directory_exists(self.tracking_data_path)
 
 
 @dataclass
@@ -207,8 +135,6 @@ class SessionData(YamlConfig):
     """Defines the session's raw data hierarchy."""
     processed_data: ProcessedData = field(default_factory=lambda: ProcessedData())
     """Defines the session's processed data hierarchy."""
-    tracking_data: TrackingData = field(default_factory=lambda: TrackingData())
-    """Defines the session's tracking data hierarchy."""
 
     def __post_init__(self) -> None:
         """Ensures that all instances used to define the session's data hierarchy are properly initialized."""
@@ -217,9 +143,6 @@ class SessionData(YamlConfig):
 
         if not isinstance(self.processed_data, ProcessedData):
             self.processed_data = ProcessedData()  # pragma: no cover
-
-        if not isinstance(self.tracking_data, TrackingData):
-            self.tracking_data = TrackingData()  # pragma: no cover
 
     @classmethod
     def create(
@@ -300,7 +223,7 @@ class SessionData(YamlConfig):
         instance.save()
 
         # Dumps the acquisition system's configuration data to the session's directory
-        acquisition_system.save(path=instance.raw_data.system_configuration_path)
+        acquisition_system.save(path=instance.raw_data.raw_data_path.joinpath("system_configuration.yaml"))
 
         if experiment_name is not None:
             # Copies the experiment_configuration.yaml file to the session's directory
@@ -312,7 +235,7 @@ class SessionData(YamlConfig):
         # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
         # the session becomes a valid target for deletion (purging) runtimes operating from the main acquisition
         # machine of any data acquisition system.
-        instance.raw_data.nk_path.touch()
+        instance.raw_data.raw_data_path.joinpath("nk.bin").touch()
 
         # Returns the initialized SessionData instance to caller
         return instance
@@ -362,11 +285,6 @@ class SessionData(YamlConfig):
 
         # PROCESSED DATA
         instance.processed_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "processed_data"))
-        instance.processed_data.make_directories()  # Ensures that processed data hierarchy exists.
-
-        # TRACKING DATA
-        instance.tracking_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "tracking_data"))
-        instance.tracking_data.make_directories()  # Ensures tracking data directories exist
 
         # Returns the initialized SessionData instance to caller
         return instance
@@ -378,7 +296,7 @@ class SessionData(YamlConfig):
             This service method is used by the sl-experiment library to acquire the session's data. Do not call this
             method manually.
         """
-        self.raw_data.nk_path.unlink(missing_ok=True)
+        self.raw_data.raw_data_path.joinpath("nk.bin").unlink(missing_ok=True)
 
     def save(self) -> None:
         """Caches the instance's data to the session's 'raw_data' directory as a 'session_data.yaml' file."""
@@ -389,11 +307,10 @@ class SessionData(YamlConfig):
         # Resets all path fields to Null (None) before saving the instance to disk.
         origin.raw_data = None  # type: ignore[assignment]
         origin.processed_data = None  # type: ignore[assignment]
-        origin.tracking_data = None  # type: ignore[assignment]
 
         # Converts StringEnum instances to strings.
         origin.session_type = str(origin.session_type)
         origin.acquisition_system = str(origin.acquisition_system)
 
         # Saves instance data as a .YAML file.
-        origin.to_yaml(file_path=self.raw_data.session_data_path)
+        origin.to_yaml(file_path=self.raw_data.raw_data_path.joinpath("session_data.yaml"))
