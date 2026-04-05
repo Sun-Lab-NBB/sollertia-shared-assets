@@ -1,11 +1,5 @@
 """Provides assets for storing data acquired in the Sun lab."""
 
-from .dataset_data import (
-    DatasetData,
-    SessionMetadata,
-    DatasetSessionData,
-    DatasetTrackingData,
-)
 from .runtime_data import (
     ZaberPositions,
     MesoscopePositions,
@@ -32,9 +26,6 @@ from .surgery_data import (
 )
 
 __all__ = [
-    "DatasetData",
-    "DatasetSessionData",
-    "DatasetTrackingData",
     "DrugData",
     "ImplantData",
     "InjectionData",
@@ -47,7 +38,6 @@ __all__ = [
     "RawData",
     "RunTrainingDescriptor",
     "SessionData",
-    "SessionMetadata",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
