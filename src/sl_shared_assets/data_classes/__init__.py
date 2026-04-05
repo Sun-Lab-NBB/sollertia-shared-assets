@@ -1,8 +1,6 @@
 """Provides assets for storing data acquired in the Sun lab."""
 
 from .runtime_data import (
-    ZaberPositions,
-    MesoscopePositions,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
@@ -32,7 +30,6 @@ __all__ = [
     "LickTrainingDescriptor",
     "MesoscopeExperimentDescriptor",
     "MesoscopeHardwareState",
-    "MesoscopePositions",
     "ProcedureData",
     "ProcessedData",
     "RawData",
@@ -43,5 +40,4 @@ __all__ = [
     "SurgeryData",
     "TrackingData",
     "WindowCheckingDescriptor",
-    "ZaberPositions",
 ]
