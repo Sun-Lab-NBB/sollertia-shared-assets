@@ -4,15 +4,13 @@ machines.
 
 import copy
 from enum import StrEnum
-import shutil
 from pathlib import Path
 from dataclasses import field, dataclass
 
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
-from ataraxis_time import TimestampFormats, get_timestamp
 
-from ..configuration import AcquisitionSystems, get_system_configuration_data
+from ..configuration import AcquisitionSystems
 
 
 class SessionTypes(StrEnum):
@@ -157,88 +155,17 @@ class SessionData(YamlConfig):
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
 
         Notes:
-            To access the data of an already existing session, use the load() method.
+            This method has been moved to sl-experiment. It depends on get_system_configuration_data() which is now
+            owned by sl-experiment. Use the sl-experiment session creation interface instead.
 
-        Args:
-            project_name: The name of the project for which the session is acquired.
-            animal_id: The unique identifier of the animal participating in the session.
-            session_type: The type of the session.
-            python_version: The Python version used to acquire the session's data.
-            sl_experiment_version: The sl-experiment library version used to acquire the session's data.
-            experiment_name: The name of the experiment performed during the session or None, if the session is
-                not an experiment session.
-
-        Returns:
-            An initialized SessionData instance that stores the structure and the metadata of the created session.
+        Raises:
+            NotImplementedError: Always. This method must be reimplemented in sl-experiment.
         """
-        if session_type not in SessionTypes:
-            message = (
-                f"Invalid session type '{session_type}' encountered when initializing a new data acquisition session. "
-                f"Use one of the supported session types from the SessionTypes enumeration."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Acquires the UTC timestamp to use as the session name
-        session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
-
-        # Resolves the acquisition system configuration. This queries the acquisition system configuration data used
-        # by the machine (PC) that calls this method.
-        acquisition_system = get_system_configuration_data()
-
-        # Constructs the root session directory path
-        session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, session_name)
-
-        # Prevents creating new sessions for non-existent projects.
-        if not acquisition_system.filesystem.root_directory.joinpath(project_name).exists():
-            message = (
-                f"Unable to initialize a new data acquisition session {session_name} for the animal '{animal_id}' and "
-                f"project '{project_name}'. The project does not exist on the local machine (PC). Use the "
-                f"'sl-project create' CLI command to create the project on the local machine before creating new "
-                f"sessions."
-            )
-            console.error(message=message, error=FileNotFoundError)
-
-        # Generates the session's raw data directory. This method assumes that the session is created on the
-        # data acquisition machine that only acquires the data and does not create the other session's directories used
-        # during data processing.
-        raw_data = RawData()
-        raw_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
-        raw_data.make_directories()  # Generates the local 'raw_data' directory tree
-
-        # Generates the SessionData instance.
-        instance = SessionData(
-            project_name=project_name,
-            animal_id=animal_id,
-            session_name=session_name,
-            session_type=session_type,
-            acquisition_system=acquisition_system.name,
-            raw_data=raw_data,
-            experiment_name=experiment_name,
-            python_version=python_version,
-            sl_experiment_version=sl_experiment_version,
+        message = (
+            "SessionData.create() has been moved to sl-experiment. This method depends on "
+            "get_system_configuration_data() which is now owned by sl-experiment."
         )
-
-        # Saves the configured instance data to the session's directory so that it can be reused during processing or
-        # preprocessing.
-        instance.save()
-
-        # Dumps the acquisition system's configuration data to the session's directory
-        acquisition_system.save(path=instance.raw_data.raw_data_path.joinpath("system_configuration.yaml"))
-
-        if experiment_name is not None:
-            # Copies the experiment_configuration.yaml file to the session's directory
-            experiment_configuration_path = acquisition_system.filesystem.root_directory.joinpath(
-                project_name, "configuration", f"{experiment_name}.yaml"
-            )
-            shutil.copy2(experiment_configuration_path, instance.raw_data.experiment_configuration_path)
-
-        # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
-        # the session becomes a valid target for deletion (purging) runtimes operating from the main acquisition
-        # machine of any data acquisition system.
-        instance.raw_data.raw_data_path.joinpath("nk.bin").touch()
-
-        # Returns the initialized SessionData instance to caller
-        return instance
+        raise NotImplementedError(message)
 
     @classmethod
     def load(cls, session_path: Path) -> SessionData:
