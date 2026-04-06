@@ -183,55 +183,9 @@ class WindowCheckingDescriptor(YamlConfig):  # pragma: no cover
     experimenter: str
     """The ID of the experimenter running the session."""
     surgery_quality: int = 0
-    """The quality of the cranial window and surgical intervention on a scale from 0 (non-usable) to 
+    """The quality of the cranial window and surgical intervention on a scale from 0 (non-usable) to
     3 (high-tier publication grade) inclusive."""
     incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
-
-
-@dataclass
-class ZaberPositions(YamlConfig):  # pragma: no cover
-    """Stores Zaber motor positions reused between data acquisition sessions that use the Mesoscope-VR system."""
-
-    headbar_z: int = 0
-    """The absolute position, in native motor units, of the HeadBar z-axis motor."""
-    headbar_pitch: int = 0
-    """The absolute position, in native motor units, of the HeadBar pitch-axis motor."""
-    headbar_roll: int = 0
-    """The absolute position, in native motor units, of the HeadBar roll-axis motor."""
-    lickport_z: int = 0
-    """The absolute position, in native motor units, of the LickPort z-axis motor."""
-    lickport_y: int = 0
-    """The absolute position, in native motor units, of the LickPort y-axis motor."""
-    lickport_x: int = 0
-    """The absolute position, in native motor units, of the LickPort x-axis motor."""
-    wheel_x: int = 0
-    """The absolute position, in native motor units, of the running wheel platform x-axis motor."""
-
-
-@dataclass
-class MesoscopePositions(YamlConfig):  # pragma: no cover
-    """Stores the positions of real and virtual Mesoscope imaging axes reused between experiment sessions that use the
-    Mesoscope-VR system.
-    """
-
-    mesoscope_x: float = 0.0
-    """The Mesoscope objective's X-axis position, in micrometers."""
-    mesoscope_y: float = 0.0
-    """The Mesoscope objective's Y-axis position, in micrometers."""
-    mesoscope_roll: float = 0.0
-    """The Mesoscope objective's Roll-axis position, in degrees."""
-    mesoscope_z: float = 0.0
-    """The Mesoscope objective's Z-axis position, in micrometers."""
-    mesoscope_fast_z: float = 0.0
-    """The ScanImage's FastZ (virtual Z-axis) position, in micrometers."""
-    mesoscope_tip: float = 0.0
-    """The ScanImage's Tilt position, in degrees."""
-    mesoscope_tilt: float = 0.0
-    """The ScanImage's Tip position, in degrees."""
-    laser_power_mw: float = 0.0
-    """The laser excitation power at the sample, in milliwatts."""
-    red_dot_alignment_z: float = 0.0
-    """The Mesoscope objective's Z-axis position, in micrometers, used for the red-dot alignment procedure."""

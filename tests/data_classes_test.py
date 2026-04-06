@@ -9,10 +9,7 @@ from sl_shared_assets.data_classes import (
     SessionTypes,
     RawData,
     ProcessedData,
-    TrackingData,
     SessionData,
-    ProcessingTracker,
-    ProcessingStatus,
 )
 from sl_shared_assets.configuration import (
     AcquisitionSystems,
@@ -152,11 +149,11 @@ def test_raw_data_default_initialization():
     raw_data = RawData()
 
     assert raw_data.raw_data_path == Path()
-    assert raw_data.camera_data_path == Path()
-    assert raw_data.mesoscope_data_path == Path()
-    assert raw_data.behavior_data_path == Path()
-    assert raw_data.zaber_positions_path == Path()
     assert raw_data.session_descriptor_path == Path()
+    assert raw_data.hardware_state_path == Path()
+    assert raw_data.surgery_metadata_path == Path()
+    assert raw_data.experiment_configuration_path == Path()
+    assert raw_data.window_screenshot_path == Path()
 
 
 def test_raw_data_resolve_paths(tmp_path):
@@ -170,17 +167,15 @@ def test_raw_data_resolve_paths(tmp_path):
     raw_data.resolve_paths(root_directory_path=root_path)
 
     assert raw_data.raw_data_path == root_path
-    assert raw_data.camera_data_path == root_path / "camera_data"
-    assert raw_data.mesoscope_data_path == root_path / "mesoscope_data"
-    assert raw_data.behavior_data_path == root_path / "behavior_data"
-    assert raw_data.zaber_positions_path == root_path / "zaber_positions.yaml"
     assert raw_data.session_descriptor_path == root_path / "session_descriptor.yaml"
-    assert raw_data.session_data_path == root_path / "session_data.yaml"
-    assert raw_data.nk_path == root_path / "nk.bin"
+    assert raw_data.hardware_state_path == root_path / "hardware_state.yaml"
+    assert raw_data.surgery_metadata_path == root_path / "surgery_metadata.yaml"
+    assert raw_data.experiment_configuration_path == root_path / "experiment_configuration.yaml"
+    assert raw_data.window_screenshot_path == root_path / "window_screenshot.png"
 
 
 def test_raw_data_make_directories(tmp_path):
-    """Verifies that make_directories creates all required subdirectories.
+    """Verifies that make_directories creates the root raw data directory.
 
     This test ensures the directory creation method works correctly.
     """
@@ -191,9 +186,6 @@ def test_raw_data_make_directories(tmp_path):
     raw_data.make_directories()
 
     assert root_path.exists()
-    assert (root_path / "camera_data").exists()
-    assert (root_path / "mesoscope_data").exists()
-    assert (root_path / "behavior_data").exists()
 
 
 # Tests for ProcessedData dataclass
@@ -202,20 +194,17 @@ def test_raw_data_make_directories(tmp_path):
 def test_processed_data_default_initialization():
     """Verifies default initialization of ProcessedData.
 
-    This test ensures all path fields have default Path() values.
+    This test ensures the path field has a default Path() value.
     """
     processed_data = ProcessedData()
 
     assert processed_data.processed_data_path == Path()
-    assert processed_data.camera_data_path == Path()
-    assert processed_data.mesoscope_data_path == Path()
-    assert processed_data.behavior_data_path == Path()
 
 
 def test_processed_data_resolve_paths(tmp_path):
-    """Verifies that resolve_paths correctly generates all data paths.
+    """Verifies that resolve_paths correctly sets the processed data root path.
 
-    This test ensures all paths are properly resolved from the root directory.
+    This test ensures the path is properly resolved from the root directory.
     """
     processed_data = ProcessedData()
     root_path = tmp_path / "processed_data"
@@ -223,65 +212,6 @@ def test_processed_data_resolve_paths(tmp_path):
     processed_data.resolve_paths(root_directory_path=root_path)
 
     assert processed_data.processed_data_path == root_path
-    assert processed_data.camera_data_path == root_path / "camera_data"
-    assert processed_data.mesoscope_data_path == root_path / "mesoscope_data"
-    assert processed_data.behavior_data_path == root_path / "behavior_data"
-
-
-def test_processed_data_make_directories(tmp_path):
-    """Verifies that make_directories creates all required subdirectories.
-
-    This test ensures the directory creation method works correctly.
-    """
-    processed_data = ProcessedData()
-    root_path = tmp_path / "processed_data"
-
-    processed_data.resolve_paths(root_directory_path=root_path)
-    processed_data.make_directories()
-
-    assert root_path.exists()
-    assert (root_path / "camera_data").exists()
-    assert (root_path / "behavior_data").exists()
-
-
-# Tests for TrackingData dataclass
-
-
-def test_tracking_data_default_initialization():
-    """Verifies default initialization of TrackingData.
-
-    This test ensures all path fields have default Path() values.
-    """
-    tracking_data = TrackingData()
-
-    assert tracking_data.tracking_data_path == Path()
-
-
-def test_tracking_data_resolve_paths(tmp_path):
-    """Verifies that resolve_paths correctly generates all data paths.
-
-    This test ensures all paths are properly resolved from the root directory.
-    """
-    tracking_data = TrackingData()
-    root_path = tmp_path / "tracking_data"
-
-    tracking_data.resolve_paths(root_directory_path=root_path)
-
-    assert tracking_data.tracking_data_path == root_path
-
-
-def test_tracking_data_make_directories(tmp_path):
-    """Verifies that make_directories creates the tracking data directory.
-
-    This test ensures the directory creation method works correctly.
-    """
-    tracking_data = TrackingData()
-    root_path = tmp_path / "tracking_data"
-
-    tracking_data.resolve_paths(root_directory_path=root_path)
-    tracking_data.make_directories()
-
-    assert root_path.exists()
 
 
 # Tests for SessionData dataclass
@@ -290,7 +220,7 @@ def test_tracking_data_make_directories(tmp_path):
 def test_session_data_post_init_creates_nested_instances():
     """Verifies that __post_init__ creates nested dataclass instances.
 
-    This test ensures RawData, ProcessedData, and TrackingData are initialized.
+    This test ensures RawData and ProcessedData are initialized.
     """
     session_data = SessionData(
         project_name="test_project",
@@ -303,7 +233,6 @@ def test_session_data_post_init_creates_nested_instances():
 
     assert isinstance(session_data.raw_data, RawData)
     assert isinstance(session_data.processed_data, ProcessedData)
-    assert isinstance(session_data.tracking_data, TrackingData)
 
 
 def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
@@ -364,8 +293,6 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     session_path = session_data.raw_data.raw_data_path.parent
     assert session_path.exists()
     assert session_data.raw_data.raw_data_path.exists()
-    assert session_data.raw_data.camera_data_path.exists()
-    assert session_data.raw_data.behavior_data_path.exists()
 
 
 def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
@@ -395,9 +322,10 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
     )
 
     # Verifies session_data.yaml exists
-    assert session_data.raw_data.session_data_path.exists()
+    session_data_yaml = session_data.raw_data.raw_data_path.joinpath("session_data.yaml")
+    assert session_data_yaml.exists()
 
-    content = session_data.raw_data.session_data_path.read_text()
+    content = session_data_yaml.read_text()
     assert "test_project" in content
     assert "test_animal" in content
 
@@ -429,7 +357,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
     )
 
     # Verifies nk.bin exists
-    assert session_data.raw_data.nk_path.exists()
+    assert session_data.raw_data.raw_data_path.joinpath("nk.bin").exists()
 
 
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
@@ -449,7 +377,6 @@ python_version: "3.11.13"
 sl_experiment_version: "3.0.0"
 raw_data: null
 processed_data: null
-tracking_data: null
 """
     session_data_path.write_text(session_data_content)
 
@@ -492,7 +419,7 @@ def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
 def test_session_data_load_resolves_all_paths(sample_session_hierarchy):
     """Verifies that load() resolves all data paths.
 
-    This test ensures raw_data, processed_data, and tracking_data paths are set.
+    This test ensures raw_data and processed_data paths are set.
     """
     session_data_path = sample_session_hierarchy / "raw_data" / "session_data.yaml"
     session_data_content = """
@@ -505,7 +432,6 @@ python_version: "3.11.13"
 sl_experiment_version: "3.0.0"
 raw_data: null
 processed_data: null
-tracking_data: null
 """
     session_data_path.write_text(session_data_content)
 
@@ -514,38 +440,6 @@ tracking_data: null
     # Verifies paths are resolved
     assert loaded_session.raw_data.raw_data_path == sample_session_hierarchy / "raw_data"
     assert loaded_session.processed_data.processed_data_path == sample_session_hierarchy / "processed_data"
-    assert loaded_session.tracking_data.tracking_data_path == sample_session_hierarchy / "tracking_data"
-
-
-def test_session_data_load_creates_processed_and_tracking_directories(sample_session_hierarchy):
-    """Verifies that load() creates processed and tracking directories if missing.
-
-    This test ensures all required directories exist after loading.
-    """
-    session_data_path = sample_session_hierarchy / "raw_data" / "session_data.yaml"
-    session_data_content = """
-project_name: test_project
-animal_id: test_animal
-session_name: 2024-01-15-12-30-45-123456
-session_type: lick training
-acquisition_system: mesoscope
-python_version: "3.11.13"
-sl_experiment_version: "3.0.0"
-raw_data: null
-processed_data: null
-tracking_data: null
-"""
-    session_data_path.write_text(session_data_content)
-
-    # Verifies directories do not exist before load
-    assert not (sample_session_hierarchy / "processed_data").exists()
-    assert not (sample_session_hierarchy / "tracking_data").exists()
-
-    loaded_session = SessionData.load(session_path=sample_session_hierarchy)
-
-    # Verifies directories exist after load
-    assert loaded_session.processed_data.processed_data_path.exists()
-    assert loaded_session.tracking_data.tracking_data_path.exists()
 
 
 def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
@@ -564,20 +458,20 @@ python_version: "3.11.13"
 sl_experiment_version: "3.0.0"
 raw_data: null
 processed_data: null
-tracking_data: null
 """
     session_data_path.write_text(session_data_content)
 
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
     # Creates the nk.bin file
-    loaded_session.raw_data.nk_path.touch()
-    assert loaded_session.raw_data.nk_path.exists()
+    nk_path = loaded_session.raw_data.raw_data_path.joinpath("nk.bin")
+    nk_path.touch()
+    assert nk_path.exists()
 
     # Calls runtime_initialized
     loaded_session.runtime_initialized()
 
-    assert not loaded_session.raw_data.nk_path.exists()
+    assert not nk_path.exists()
 
 
 def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
@@ -601,7 +495,7 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
     session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
     session_data.save()
 
-    content = session_data.raw_data.session_data_path.read_text()
+    content = session_data.raw_data.raw_data_path.joinpath("session_data.yaml").read_text()
     assert "session_type: mesoscope experiment" in content
     assert "acquisition_system: mesoscope" in content
 
@@ -626,10 +520,9 @@ def test_session_data_save_does_not_include_path_objects(sample_session_hierarch
     session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
     session_data.save()
 
-    content = session_data.raw_data.session_data_path.read_text()
+    content = session_data.raw_data.raw_data_path.joinpath("session_data.yaml").read_text()
     assert "raw_data: null" in content
     assert "processed_data: null" in content
-    assert "tracking_data: null" in content
 
 
 def test_session_data_create_raises_error_if_project_does_not_exist(
@@ -769,422 +662,10 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
     )
 
     # Verifies system configuration file exists
-    assert session_data.raw_data.system_configuration_path.exists()
+    system_config_path = session_data.raw_data.raw_data_path.joinpath("system_configuration.yaml")
+    assert system_config_path.exists()
 
     # Verifies content can be loaded
-    loaded_config = MesoscopeSystemConfiguration.from_yaml(file_path=session_data.raw_data.system_configuration_path)
+    loaded_config = MesoscopeSystemConfiguration.from_yaml(file_path=system_config_path)
     assert loaded_config.name == sample_mesoscope_config.name
     assert loaded_config.cameras.face_camera_index == sample_mesoscope_config.cameras.face_camera_index
-
-
-# Tests for ProcessingTracker dataclass
-
-
-def test_processing_tracker_initialization(tmp_path):
-    """Verifies basic initialization of ProcessingTracker.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the tracker initializes with default values.
-    """
-    tracker_file = tmp_path / "test_tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    assert tracker.file_path == tracker_file
-    assert tracker.jobs == {}
-    assert tracker.lock_path == str(tracker_file.with_suffix(".yaml.lock"))
-
-
-def test_processing_tracker_generate_job_id():
-    """Verifies that generate_job_id produces consistent hash-based IDs.
-
-    This test ensures the job ID generation is deterministic.
-    """
-    session_path = Path("/data/project/animal/session")
-    job_name = "suite2p_processing"
-
-    # Generate the same ID multiple times
-    id1 = ProcessingTracker.generate_job_id(session_path, job_name)
-    id2 = ProcessingTracker.generate_job_id(session_path, job_name)
-
-    # Should be consistent
-    assert id1 == id2
-    # Should be a hexadecimal string
-    assert len(id1) == 16
-    assert all(c in "0123456789abcdef" for c in id1)
-
-
-def test_processing_tracker_generate_job_id_unique():
-    """Verifies that different jobs produce different IDs.
-
-    This test ensures job IDs are unique for different inputs.
-    """
-    session_path = Path("/data/project/animal/session")
-
-    id1 = ProcessingTracker.generate_job_id(session_path, "job1")
-    id2 = ProcessingTracker.generate_job_id(session_path, "job2")
-
-    assert id1 != id2
-
-
-def test_processing_tracker_initialize_jobs(tmp_path):
-    """Verifies that initialize_jobs creates scheduled job entries.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures jobs are properly initialized.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_ids = [
-        ProcessingTracker.generate_job_id(session_path, "job1"),
-        ProcessingTracker.generate_job_id(session_path, "job2"),
-        ProcessingTracker.generate_job_id(session_path, "job3"),
-    ]
-
-    tracker.initialize_jobs(job_ids=job_ids)
-
-    # Reload to verify persistence
-    tracker._load_state()
-    assert len(tracker.jobs) == 3
-    for job_id in job_ids:
-        assert job_id in tracker.jobs
-        assert tracker.jobs[job_id].status == ProcessingStatus.SCHEDULED
-        assert tracker.jobs[job_id].slurm_job_id is None
-
-
-def test_processing_tracker_initialize_jobs_preserves_existing(tmp_path):
-    """Verifies that initialize_jobs doesn't overwrite existing job entries.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures reinitializing doesn't lose progress.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_ids = [
-        ProcessingTracker.generate_job_id(session_path, "job1"),
-        ProcessingTracker.generate_job_id(session_path, "job2"),
-    ]
-
-    # Initialize first time
-    tracker.initialize_jobs(job_ids=job_ids)
-
-    # Start one job
-    tracker.start_job(job_ids[0])
-
-    # Reinitialize with the same jobs
-    tracker.initialize_jobs(job_ids=job_ids)
-
-    # Verify the first job's status is preserved
-    tracker._load_state()
-    assert tracker.jobs[job_ids[0]].status == ProcessingStatus.RUNNING
-    assert tracker.jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
-
-
-def test_processing_tracker_start_job(tmp_path, monkeypatch):
-    """Verifies that start_job marks a job as running.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-        monkeypatch: Pytest fixture for environment modification.
-
-    This test ensures jobs' transition to RUNNING status.
-    """
-    # Mock SLURM environment
-    monkeypatch.setenv("SLURM_JOB_ID", "12345")
-
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
-
-    tracker.initialize_jobs(job_ids=[job_id])
-    tracker.start_job(job_id)
-
-    tracker._load_state()
-    assert tracker.jobs[job_id].status == ProcessingStatus.RUNNING
-    assert tracker.jobs[job_id].slurm_job_id == 12345
-
-
-def test_processing_tracker_start_job_without_slurm(tmp_path):
-    """Verifies that start_job works without a SLURM environment.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the tracker works in non-SLURM environments.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
-
-    tracker.initialize_jobs(job_ids=[job_id])
-    tracker.start_job(job_id)
-
-    tracker._load_state()
-    assert tracker.jobs[job_id].status == ProcessingStatus.RUNNING
-    assert tracker.jobs[job_id].slurm_job_id is None
-
-
-def test_processing_tracker_start_job_raises_for_unknown_job(tmp_path):
-    """Verifies that start_job raises ValueError for unknown job IDs.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures proper error handling for invalid job IDs.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    unknown_job_id = "nonexistent_job_id"
-
-    with pytest.raises(ValueError) as exc_info:
-        tracker.start_job(unknown_job_id)
-
-    assert "not configured to track" in str(exc_info.value)
-
-
-def test_processing_tracker_complete_job(tmp_path):
-    """Verifies that complete_job marks a job as succeeded.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures jobs' transition to SUCCEEDED status.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
-
-    tracker.initialize_jobs(job_ids=[job_id])
-    tracker.start_job(job_id)
-    tracker.complete_job(job_id)
-
-    tracker._load_state()
-    assert tracker.jobs[job_id].status == ProcessingStatus.SUCCEEDED
-
-
-def test_processing_tracker_fail_job(tmp_path):
-    """Verifies that fail_job marks a job as failed.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures jobs can be marked as FAILED.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
-
-    tracker.initialize_jobs(job_ids=[job_id])
-    tracker.start_job(job_id)
-    tracker.fail_job(job_id)
-
-    tracker._load_state()
-    assert tracker.jobs[job_id].status == ProcessingStatus.FAILED
-
-
-def test_processing_tracker_get_job_status(tmp_path):
-    """Verifies that get_job_status returns the correct status.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures status queries work correctly.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
-
-    tracker.initialize_jobs(job_ids=[job_id])
-
-    # Check scheduled status
-    assert tracker.get_job_status(job_id) == ProcessingStatus.SCHEDULED
-
-    # Start and check the running status
-    tracker.start_job(job_id)
-    assert tracker.get_job_status(job_id) == ProcessingStatus.RUNNING
-
-    # Complete and check succeeded status
-    tracker.complete_job(job_id)
-    assert tracker.get_job_status(job_id) == ProcessingStatus.SUCCEEDED
-
-
-def test_processing_tracker_reset(tmp_path):
-    """Verifies that reset clears all jobs.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures the reset method works correctly.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_ids = [
-        ProcessingTracker.generate_job_id(session_path, "job1"),
-        ProcessingTracker.generate_job_id(session_path, "job2"),
-    ]
-
-    tracker.initialize_jobs(job_ids=job_ids)
-    tracker.start_job(job_ids[0])
-
-    # Reset
-    tracker.reset()
-
-    tracker._load_state()
-    assert len(tracker.jobs) == 0
-
-
-def test_processing_tracker_complete_property(tmp_path):
-    """Verifies that the complete property returns True when all jobs succeed.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures pipeline completion detection works.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_ids = [
-        ProcessingTracker.generate_job_id(session_path, "job1"),
-        ProcessingTracker.generate_job_id(session_path, "job2"),
-    ]
-
-    tracker.initialize_jobs(job_ids=job_ids)
-    assert not tracker.complete
-
-    # Completes the first job
-    tracker.start_job(job_ids[0])
-    tracker.complete_job(job_ids[0])
-    assert not tracker.complete
-
-    # Completes the second job
-    tracker.start_job(job_ids[1])
-    tracker.complete_job(job_ids[1])
-    assert tracker.complete
-
-
-def test_processing_tracker_encountered_error_property(tmp_path):
-    """Verifies that the encountered_error property returns True when any job fails.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures error detection works.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_ids = [
-        ProcessingTracker.generate_job_id(session_path, "job1"),
-        ProcessingTracker.generate_job_id(session_path, "job2"),
-    ]
-
-    tracker.initialize_jobs(job_ids=job_ids)
-    assert not tracker.encountered_error
-
-    # Complete the first job successfully
-    tracker.start_job(job_ids[0])
-    tracker.complete_job(job_ids[0])
-    assert not tracker.encountered_error
-
-    # Fail second job
-    tracker.start_job(job_ids[1])
-    tracker.fail_job(job_ids[1])
-    assert tracker.encountered_error
-
-
-def test_processing_tracker_concurrent_access(tmp_path):
-    """Verifies that file locks prevent race conditions.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures thread-safe operation.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-
-    # Simulate two processes
-    tracker1 = ProcessingTracker(file_path=tracker_file)
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_id = ProcessingTracker.generate_job_id(session_path, "test_job")
-
-    # Initialize from the first process
-    tracker1.initialize_jobs(job_ids=[job_id])
-
-    # The second process can see the job
-    assert tracker2.get_job_status(job_id) == ProcessingStatus.SCHEDULED
-
-    # The first process starts the job
-    tracker1.start_job(job_id)
-
-    # The second process sees the update
-    assert tracker2.get_job_status(job_id) == ProcessingStatus.RUNNING
-
-
-def test_processing_tracker_yaml_serialization(tmp_path):
-    """Verifies that the tracker state is properly serialized to YAML.
-
-    Args:
-        tmp_path: Pytest fixture providing a temporary directory path.
-
-    This test ensures YAML round-trip works correctly.
-    """
-    tracker_file = tmp_path / "tracker.yaml"
-    tracker = ProcessingTracker(file_path=tracker_file)
-
-    session_path = Path("/data/session")
-    job_ids = [
-        ProcessingTracker.generate_job_id(session_path, "job1"),
-        ProcessingTracker.generate_job_id(session_path, "job2"),
-    ]
-
-    tracker.initialize_jobs(job_ids=job_ids)
-    tracker.start_job(job_ids[0])
-
-    # Creates a new instance and verify it loads correctly
-    tracker2 = ProcessingTracker(file_path=tracker_file)
-    tracker2._load_state()
-
-    assert len(tracker2.jobs) == 2
-    assert tracker2.jobs[job_ids[0]].status == ProcessingStatus.RUNNING
-    assert tracker2.jobs[job_ids[1]].status == ProcessingStatus.SCHEDULED
-
-
-# Tests for ProcessingStatus enumeration
-
-
-def test_processing_status_enum_values():
-    """Verifies all ProcessingStatus enumeration values.
-
-    This test ensures the enumeration contains all expected status codes.
-    """
-    assert ProcessingStatus.SCHEDULED == 0
-    assert ProcessingStatus.RUNNING == 1
-    assert ProcessingStatus.SUCCEEDED == 2
-    assert ProcessingStatus.FAILED == 3
