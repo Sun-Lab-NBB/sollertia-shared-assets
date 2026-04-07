@@ -2,12 +2,12 @@
 import importlib_metadata
 
 # -- Project information -----------------------------------------------------
-project = 'sl-shared-assets'
+project = 'sollertia-shared-assets'
 # noinspection PyShadowingBuiltins
 copyright = '2026, Sun (NeuroAI) lab'
 authors = ['Ivan Kondratyev', 'Kushaan Gupta', 'Natalie Yeung']
 # Extracts the project version from the .toml file.
-release = importlib_metadata.version("sl-shared-assets")
+release = importlib_metadata.version("sollertia-shared-assets")
 
 # -- General configuration ---------------------------------------------------
 extensions = [

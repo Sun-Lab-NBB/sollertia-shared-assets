@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 import appdirs
 
-from sl_shared_assets.data_classes import (
+from sollertia_shared_assets.data_classes import (
     SessionTypes,
     RawData,
     ProcessedData,
     SessionData,
 )
-from sl_shared_assets.configuration import (
+from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
     Cue,
     Segment,
@@ -228,7 +228,7 @@ def test_session_data_post_init_creates_nested_instances():
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     assert isinstance(session_data.raw_data, RawData)
@@ -259,7 +259,7 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
             animal_id="test_animal",
             session_type="invalid_session_type",
             python_version="3.11.13",
-            sl_experiment_version="3.0.0",
+            sollertia_experiment_version="3.0.0",
         )
 
 
@@ -286,7 +286,7 @@ def test_session_data_create_generates_session_directory(clean_working_directory
         animal_id="test_animal",
         session_type=SessionTypes.LICK_TRAINING,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     # Verifies session directory exists
@@ -318,7 +318,7 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
         animal_id="test_animal",
         session_type=SessionTypes.RUN_TRAINING,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     # Verifies session_data.yaml exists
@@ -353,7 +353,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
         animal_id="test_animal",
         session_type=SessionTypes.LICK_TRAINING,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     # Verifies nk.bin exists
@@ -374,7 +374,7 @@ session_name: 2024-01-15-12-30-45-123456
 session_type: lick training
 acquisition_system: mesoscope
 python_version: "3.11.13"
-sl_experiment_version: "3.0.0"
+sollertia_experiment_version: "3.0.0"
 raw_data: null
 processed_data: null
 """
@@ -429,7 +429,7 @@ session_name: 2024-01-15-12-30-45-123456
 session_type: mesoscope experiment
 acquisition_system: mesoscope
 python_version: "3.11.13"
-sl_experiment_version: "3.0.0"
+sollertia_experiment_version: "3.0.0"
 raw_data: null
 processed_data: null
 """
@@ -455,7 +455,7 @@ session_name: 2024-01-15-12-30-45-123456
 session_type: run training
 acquisition_system: mesoscope
 python_version: "3.11.13"
-sl_experiment_version: "3.0.0"
+sollertia_experiment_version: "3.0.0"
 raw_data: null
 processed_data: null
 """
@@ -489,7 +489,7 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
         session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
@@ -514,7 +514,7 @@ def test_session_data_save_does_not_include_path_objects(sample_session_hierarch
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.RUN_TRAINING,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
@@ -550,7 +550,7 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
             animal_id="test_animal",
             session_type=SessionTypes.LICK_TRAINING,
             python_version="3.11.13",
-            sl_experiment_version="3.0.0",
+            sollertia_experiment_version="3.0.0",
         )
 
     # Verifies the error message mentioning the project and CLI command
@@ -590,7 +590,7 @@ def test_session_data_create_copies_experiment_configuration(
         session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
         experiment_name="test_experiment",
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     # Verifies experiment configuration was copied
@@ -627,7 +627,7 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
         session_type=SessionTypes.LICK_TRAINING,
         # No experiment_name provided
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     # Verifies experiment configuration was NOT created
@@ -658,7 +658,7 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
         animal_id="test_animal",
         session_type=SessionTypes.LICK_TRAINING,
         python_version="3.11.13",
-        sl_experiment_version="3.0.0",
+        sollertia_experiment_version="3.0.0",
     )
 
     # Verifies system configuration file exists

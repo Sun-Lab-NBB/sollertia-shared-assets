@@ -3,34 +3,34 @@
 
 Command Line Interfaces
 =======================
-.. click:: sl_shared_assets.interfaces.configure:configure
+.. click:: sollertia_shared_assets.interfaces.configure:configure
    :prog: sl-configure
    :nested: full
 
 Data Transfer Assets
 ====================
-.. automodule:: sl_shared_assets.data_transfer
+.. automodule:: sollertia_shared_assets.data_transfer
    :members:
    :undoc-members:
    :show-inheritance:
 
 Data Processing Assets
 ======================
-.. automodule:: sl_shared_assets.data_processing
+.. automodule:: sollertia_shared_assets.data_processing
    :members:
    :undoc-members:
    :show-inheritance:
 
 Data Storage Assets
 ===================
-.. automodule:: sl_shared_assets.data_classes
+.. automodule:: sollertia_shared_assets.data_classes
    :members:
    :undoc-members:
    :show-inheritance:
 
 Configuration Assets
 ====================
-.. automodule:: sl_shared_assets.configuration
+.. automodule:: sollertia_shared_assets.configuration
    :members:
    :undoc-members:
    :show-inheritance:

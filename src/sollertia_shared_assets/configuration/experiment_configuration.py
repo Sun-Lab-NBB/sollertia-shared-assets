@@ -133,7 +133,7 @@ class GasPuffTrial(BaseTrial):
         stimulus boundary and avoid the gas puff. If the animal exits the zone early or collides with the boundary
         before meeting the occupancy threshold, the gas puff is delivered.
         Guidance mode: When the animal exits the zone early, an OccupancyFailed message is emitted, allowing
-        sl-experiment to block movement and prevent the animal from reaching the armed boundary.
+        sollertia-experiment to block movement and prevent the animal from reaching the armed boundary.
     """
 
     puff_duration_ms: int = 100

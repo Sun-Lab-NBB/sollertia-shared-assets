@@ -1,11 +1,11 @@
-"""Provides assets for storing animal surgery data extracted from the Sun lab surgery log."""
+"""Provides assets for storing animal surgery data extracted from the Sollertia platform surgery log."""
 
 from dataclasses import dataclass  # pragma: no cover
 
 from ataraxis_data_structures import YamlConfig  # pragma: no cover
 
 
-@dataclass
+@dataclass(slots=True)
 class SubjectData:  # pragma: no cover
     """Stores information about the subject of the surgical intervention."""
 
@@ -14,7 +14,7 @@ class SubjectData:  # pragma: no cover
     ear_punch: str
     """The number and the locations of ear-tags used to distinguish the subject from its cage-mates."""
     sex: str
-    """The subject's gender."""
+    """The subject's sex."""
     genotype: str
     """The subject's genotype."""
     date_of_birth_us: int
@@ -29,7 +29,7 @@ class SubjectData:  # pragma: no cover
     """The current subject's status (alive / deceased)."""
 
 
-@dataclass
+@dataclass(slots=True)
 class ProcedureData:  # pragma: no cover
     """Stores general information about the surgical intervention."""
 
@@ -38,7 +38,7 @@ class ProcedureData:  # pragma: no cover
     surgery_end_us: int
     """The surgery's stop date and time as microseconds elapsed since UTC epoch onset."""
     surgeon: str
-    """The surgeon's name or ID. If the intervention was carried out by multiple surgeons, the data 
+    """The surgeon's name or ID. If the intervention was carried out by multiple surgeons, the data
     for all surgeons is stored as part of the same string."""
     protocol: str
     """The number (ID) of the experiment protocol used during the surgery."""
@@ -52,7 +52,7 @@ class ProcedureData:  # pragma: no cover
     result, 3 indicates high-tier publication grade result."""
 
 
-@dataclass
+@dataclass(slots=True)
 class DrugData:  # pragma: no cover
     """Stores information about all medical substances (drugs) administered to the subject before, during, and
     immediately after the surgical intervention.
@@ -76,7 +76,7 @@ class DrugData:  # pragma: no cover
     """The manufacturer code or internal reference code for the administered dexamethasone."""
 
 
-@dataclass
+@dataclass(slots=True)
 class ImplantData:  # pragma: no cover
     """Stores information about a single implantation procedure performed during the surgical intervention.
 
@@ -98,7 +98,7 @@ class ImplantData:  # pragma: no cover
     """The implant's dorsal-ventral stereotactic coordinate, in millimeters, relative to bregma."""
 
 
-@dataclass
+@dataclass(slots=True)
 class InjectionData:  # pragma: no cover
     """Stores information about a single injection performed during the surgical intervention.
 

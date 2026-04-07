@@ -5,9 +5,9 @@ build-backend = "hatchling.build"
 
 # Project metadata section. Provides the general ID information about the project.
 [project]
-name = "sl-shared-assets"
+name = "sollertia-shared-assets"
 version = "7.0.0"
-description = "Provides data acquisition and processing assets shared between Sun (NeuroAI) lab libraries."
+description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.14,<3.15"
@@ -20,7 +20,7 @@ maintainers = [
     { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
 ]
 
-keywords = ["sunlab", "data", "assets", "acquisition", "processing", "server"]
+keywords = ["sollertia", "ataraxis", "sunlab", "data", "assets", "acquisition", "processing", "server"]
 
 classifiers = [
     # Development status
@@ -52,8 +52,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Sun-Lab-NBB/sl-shared-assets"
-Documentation = "https://sl-shared-assets-api-docs.netlify.app/"
+Homepage = "https://github.com/Sun-Lab-NBB/sollertia-shared-assets"
+Documentation = "https://sollertia-shared-assets-api-docs.netlify.app/"
 
 # Specifies additional dependencies that can be installed alongside the main library.
 [project.optional-dependencies]
@@ -72,9 +72,9 @@ dev = [
     "types-appdirs>=1,<2",
 ]
 
-# Exports the CLI for configuring various components of the Sun lab's data workflow on the host-machine.
+# Exports the CLI for configuring various components of the Sollertia platform data workflow on the host-machine.
 [project.scripts]
-sl-configure = "sl_shared_assets.interfaces.configure:configure"
+sl-configure = "sollertia_shared_assets.interfaces.configure:configure"
 
 # Specifies files that should not be included in the source-code distribution but are also not part of gitignore.
 [tool.hatch.build.targets.sdist]
@@ -82,7 +82,7 @@ exclude = [".github", "recipe"]
 
 # Specifies the library structure.
 [tool.hatch.build.targets.wheel]
-packages = ["src/sl_shared_assets"]
+packages = ["src/sollertia_shared_assets"]
 
 # Ruff Configuration.
 [tool.ruff]
@@ -143,7 +143,7 @@ length-sort = true                 # Places shorter imports first
 disallow_untyped_defs = true # Enforces function annotation
 warn_unused_ignores = true   # Warns against using 'type: ignore' for packages that have type stubs available.
 exclude = [
-    "sl-shared-assets-\\d+", # Ignores temporary folder created by setuptools when building the sdist
+    "sollertia-shared-assets-\\d+", # Ignores temporary folder created by setuptools when building the sdist
     "venv.*/",               # Ignores virtual environments
     "build/",                # Ignores the sdist directory
     "dist/",                 # Ignores the wheel directory
