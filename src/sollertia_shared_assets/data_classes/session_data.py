@@ -2,11 +2,10 @@
 processing machines.
 """
 
-import copy
-import shutil
 from enum import StrEnum
+import shutil
 from pathlib import Path
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 
 from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
@@ -17,7 +16,8 @@ from ..configuration import AcquisitionSystems, get_system_configuration_data
 
 class SessionTypes(StrEnum):
     """Defines the data acquisition session types supported by all data acquisition systems in the Sollertia
-    platform."""
+    platform.
+    """
 
     LICK_TRAINING = "lick training"
     """Teaches animals to use the water delivery port while being head-fixed on the Mesoscope-VR system."""
@@ -25,78 +25,12 @@ class SessionTypes(StrEnum):
     """Teaches animals to run on the treadmill while being head-fixed on the Mesoscope-VR system."""
     MESOSCOPE_EXPERIMENT = "mesoscope experiment"
     """Runs virtual reality tasks using Unity game engine and collects brain activity data using the 2-Photon Random
-    Access Mesoscope (2P-RAM)."""
+    Access Mesoscope (2P-RAM).
+    """
     WINDOW_CHECKING = "window checking"
     """Evaluates the quality of the cranial window implantation procedure and the suitability of the animal for
-    experiment sessions using the Mesoscope."""
-
-
-@dataclass
-class RawData:
-    """Provides the paths to the root directory and shared metadata files that store the data acquired during the
-    session's data acquisition runtime.
-
-    Notes:
-        Only paths to files consumed by multiple Sollertia libraries are exposed as fields. Internal files
-        (session_data.yaml, nk.bin, system_configuration.yaml) and data subdirectories (camera_data, mesoscope_data,
-        behavior_data) are resolved at runtime by the libraries that own them.
+    experiment sessions using the Mesoscope.
     """
-
-    raw_data_path: Path = Path()
-    """The path to the root directory that stores the session's raw data."""
-    session_descriptor_path: Path = Path()
-    """The path to the session_descriptor.yaml file that contains session-specific information, such as the specific
-    task parameters and the notes made by the experimenter during the session's runtime."""
-    hardware_state_path: Path = Path()
-    """The path to the hardware_state.yaml file that contains the partial snapshot of the configuration parameters used
-    by the data acquisition system's hardware modules during the session's runtime."""
-    surgery_metadata_path: Path = Path()
-    """The path to the surgery_metadata.yaml file that contains the information about the surgical intervention(s)
-    performed on the animal prior to the session's runtime."""
-    experiment_configuration_path: Path = Path()
-    """The path to the experiment_configuration.yaml file that contains the snapshot of the experiment's configuration
-    used during the session's runtime. This file is only created for experiment sessions."""
-    window_screenshot_path: Path = Path()
-    """The path to the .png screenshot of the ScanImagePC screen that communicates the visual snapshot of the
-    cranial window alignment and cell appearance at the beginning of the session's runtime."""
-
-    def resolve_paths(self, root_directory_path: Path) -> None:
-        """Resolves all paths managed by the class instance based on the input root directory path.
-
-        Args:
-            root_directory_path: The path to the top-level raw data directory of the session's data hierarchy.
-        """
-        self.raw_data_path = root_directory_path
-        self.session_descriptor_path = self.raw_data_path.joinpath("session_descriptor.yaml")
-        self.hardware_state_path = self.raw_data_path.joinpath("hardware_state.yaml")
-        self.surgery_metadata_path = self.raw_data_path.joinpath("surgery_metadata.yaml")
-        self.experiment_configuration_path = self.raw_data_path.joinpath("experiment_configuration.yaml")
-        self.window_screenshot_path = self.raw_data_path.joinpath("window_screenshot.png")
-
-    def make_directories(self) -> None:
-        """Ensures that the root raw data directory exists, creating it if missing."""
-        ensure_directory_exists(self.raw_data_path)
-
-
-@dataclass
-class ProcessedData:
-    """Provides the path to the root directory that stores the session's processed data.
-
-    Notes:
-        Each data processing library (axvs, axci, cindra) creates its own output subdirectory under this root at
-        runtime. The specific subdirectory layout is owned by the processing libraries.
-    """
-
-    processed_data_path: Path = Path()
-    """The path to the root directory that stores the session's processed data."""
-
-    def resolve_paths(self, root_directory_path: Path) -> None:
-        """Resolves the processed data root path.
-
-        Args:
-            root_directory_path: The path to the top-level processed data directory of the session's data hierarchy.
-        """
-        self.processed_data_path = root_directory_path
 
 
 @dataclass
@@ -124,33 +58,34 @@ class SessionData(YamlConfig):
     session_type: str | SessionTypes
     """The type of the session."""
     acquisition_system: str | AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR
-    """The name of the data acquisition system used to acquire the session's data"""
+    """The name of the data acquisition system used to acquire the session's data."""
     experiment_name: str | None = None
-    """The name of the experiment performed during the session or Null (None), if the session is not an experiment 
-    session."""
-    python_version: str = "3.11.13"
+    """The name of the experiment performed during the session or Null (None), if the session is not an experiment
+    session.
+    """
+    python_version: str = "3.14.4"
     """The Python version used to acquire session's data."""
-    sollertia_experiment_version: str = "3.0.0"
+    sollertia_experiment_version: str = "5.0.0"
     """The sollertia-experiment library version used to acquire the session's data."""
-    raw_data: RawData = field(default_factory=lambda: RawData())
-    """Defines the session's raw data hierarchy."""
-    processed_data: ProcessedData = field(default_factory=lambda: ProcessedData())
-    """Defines the session's processed data hierarchy."""
+    raw_data_path: Path = Path()
+    """The path to the root directory that stores the session's raw data."""
+    processed_data_path: Path = Path()
+    """The path to the root directory that stores the session's processed data."""
 
     def __post_init__(self) -> None:
-        """Ensures that all instances used to define the session's data hierarchy are properly initialized."""
-        if not isinstance(self.raw_data, RawData):
-            self.raw_data = RawData()  # pragma: no cover
-
-        if not isinstance(self.processed_data, ProcessedData):
-            self.processed_data = ProcessedData()  # pragma: no cover
+        """Ensures that all fields used to define the session are properly initialized."""
+        # Converts string values loaded from YAML to proper enum types.
+        if isinstance(self.session_type, str):
+            self.session_type = SessionTypes(self.session_type)
+        if isinstance(self.acquisition_system, str):
+            self.acquisition_system = AcquisitionSystems(self.acquisition_system)
 
     @classmethod
     def create(
         cls,
         project_name: str,
         animal_id: str,
-        session_type: SessionTypes | str,
+        session_type: str | SessionTypes,
         python_version: str,
         sollertia_experiment_version: str,
         experiment_name: str | None = None,
@@ -171,22 +106,26 @@ class SessionData(YamlConfig):
 
         Returns:
             An initialized SessionData instance that stores the structure and the metadata of the created session.
+
+        Raises:
+            ValueError: If the specified session_type is not a valid SessionTypes enumeration member.
+            FileNotFoundError: If the project does not exist on the local machine (PC).
         """
         if session_type not in SessionTypes:
             message = (
-                f"Invalid session type '{session_type}' encountered when initializing a new data acquisition session. "
-                f"Use one of the supported session types from the SessionTypes enumeration."
+                f"Unable to initialize a new data acquisition session. The session_type must be one of the "
+                f"SessionTypes enumeration members, but got '{session_type}'."
             )
             console.error(message=message, error=ValueError)
 
-        # Acquires the UTC timestamp to use as the session name
+        # Acquires the UTC timestamp to use as the session name.
         session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
 
         # Resolves the acquisition system configuration. This queries the acquisition system configuration data used
         # by the machine (PC) that calls this method.
         acquisition_system = get_system_configuration_data()
 
-        # Constructs the root session directory path
+        # Constructs the root session directory path.
         session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, session_name)
 
         # Prevents creating new sessions for non-existent projects.
@@ -202,43 +141,45 @@ class SessionData(YamlConfig):
         # Generates the session's raw data directory. This method assumes that the session is created on the
         # data acquisition machine that only acquires the data and does not create the other session's directories used
         # during data processing.
-        raw_data = RawData()
-        raw_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
-        raw_data.make_directories()  # Generates the local 'raw_data' directory tree
+        raw_data_path = session_path.joinpath("raw_data")
+        ensure_directory_exists(path=raw_data_path)
 
-        # Generates the SessionData instance.
-        instance = SessionData(
+        # Generates the SessionData instance. processed_data_path is left at the default Path() because the data
+        # acquisition machine does not own the processed data hierarchy.
+        instance = cls(
             project_name=project_name,
             animal_id=animal_id,
             session_name=session_name,
             session_type=session_type,
             acquisition_system=acquisition_system.name,
-            raw_data=raw_data,
             experiment_name=experiment_name,
             python_version=python_version,
             sollertia_experiment_version=sollertia_experiment_version,
+            raw_data_path=raw_data_path,
         )
 
         # Saves the configured instance data to the session's directory so that it can be reused during processing or
         # preprocessing.
         instance.save()
 
-        # Dumps the acquisition system's configuration data to the session's directory
-        acquisition_system.save(path=instance.raw_data.raw_data_path.joinpath("system_configuration.yaml"))
+        # Dumps the acquisition system's configuration data to the session's directory.
+        acquisition_system.save(path=instance.raw_data_path.joinpath("system_configuration.yaml"))
 
         if experiment_name is not None:
-            # Copies the experiment_configuration.yaml file to the session's directory
+            # Copies the experiment_configuration.yaml file to the session's directory.
             experiment_configuration_path = acquisition_system.filesystem.root_directory.joinpath(
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
-            shutil.copy2(experiment_configuration_path, instance.raw_data.experiment_configuration_path)
+            shutil.copy2(
+                src=experiment_configuration_path,
+                dst=instance.raw_data_path.joinpath("experiment_configuration.yaml"),
+            )
 
         # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
         # the session becomes a valid target for deletion (purging) runtimes operating from the main acquisition
         # machine of any data acquisition system.
-        instance.raw_data.raw_data_path.joinpath("nk.bin").touch()
+        instance.raw_data_path.joinpath("nk.bin").touch()
 
-        # Returns the initialized SessionData instance to caller
         return instance
 
     @classmethod
@@ -274,44 +215,28 @@ class SessionData(YamlConfig):
         # session data hierarchy.
         session_data_path = session_data_files.pop()
 
-        # Loads the session's data from the.yaml file
+        # Loads the session's data from the .yaml file.
         instance: SessionData = cls.from_yaml(file_path=session_data_path)
 
         # The method assumes that the 'donor' YAML file is always stored inside the raw_data directory of the session
-        # to be processed. Uses this heuristic to get the path to the root session's directory.
+        # to be processed. Uses this heuristic to get the path to the root session's directory and re-resolves the
+        # raw and processed data root paths against the local filesystem layout so the session remains portable.
         local_root = session_data_path.parents[1]
+        instance.raw_data_path = local_root.joinpath("raw_data")
+        instance.processed_data_path = local_root.joinpath("processed_data")
 
-        # RAW DATA
-        instance.raw_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "raw_data"))
-
-        # PROCESSED DATA
-        instance.processed_data.resolve_paths(root_directory_path=local_root.joinpath(local_root, "processed_data"))
-
-        # Returns the initialized SessionData instance to caller
         return instance
 
-    def runtime_initialized(self) -> None:
-        """Ensures that the 'nk.bin' marker file is removed from the session's raw_data directory.
+    def mark_runtime_initialized(self) -> None:
+        """Removes the 'nk.bin' marker file from the session's raw_data directory to signal that runtime
+        initialization has completed.
 
         Notes:
             This service method is used by the sollertia-experiment library to acquire the session's data. Do not call
             this method manually.
         """
-        self.raw_data.raw_data_path.joinpath("nk.bin").unlink(missing_ok=True)
+        self.raw_data_path.joinpath("nk.bin").unlink(missing_ok=True)
 
     def save(self) -> None:
         """Caches the instance's data to the session's 'raw_data' directory as a 'session_data.yaml' file."""
-        # Generates a copy of the original class to avoid modifying the instance that will be used for further
-        # processing.
-        origin = copy.deepcopy(self)
-
-        # Resets all path fields to Null (None) before saving the instance to disk.
-        origin.raw_data = None  # type: ignore[assignment]
-        origin.processed_data = None  # type: ignore[assignment]
-
-        # Converts StringEnum instances to strings.
-        origin.session_type = str(origin.session_type)
-        origin.acquisition_system = str(origin.acquisition_system)
-
-        # Saves instance data as a .YAML file.
-        origin.to_yaml(file_path=self.raw_data.raw_data_path.joinpath("session_data.yaml"))
+        self.to_yaml(file_path=self.raw_data_path.joinpath("session_data.yaml"))

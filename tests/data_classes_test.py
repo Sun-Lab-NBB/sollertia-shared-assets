@@ -6,10 +6,10 @@ import pytest
 import appdirs
 
 from sollertia_shared_assets.data_classes import (
-    SessionTypes,
-    RawData,
-    ProcessedData,
+    DatasetData,
+    DatasetSession,
     SessionData,
+    SessionTypes,
 )
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
@@ -138,89 +138,14 @@ def test_session_types_is_string_enum():
     assert isinstance(SessionTypes.WINDOW_CHECKING, str)
 
 
-# Tests for RawData dataclass
-
-
-def test_raw_data_default_initialization():
-    """Verifies default initialization of RawData.
-
-    This test ensures all path fields have default Path() values.
-    """
-    raw_data = RawData()
-
-    assert raw_data.raw_data_path == Path()
-    assert raw_data.session_descriptor_path == Path()
-    assert raw_data.hardware_state_path == Path()
-    assert raw_data.surgery_metadata_path == Path()
-    assert raw_data.experiment_configuration_path == Path()
-    assert raw_data.window_screenshot_path == Path()
-
-
-def test_raw_data_resolve_paths(tmp_path):
-    """Verifies that resolve_paths correctly generates all data paths.
-
-    This test ensures all paths are properly resolved from the root directory.
-    """
-    raw_data = RawData()
-    root_path = tmp_path / "raw_data"
-
-    raw_data.resolve_paths(root_directory_path=root_path)
-
-    assert raw_data.raw_data_path == root_path
-    assert raw_data.session_descriptor_path == root_path / "session_descriptor.yaml"
-    assert raw_data.hardware_state_path == root_path / "hardware_state.yaml"
-    assert raw_data.surgery_metadata_path == root_path / "surgery_metadata.yaml"
-    assert raw_data.experiment_configuration_path == root_path / "experiment_configuration.yaml"
-    assert raw_data.window_screenshot_path == root_path / "window_screenshot.png"
-
-
-def test_raw_data_make_directories(tmp_path):
-    """Verifies that make_directories creates the root raw data directory.
-
-    This test ensures the directory creation method works correctly.
-    """
-    raw_data = RawData()
-    root_path = tmp_path / "raw_data"
-
-    raw_data.resolve_paths(root_directory_path=root_path)
-    raw_data.make_directories()
-
-    assert root_path.exists()
-
-
-# Tests for ProcessedData dataclass
-
-
-def test_processed_data_default_initialization():
-    """Verifies default initialization of ProcessedData.
-
-    This test ensures the path field has a default Path() value.
-    """
-    processed_data = ProcessedData()
-
-    assert processed_data.processed_data_path == Path()
-
-
-def test_processed_data_resolve_paths(tmp_path):
-    """Verifies that resolve_paths correctly sets the processed data root path.
-
-    This test ensures the path is properly resolved from the root directory.
-    """
-    processed_data = ProcessedData()
-    root_path = tmp_path / "processed_data"
-
-    processed_data.resolve_paths(root_directory_path=root_path)
-
-    assert processed_data.processed_data_path == root_path
-
-
 # Tests for SessionData dataclass
 
 
-def test_session_data_post_init_creates_nested_instances():
-    """Verifies that __post_init__ creates nested dataclass instances.
+def test_session_data_default_path_fields():
+    """Verifies that raw_data_path and processed_data_path default to empty Path() values.
 
-    This test ensures RawData and ProcessedData are initialized.
+    This test ensures the bare-Path dataclass fields are populated when SessionData is constructed
+    without going through create() or load().
     """
     session_data = SessionData(
         project_name="test_project",
@@ -231,8 +156,10 @@ def test_session_data_post_init_creates_nested_instances():
         sollertia_experiment_version="3.0.0",
     )
 
-    assert isinstance(session_data.raw_data, RawData)
-    assert isinstance(session_data.processed_data, ProcessedData)
+    assert isinstance(session_data.raw_data_path, Path)
+    assert isinstance(session_data.processed_data_path, Path)
+    assert session_data.raw_data_path == Path()
+    assert session_data.processed_data_path == Path()
 
 
 def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
@@ -290,9 +217,9 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     )
 
     # Verifies session directory exists
-    session_path = session_data.raw_data.raw_data_path.parent
+    session_path = session_data.raw_data_path.parent
     assert session_path.exists()
-    assert session_data.raw_data.raw_data_path.exists()
+    assert session_data.raw_data_path.exists()
 
 
 def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
@@ -322,7 +249,7 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
     )
 
     # Verifies session_data.yaml exists
-    session_data_yaml = session_data.raw_data.raw_data_path.joinpath("session_data.yaml")
+    session_data_yaml = session_data.raw_data_path.joinpath("session_data.yaml")
     assert session_data_yaml.exists()
 
     content = session_data_yaml.read_text()
@@ -357,7 +284,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
     )
 
     # Verifies nk.bin exists
-    assert session_data.raw_data.raw_data_path.joinpath("nk.bin").exists()
+    assert session_data.raw_data_path.joinpath("nk.bin").exists()
 
 
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
@@ -438,12 +365,12 @@ processed_data: null
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
     # Verifies paths are resolved
-    assert loaded_session.raw_data.raw_data_path == sample_session_hierarchy / "raw_data"
-    assert loaded_session.processed_data.processed_data_path == sample_session_hierarchy / "processed_data"
+    assert loaded_session.raw_data_path == sample_session_hierarchy / "raw_data"
+    assert loaded_session.processed_data_path == sample_session_hierarchy / "processed_data"
 
 
-def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
-    """Verifies that runtime_initialized() removes the nk.bin file.
+def test_session_data_mark_runtime_initialized_removes_nk_file(sample_session_hierarchy):
+    """Verifies that mark_runtime_initialized() removes the nk.bin file.
 
     This test ensures sessions can be marked as initialized.
     """
@@ -464,12 +391,12 @@ processed_data: null
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
     # Creates the nk.bin file
-    nk_path = loaded_session.raw_data.raw_data_path.joinpath("nk.bin")
+    nk_path = loaded_session.raw_data_path.joinpath("nk.bin")
     nk_path.touch()
     assert nk_path.exists()
 
-    # Calls runtime_initialized
-    loaded_session.runtime_initialized()
+    # Calls mark_runtime_initialized
+    loaded_session.mark_runtime_initialized()
 
     assert not nk_path.exists()
 
@@ -490,20 +417,19 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
+        raw_data_path=raw_data_path,
     )
-
-    session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
     session_data.save()
 
-    content = session_data.raw_data.raw_data_path.joinpath("session_data.yaml").read_text()
+    content = session_data.raw_data_path.joinpath("session_data.yaml").read_text()
     assert "session_type: mesoscope experiment" in content
     assert "acquisition_system: mesoscope" in content
 
 
-def test_session_data_save_does_not_include_path_objects(sample_session_hierarchy):
-    """Verifies that save() excludes path objects from the saved YAML.
+def test_session_data_save_serializes_path_fields(sample_session_hierarchy):
+    """Verifies that save() serializes the raw and processed data root paths as YAML scalars.
 
-    This test ensures only metadata is saved, not path instances.
+    This test ensures the path fields are written using the YamlConfig automatic Path serialization.
     """
     raw_data_path = sample_session_hierarchy / "raw_data"
     raw_data_path.mkdir(parents=True, exist_ok=True)
@@ -515,14 +441,13 @@ def test_session_data_save_does_not_include_path_objects(sample_session_hierarch
         session_type=SessionTypes.RUN_TRAINING,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
+        raw_data_path=raw_data_path,
     )
-
-    session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
     session_data.save()
 
-    content = session_data.raw_data.raw_data_path.joinpath("session_data.yaml").read_text()
-    assert "raw_data: null" in content
-    assert "processed_data: null" in content
+    content = session_data.raw_data_path.joinpath("session_data.yaml").read_text()
+    assert f"raw_data_path: {raw_data_path.as_posix()}" in content
+    assert "processed_data_path: ." in content
 
 
 def test_session_data_create_raises_error_if_project_does_not_exist(
@@ -594,7 +519,7 @@ def test_session_data_create_copies_experiment_configuration(
     )
 
     # Verifies experiment configuration was copied
-    session_experiment_config = session_data.raw_data.raw_data_path / "experiment_configuration.yaml"
+    session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
     assert session_experiment_config.exists()
 
     content = session_experiment_config.read_text()
@@ -631,7 +556,7 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
     )
 
     # Verifies experiment configuration was NOT created
-    session_experiment_config = session_data.raw_data.raw_data_path / "experiment_configuration.yaml"
+    session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
     assert not session_experiment_config.exists()
 
 
@@ -662,10 +587,344 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
     )
 
     # Verifies system configuration file exists
-    system_config_path = session_data.raw_data.raw_data_path.joinpath("system_configuration.yaml")
+    system_config_path = session_data.raw_data_path.joinpath("system_configuration.yaml")
     assert system_config_path.exists()
 
     # Verifies content can be loaded
     loaded_config = MesoscopeSystemConfiguration.from_yaml(file_path=system_config_path)
     assert loaded_config.name == sample_mesoscope_config.name
     assert loaded_config.cameras.face_camera_index == sample_mesoscope_config.cameras.face_camera_index
+
+
+def test_session_data_post_init_coerces_string_session_type():
+    """Verifies that __post_init__ converts a string session_type into a SessionTypes enum member.
+
+    This test ensures the manual-construction code path that bypasses YamlConfig type hooks still produces a
+    properly typed enum value.
+    """
+    session_data = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type="lick training",
+        python_version="3.11.13",
+        sollertia_experiment_version="3.0.0",
+    )
+
+    assert session_data.session_type == SessionTypes.LICK_TRAINING
+
+
+# Tests for DatasetSession dataclass
+
+
+def test_dataset_session_default_initialization():
+    """Verifies default initialization of DatasetSession.
+
+    This test ensures session_path defaults to an empty Path() when not provided.
+    """
+    dataset_session = DatasetSession(session="2024-01-15-12-30-45-123456", animal="test_animal")
+
+    assert dataset_session.session == "2024-01-15-12-30-45-123456"
+    assert dataset_session.animal == "test_animal"
+    assert dataset_session.session_path == Path()
+
+
+def test_dataset_session_is_frozen():
+    """Verifies that DatasetSession instances are immutable.
+
+    This test ensures the frozen=True dataclass option correctly forbids attribute reassignment.
+    """
+    dataset_session = DatasetSession(
+        session="2024-01-15-12-30-45-123456",
+        animal="test_animal",
+        session_path=Path("/data/test_animal/2024-01-15-12-30-45-123456"),
+    )
+
+    with pytest.raises(AttributeError):
+        dataset_session.session_path = Path("/other")  # type: ignore[misc]
+
+
+# Tests for DatasetData dataclass
+
+
+def test_dataset_data_post_init_coerces_string_enums():
+    """Verifies that __post_init__ converts string session_type and acquisition_system into enum members.
+
+    This test ensures the manual-construction code path that bypasses YamlConfig type hooks still produces
+    properly typed enum values for both fields.
+    """
+    dataset_data = DatasetData(
+        name="test_dataset",
+        project="test_project",
+        session_type="lick training",
+        acquisition_system="mesoscope",
+    )
+
+    assert dataset_data.session_type == SessionTypes.LICK_TRAINING
+    assert dataset_data.acquisition_system == AcquisitionSystems.MESOSCOPE_VR
+
+
+def test_dataset_data_create_generates_dataset_directory(tmp_path):
+    """Verifies that create() generates the dataset root and per-session subdirectories.
+
+    This test ensures the dataset hierarchy is fully laid out on disk after a successful create() call.
+    """
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="mouse_a"),
+        DatasetSession(session="2024-01-16-09-15-22-654321", animal="mouse_b"),
+    )
+
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    dataset_root = tmp_path / "test_dataset"
+    assert dataset_root.exists()
+    assert (dataset_root / "mouse_a" / "2024-01-15-12-30-45-123456").exists()
+    assert (dataset_root / "mouse_b" / "2024-01-16-09-15-22-654321").exists()
+    assert dataset_data.dataset_data_path == dataset_root / "dataset.yaml"
+    assert dataset_data.dataset_data_path.exists()
+
+
+def test_dataset_data_create_resolves_session_paths(tmp_path):
+    """Verifies that create() rebuilds each input DatasetSession with its resolved session_path.
+
+    This test ensures the session_path attribute on each entry of the resulting sessions tuple points to the
+    actual subdirectory inside the dataset hierarchy, regardless of any path supplied on the input instance.
+    """
+    sessions = (
+        DatasetSession(
+            session="2024-01-15-12-30-45-123456",
+            animal="mouse_a",
+            session_path=Path("/ignored/path"),
+        ),
+    )
+
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    expected_path = tmp_path / "test_dataset" / "mouse_a" / "2024-01-15-12-30-45-123456"
+    assert len(dataset_data.sessions) == 1
+    assert dataset_data.sessions[0].session_path == expected_path
+
+
+def test_dataset_data_create_accepts_session_set(tmp_path):
+    """Verifies that create() accepts a set of DatasetSession instances and converts them to a tuple.
+
+    This test ensures the set-to-tuple normalization branch is exercised.
+    """
+    sessions = {
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="mouse_a"),
+        DatasetSession(session="2024-01-16-09-15-22-654321", animal="mouse_b"),
+    }
+
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    assert isinstance(dataset_data.sessions, tuple)
+    assert len(dataset_data.sessions) == 2
+
+
+def test_dataset_data_create_raises_error_with_empty_sessions(tmp_path):
+    """Verifies that create() raises ValueError when no sessions are provided.
+
+    This test ensures the empty-sessions guard branch in create() is exercised.
+    """
+    with pytest.raises(ValueError, match="must contain at least one"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=(),
+            datasets_root=tmp_path,
+        )
+
+
+def test_dataset_data_create_raises_error_when_dataset_already_exists(tmp_path):
+    """Verifies that create() raises FileExistsError when the destination directory already exists.
+
+    This test ensures the duplicate-dataset guard branch in create() is exercised.
+    """
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="mouse_a"),)
+    (tmp_path / "test_dataset").mkdir()
+
+    with pytest.raises(FileExistsError, match="must not exist"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+        )
+
+
+def test_dataset_data_load_round_trips(tmp_path):
+    """Verifies that load() reconstructs a DatasetData instance from a previously saved dataset.yaml file.
+
+    This test ensures the create()/load() round-trip preserves all dataset metadata and re-resolves the
+    dataset_data_path and per-session paths against the loaded YAML file's filesystem location.
+    """
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="mouse_a"),
+        DatasetSession(session="2024-01-16-09-15-22-654321", animal="mouse_b"),
+    )
+    created = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    loaded = DatasetData.load(dataset_path=tmp_path / "test_dataset")
+
+    assert loaded.name == created.name
+    assert loaded.project == created.project
+    assert loaded.session_type == SessionTypes.LICK_TRAINING
+    assert loaded.acquisition_system == AcquisitionSystems.MESOSCOPE_VR
+    assert loaded.dataset_data_path == tmp_path / "test_dataset" / "dataset.yaml"
+    assert len(loaded.sessions) == 2
+    expected_paths = {
+        ("mouse_a", "2024-01-15-12-30-45-123456"): tmp_path / "test_dataset" / "mouse_a" / "2024-01-15-12-30-45-123456",
+        ("mouse_b", "2024-01-16-09-15-22-654321"): tmp_path / "test_dataset" / "mouse_b" / "2024-01-16-09-15-22-654321",
+    }
+    for session in loaded.sessions:
+        assert session.session_path == expected_paths[(session.animal, session.session)]
+
+
+def test_dataset_data_load_raises_error_no_dataset_file(tmp_path):
+    """Verifies that load() raises FileNotFoundError when the dataset.yaml file is missing.
+
+    This test ensures the no-files branch of load()'s file count guard is exercised.
+    """
+    (tmp_path / "empty_dataset").mkdir()
+
+    with pytest.raises(FileNotFoundError, match="Expected a single dataset.yaml"):
+        DatasetData.load(dataset_path=tmp_path / "empty_dataset")
+
+
+def test_dataset_data_load_raises_error_with_multiple_dataset_files(tmp_path):
+    """Verifies that load() raises FileNotFoundError when multiple dataset.yaml files are found.
+
+    This test ensures the multiple-files branch of load()'s file count guard is exercised.
+    """
+    dataset_root = tmp_path / "ambiguous_dataset"
+    dataset_root.mkdir()
+    (dataset_root / "first").mkdir()
+    (dataset_root / "second").mkdir()
+    (dataset_root / "first" / "dataset.yaml").write_text("placeholder")
+    (dataset_root / "second" / "dataset.yaml").write_text("placeholder")
+
+    with pytest.raises(FileNotFoundError, match="Expected a single dataset.yaml"):
+        DatasetData.load(dataset_path=dataset_root)
+
+
+def test_dataset_data_animals_property_returns_unique_sorted_animals(tmp_path):
+    """Verifies that the animals property returns a sorted tuple of unique animal identifiers.
+
+    This test ensures the set-comprehension-and-sort logic correctly de-duplicates and orders the animals.
+    """
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-000001", animal="mouse_b"),
+        DatasetSession(session="2024-01-15-12-30-45-000002", animal="mouse_a"),
+        DatasetSession(session="2024-01-15-12-30-45-000003", animal="mouse_b"),
+    )
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    assert dataset_data.animals == ("mouse_a", "mouse_b")
+
+
+def test_dataset_data_get_sessions_for_animal_filters_sessions(tmp_path):
+    """Verifies that get_sessions_for_animal() returns only the sessions performed by the specified animal.
+
+    This test ensures the filter comprehension correctly excludes sessions from other animals.
+    """
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-000001", animal="mouse_a"),
+        DatasetSession(session="2024-01-15-12-30-45-000002", animal="mouse_b"),
+        DatasetSession(session="2024-01-15-12-30-45-000003", animal="mouse_a"),
+    )
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    mouse_a_sessions = dataset_data.get_sessions_for_animal(animal="mouse_a")
+
+    assert len(mouse_a_sessions) == 2
+    assert all(s.animal == "mouse_a" for s in mouse_a_sessions)
+
+
+def test_dataset_data_get_session_returns_matching_session(tmp_path):
+    """Verifies that get_session() returns the DatasetSession matching the specified animal and session.
+
+    This test ensures the linear lookup hits the matching candidate and returns it.
+    """
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-000001", animal="mouse_a"),
+        DatasetSession(session="2024-01-15-12-30-45-000002", animal="mouse_b"),
+    )
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    found = dataset_data.get_session(animal="mouse_b", session="2024-01-15-12-30-45-000002")
+
+    assert found.animal == "mouse_b"
+    assert found.session == "2024-01-15-12-30-45-000002"
+    assert found.session_path == tmp_path / "test_dataset" / "mouse_b" / "2024-01-15-12-30-45-000002"
+
+
+def test_dataset_data_get_session_raises_error_for_unknown_session(tmp_path):
+    """Verifies that get_session() raises ValueError when the animal and session combination is missing.
+
+    This test ensures the not-found branch of get_session() is exercised.
+    """
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-000001", animal="mouse_a"),)
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+    )
+
+    with pytest.raises(ValueError, match="must exist in the 'test_dataset' dataset"):
+        dataset_data.get_session(animal="mouse_z", session="2024-01-15-12-30-45-999999")

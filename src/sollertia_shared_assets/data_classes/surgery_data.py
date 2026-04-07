@@ -1,8 +1,8 @@
 """Provides assets for storing animal surgery data extracted from the Sollertia platform surgery log."""
 
-from dataclasses import dataclass  # pragma: no cover
+from dataclasses import dataclass
 
-from ataraxis_data_structures import YamlConfig  # pragma: no cover
+from ataraxis_data_structures import YamlConfig
 
 
 @dataclass(slots=True)

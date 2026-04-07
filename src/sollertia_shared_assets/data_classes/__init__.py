@@ -1,5 +1,9 @@
 """Provides assets for storing data acquired through the Sollertia platform."""
 
+from .dataset_data import (
+    DatasetData,
+    DatasetSession,
+)
 from .runtime_data import (
     ZaberPositions,
     MesoscopePositions,
@@ -9,16 +13,9 @@ from .runtime_data import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from .dataset_data import (
-    DatasetData,
-    SessionMetadata,
-    DatasetSessionData,
-)
 from .session_data import (
-    RawData,
     SessionData,
     SessionTypes,
-    ProcessedData,
 )
 from .surgery_data import (
     DrugData,
@@ -31,7 +28,7 @@ from .surgery_data import (
 
 __all__ = [
     "DatasetData",
-    "DatasetSessionData",
+    "DatasetSession",
     "DrugData",
     "ImplantData",
     "InjectionData",
@@ -40,11 +37,8 @@ __all__ = [
     "MesoscopeHardwareState",
     "MesoscopePositions",
     "ProcedureData",
-    "ProcessedData",
-    "RawData",
     "RunTrainingDescriptor",
     "SessionData",
-    "SessionMetadata",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",

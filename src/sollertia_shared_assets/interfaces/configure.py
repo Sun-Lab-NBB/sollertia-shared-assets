@@ -1,4 +1,5 @@
-"""Provides the Command-Line Interface (CLI) for configuring major components of the Sollertia platform data workflow.
+"""Provides the Command-Line Interface (CLI) for configuring major components of the Sollertia platform data
+workflow.
 """
 
 from __future__ import annotations
@@ -207,7 +208,6 @@ def generate_experiment_configuration_file(
             f"'sl-configure project' CLI command to create the project before creating new experiment configuration(s)."
         )
         console.error(message=message, error=ValueError)
-        raise ValueError(message)
 
     templates_dir = get_task_templates_directory()
     template_path = templates_dir.joinpath(f"{template}.yaml")
@@ -218,7 +218,6 @@ def generate_experiment_configuration_file(
             f"Available templates: {', '.join(available) if available else 'none'}."
         )
         console.error(message=message, error=FileNotFoundError)
-        raise FileNotFoundError(message)
 
     task_template = TaskTemplate.from_yaml(file_path=template_path)
 
