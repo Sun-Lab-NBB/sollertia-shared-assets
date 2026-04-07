@@ -138,7 +138,7 @@ class SessionData(YamlConfig):
         # data acquisition machine that only acquires the data and does not create the other session's directories used
         # during data processing.
         raw_data_path = session_path.joinpath("raw_data")
-        ensure_directory_exists(raw_data_path)
+        ensure_directory_exists(path=raw_data_path)
 
         # Generates the SessionData instance. processed_data_path is left at the default Path() because the data
         # acquisition machine does not own the processed data hierarchy.

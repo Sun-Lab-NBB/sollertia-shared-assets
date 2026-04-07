@@ -2,8 +2,7 @@
 
 from .dataset_data import (
     DatasetData,
-    SessionMetadata,
-    DatasetSessionData,
+    DatasetSession,
 )
 from .runtime_data import (
     ZaberPositions,
@@ -29,7 +28,7 @@ from .surgery_data import (
 
 __all__ = [
     "DatasetData",
-    "DatasetSessionData",
+    "DatasetSession",
     "DrugData",
     "ImplantData",
     "InjectionData",
@@ -40,7 +39,6 @@ __all__ = [
     "ProcedureData",
     "RunTrainingDescriptor",
     "SessionData",
-    "SessionMetadata",
     "SessionTypes",
     "SubjectData",
     "SurgeryData",
