@@ -85,7 +85,7 @@ class SessionData(YamlConfig):
         cls,
         project_name: str,
         animal_id: str,
-        session_type: SessionTypes | str,
+        session_type: str | SessionTypes,
         python_version: str,
         sollertia_experiment_version: str,
         experiment_name: str | None = None,
@@ -106,6 +106,10 @@ class SessionData(YamlConfig):
 
         Returns:
             An initialized SessionData instance that stores the structure and the metadata of the created session.
+
+        Raises:
+            ValueError: If the specified session_type is not a valid SessionTypes enumeration member.
+            FileNotFoundError: If the project does not exist on the local machine (PC).
         """
         if session_type not in SessionTypes:
             message = (
@@ -142,7 +146,7 @@ class SessionData(YamlConfig):
 
         # Generates the SessionData instance. processed_data_path is left at the default Path() because the data
         # acquisition machine does not own the processed data hierarchy.
-        instance = SessionData(
+        instance = cls(
             project_name=project_name,
             animal_id=animal_id,
             session_name=session_name,
@@ -167,7 +171,8 @@ class SessionData(YamlConfig):
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
             shutil.copy2(
-                experiment_configuration_path, instance.raw_data_path.joinpath("experiment_configuration.yaml")
+                src=experiment_configuration_path,
+                dst=instance.raw_data_path.joinpath("experiment_configuration.yaml"),
             )
 
         # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
@@ -222,8 +227,9 @@ class SessionData(YamlConfig):
 
         return instance
 
-    def runtime_initialized(self) -> None:
-        """Ensures that the 'nk.bin' marker file is removed from the session's raw_data directory.
+    def mark_runtime_initialized(self) -> None:
+        """Removes the 'nk.bin' marker file from the session's raw_data directory to signal that runtime
+        initialization has completed.
 
         Notes:
             This service method is used by the sollertia-experiment library to acquire the session's data. Do not call

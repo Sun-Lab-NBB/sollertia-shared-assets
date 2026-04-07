@@ -28,6 +28,62 @@ class AcquisitionSystems(StrEnum):
     engine to conduct experiments."""
 
 
+@dataclass
+class ServerConfiguration(YamlConfig):
+    """Defines the access credentials and the filesystem layout of the Sollertia platform remote compute server."""
+
+    username: str = ""
+    """The username to use for server authentication."""
+    password: str = ""
+    """The password to use for server authentication."""
+    host: str = "cbsuwsun.biohpc.cornell.edu"
+    """The hostname or IP address of the server to connect to."""
+    storage_root: str = "/local/storage"
+    """The path to the server's storage (slow) HDD RAID volume."""
+    working_root: str = "/local/workdir"
+    """The path to the server's working (fast) NVME RAID volume."""
+    shared_directory_name: str = "sun_data"
+    """The name of the shared directory that stores Sollertia platform project data on both server volumes."""
+    shared_storage_root: str = field(init=False, default="")
+    """The path to the root Sollertia platform shared directory on the storage server's volume."""
+    shared_working_root: str = field(init=False, default="")
+    """The path to the root Sollertia platform shared directory on the working server's volume."""
+    user_data_root: str = field(init=False, default="")
+    """The path to the root user's directory on the storage server's volume."""
+    user_working_root: str = field(init=False, default="")
+    """The path to the root user's directory on the working server's volume."""
+
+    def __post_init__(self) -> None:
+        """Resolves all server-side directory paths."""
+        self.shared_storage_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
+        self.shared_working_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
+        self.user_data_root = str(Path(self.storage_root).joinpath(self.username))
+        self.user_working_root = str(Path(self.working_root).joinpath(self.username))
+
+
+type SystemConfiguration = MesoscopeSystemConfiguration
+"""Type alias for system configuration classes. Extend this union when adding new acquisition systems."""
+
+type ExperimentConfigFactory = Callable[
+    [TaskTemplate, str, dict[str, WaterRewardTrial | GasPuffTrial], float],
+    MesoscopeExperimentConfiguration,
+]
+"""Type alias for experiment configuration factory functions."""
+
+_SYSTEM_CONFIG_CLASSES: dict[str, type[SystemConfiguration]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeSystemConfiguration,
+}
+"""Maps acquisition system names to their system configuration classes."""
+
+_CONFIG_FILE_TO_CLASS: dict[str, type[SystemConfiguration]] = {
+    f"{system}_system_configuration.yaml": config_class for system, config_class in _SYSTEM_CONFIG_CLASSES.items()
+}
+"""Maps configuration file names to their configuration classes."""
+
+_EXPERIMENT_CONFIG_FACTORIES: dict[str, ExperimentConfigFactory] = {}
+"""Maps acquisition system names to their experiment configuration factory functions."""
+
+
 def set_working_directory(path: Path) -> None:
     """Sets the specified directory as the Sollertia platform working directory for the local machine (PC).
 
@@ -46,8 +102,8 @@ def set_working_directory(path: Path) -> None:
     ensure_directory_exists(path)
     ensure_directory_exists(path.joinpath("configuration"))
 
-    with path_file.open("w") as f:
-        f.write(str(path))
+    with path_file.open("w") as file:
+        file.write(str(path))
 
     console.echo(message=f"Sollertia platform working directory set to: {path}.", level=LogLevel.SUCCESS)
 
@@ -59,7 +115,8 @@ def get_working_directory() -> Path:
         The path to the local working directory.
 
     Raises:
-        FileNotFoundError: If the local working directory has not been configured for the host-machine.
+        FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
+            currently configured directory does not exist at the expected path.
     """
     app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("working_directory_path.txt")
@@ -71,8 +128,8 @@ def get_working_directory() -> Path:
         )
         console.error(message=message, error=FileNotFoundError)
 
-    with path_file.open() as f:
-        working_directory = Path(f.read().strip())
+    with path_file.open() as file:
+        working_directory = Path(file.read().strip())
 
     if not working_directory.exists():
         message = (
@@ -85,67 +142,15 @@ def get_working_directory() -> Path:
     return working_directory
 
 
-# Type alias for system configuration classes. Extend this union when adding new acquisition systems.
-SystemConfiguration = MesoscopeSystemConfiguration
-"""Type alias for system configuration classes. Extend this union when adding new acquisition systems."""
-
-_SYSTEM_CONFIG_CLASSES: dict[str, type[SystemConfiguration]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeSystemConfiguration,
-}
-"""Maps acquisition system names to their system configuration classes."""
-
-_CONFIG_FILE_TO_CLASS: dict[str, type[SystemConfiguration]] = {
-    f"{system}_system_configuration.yaml": config_class for system, config_class in _SYSTEM_CONFIG_CLASSES.items()
-}
-"""Maps configuration file names to their configuration classes."""
-
-ExperimentConfigFactory = Callable[
-    [TaskTemplate, str, dict[str, WaterRewardTrial | GasPuffTrial], float],
-    MesoscopeExperimentConfiguration,
-]
-"""Type alias for experiment configuration factory functions."""
-
-_EXPERIMENT_CONFIG_FACTORIES: dict[str, ExperimentConfigFactory] = {}
-"""Maps acquisition system names to their experiment configuration factory functions."""
-
-
-def _create_mesoscope_experiment_config(
-    template: TaskTemplate,
-    unity_scene_name: str,
-    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
-    cue_offset_cm: float,
-) -> MesoscopeExperimentConfiguration:
-    """Creates a Mesoscope-VR experiment configuration from a TaskTemplate.
-
-    Args:
-        template: The TaskTemplate containing the VR structure.
-        unity_scene_name: The Unity scene name for the experiment.
-        trial_structures: The converted trial structures dictionary.
-        cue_offset_cm: The cue offset in centimeters.
-
-    Returns:
-        The initialized MesoscopeExperimentConfiguration instance.
-    """
-    return MesoscopeExperimentConfiguration(
-        cues=deepcopy(template.cues),
-        segments=deepcopy(template.segments),
-        trial_structures=trial_structures,
-        experiment_states={},
-        vr_environment=deepcopy(template.vr_environment),
-        unity_scene_name=unity_scene_name,
-        cue_offset_cm=cue_offset_cm,
-    )
-
-
-_EXPERIMENT_CONFIG_FACTORIES[AcquisitionSystems.MESOSCOPE_VR] = _create_mesoscope_experiment_config
-
-
 def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
     """Creates the .YAML configuration file for the requested Sollertia platform data acquisition system and configures
     the local machine (PC) to use this file for all future acquisition-system-related calls.
 
     Args:
         system: The name (type) of the data acquisition system for which to create the configuration file.
+
+    Raises:
+        ValueError: If the requested acquisition system is not supported by the Sollertia platform.
     """
     system_str = str(system)
     if system_str not in _SYSTEM_CONFIG_CLASSES:
@@ -157,12 +162,11 @@ def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
         )
         console.error(message=message, error=ValueError)
 
-    directory = get_working_directory()
-    directory = directory.joinpath("configuration")
+    directory = get_working_directory().joinpath("configuration")
 
     existing_configs = tuple(directory.glob("*_system_configuration.yaml"))
     for config_file in existing_configs:
-        console.echo(f"Removing the existing configuration file {config_file.name}...")
+        console.echo(message=f"Removing the existing configuration file {config_file.name}...", level=LogLevel.INFO)
         config_file.unlink()
 
     config_class = _SYSTEM_CONFIG_CLASSES[system_str]
@@ -184,34 +188,37 @@ def get_system_configuration_data() -> SystemConfiguration:
 
     Returns:
         The initialized SystemConfiguration class instance that stores the loaded configuration parameters.
+
+    Raises:
+        FileNotFoundError: If the local Sollertia platform working directory does not contain exactly one data
+            acquisition system configuration file.
+        ValueError: If the discovered configuration file name does not match any supported acquisition system.
     """
-    directory = get_working_directory()
-    directory = directory.joinpath("configuration")
+    directory = get_working_directory().joinpath("configuration")
 
     config_files = tuple(directory.glob("*_system_configuration.yaml"))
 
     if len(config_files) != 1:
-        file_names = [f.name for f in config_files]
+        file_names = [config_file.name for config_file in config_files]
         message = (
-            f"Expected a single data acquisition system configuration file to be found inside the local Sollertia "
-            f"platform working directory ({directory}), but found {len(config_files)} files "
-            f"({', '.join(file_names)}). Call the 'sl-configure system' CLI command to reconfigure the host-machine "
-            f"to only contain a single data acquisition system configuration file."
+            f"Unable to load the data acquisition system configuration. Expected a single data acquisition system "
+            f"configuration file inside the local Sollertia platform working directory ({directory}), but found "
+            f"{len(config_files)} files ({', '.join(file_names)}). Call the 'sl-configure system' CLI command to "
+            f"reconfigure the host-machine to only contain a single data acquisition system configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
-        raise FileNotFoundError(message)  # pragma: no cover
 
     configuration_file = config_files[0]
     file_name = configuration_file.name
 
     if file_name not in _CONFIG_FILE_TO_CLASS:
         message = (
-            f"The data acquisition system configuration file '{file_name}' stored in the local Sollertia platform "
-            f"working directory is not recognized. Call the 'sl-configure system' CLI command to reconfigure the "
-            f"host-machine to use a supported configuration file."
+            f"Unable to load the data acquisition system configuration file '{file_name}' stored in the local "
+            f"Sollertia platform working directory, as the file name does not match any supported acquisition system. "
+            f"Call the 'sl-configure system' CLI command to reconfigure the host-machine to use a supported "
+            f"configuration file."
         )
         console.error(message=message, error=ValueError)
-        raise ValueError(message)  # pragma: no cover
 
     configuration_class = _CONFIG_FILE_TO_CLASS[file_name]
     return configuration_class.from_yaml(file_path=configuration_file)
@@ -239,6 +246,9 @@ def create_experiment_configuration(
 
     Returns:
         The experiment configuration for the specified acquisition system.
+
+    Raises:
+        ValueError: If the requested acquisition system is not supported by the Sollertia platform.
     """
     system_str = str(system)
     if system_str not in _EXPERIMENT_CONFIG_FACTORIES:
@@ -275,6 +285,7 @@ def create_experiment_configuration(
                 occupancy_duration_ms=default_occupancy_duration_ms,
             )
 
+    # The Callable type alias does not carry parameter names, so the factory must be called with positional arguments.
     factory = _EXPERIMENT_CONFIG_FACTORIES[system_str]
     return factory(
         template,
@@ -290,6 +301,10 @@ def set_google_credentials_path(path: Path) -> None:
 
     Args:
         path: The path to the .JSON file containing the Google Sheets service account credentials.
+
+    Raises:
+        FileNotFoundError: If the specified credentials file does not exist at the provided path.
+        ValueError: If the specified file does not have a .json extension.
     """
     if not path.exists():
         message = (
@@ -310,8 +325,10 @@ def set_google_credentials_path(path: Path) -> None:
 
     ensure_directory_exists(path_file)
 
-    with path_file.open("w") as f:
-        f.write(str(path.resolve()))
+    with path_file.open("w") as file:
+        file.write(str(path.resolve()))
+
+    console.echo(message=f"Google Sheets credentials path set to: {path.resolve()}.", level=LogLevel.SUCCESS)
 
 
 def get_google_credentials_path() -> Path:
@@ -319,6 +336,10 @@ def get_google_credentials_path() -> Path:
 
     Returns:
         The path to the Google service account credentials .JSON file.
+
+    Raises:
+        FileNotFoundError: If the Google service account credentials path has not been configured for the host-machine,
+            or if the previously configured credentials file does not exist at the expected path.
     """
     app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("google_credentials_path.txt")
@@ -330,8 +351,8 @@ def get_google_credentials_path() -> Path:
         )
         console.error(message=message, error=FileNotFoundError)
 
-    with path_file.open() as f:
-        credentials_path = Path(f.read().strip())
+    with path_file.open() as file:
+        credentials_path = Path(file.read().strip())
 
     if not credentials_path.exists():
         message = (
@@ -350,6 +371,10 @@ def set_task_templates_directory(path: Path) -> None:
 
     Args:
         path: The path to the sollertia-unity-tasks project's Configurations (Template) directory.
+
+    Raises:
+        FileNotFoundError: If the specified directory does not exist at the provided path.
+        ValueError: If the specified path does not point to a directory.
     """
     if not path.exists():
         message = (
@@ -370,8 +395,8 @@ def set_task_templates_directory(path: Path) -> None:
 
     ensure_directory_exists(path_file)
 
-    with path_file.open("w") as f:
-        f.write(str(path.resolve()))
+    with path_file.open("w") as file:
+        file.write(str(path.resolve()))
 
     console.echo(message=f"Task templates directory path set to: {path.resolve()}.", level=LogLevel.SUCCESS)
 
@@ -381,6 +406,10 @@ def get_task_templates_directory() -> Path:
 
     Returns:
         The path to the task templates directory.
+
+    Raises:
+        FileNotFoundError: If the task templates directory path has not been configured for the host-machine, or if
+            the previously configured directory does not exist at the expected path.
     """
     app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("task_templates_directory_path.txt")
@@ -392,8 +421,8 @@ def get_task_templates_directory() -> Path:
         )
         console.error(message=message, error=FileNotFoundError)
 
-    with path_file.open() as f:
-        templates_directory = Path(f.read().strip())
+    with path_file.open() as file:
+        templates_directory = Path(file.read().strip())
 
     if not templates_directory.exists():
         message = (
@@ -406,45 +435,12 @@ def get_task_templates_directory() -> Path:
     return templates_directory
 
 
-@dataclass
-class ServerConfiguration(YamlConfig):
-    """Defines the access credentials and the filesystem layout of the Sollertia platform remote compute server."""
-
-    username: str = ""
-    """The username to use for server authentication."""
-    password: str = ""
-    """The password to use for server authentication."""
-    host: str = "cbsuwsun.biohpc.cornell.edu"
-    """The hostname or IP address of the server to connect to."""
-    storage_root: str = "/local/storage"
-    """The path to the server's storage (slow) HDD RAID volume."""
-    working_root: str = "/local/workdir"
-    """The path to the server's working (fast) NVME RAID volume."""
-    shared_directory_name: str = "sun_data"
-    """The name of the shared directory that stores Sollertia platform project data on both server volumes."""
-    shared_storage_root: str = field(init=False, default_factory=lambda: "/local/storage/sun_data")
-    """The path to the root Sollertia platform shared directory on the storage server's volume."""
-    shared_working_root: str = field(init=False, default_factory=lambda: "/local/workdir/sun_data")
-    """The path to the root Sollertia platform shared directory on the working server's volume."""
-    user_data_root: str = field(init=False, default_factory=lambda: "/local/storage/YourNetID")
-    """The path to the root user's directory on the storage server's volume."""
-    user_working_root: str = field(init=False, default_factory=lambda: "/local/workdir/YourNetID")
-    """The path to the root user's directory on the working server's volume."""
-
-    def __post_init__(self) -> None:
-        """Resolves all server-side directory paths."""
-        self.shared_storage_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
-        self.shared_working_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
-        self.user_data_root = str(Path(self.storage_root).joinpath(f"{self.username}"))
-        self.user_working_root = str(Path(self.working_root).joinpath(f"{self.username}"))
-
-
 def create_server_configuration_file(
     username: str,
     password: str,
     host: str = "cbsuwsun.biohpc.cornell.edu",
-    storage_root: str = "/local/workdir",
-    working_root: str = "/local/storage",
+    storage_root: str = "/local/storage",
+    working_root: str = "/local/workdir",
     shared_directory_name: str = "sun_data",
 ) -> None:
     """Creates the .YAML configuration file for the Sollertia platform compute server and configures the local machine
@@ -477,10 +473,15 @@ def get_server_configuration() -> ServerConfiguration:
 
     Returns:
         The loaded and validated server configuration data, stored in a ServerConfiguration instance.
-    """
-    working_directory = get_working_directory().joinpath("configuration")
 
-    config_path = working_directory.joinpath("server_configuration.yaml")
+    Raises:
+        FileNotFoundError: If the 'server_configuration.yaml' file does not exist in the local Sollertia platform
+            working directory.
+        ValueError: If the loaded server configuration is unconfigured or contains placeholder access credentials.
+    """
+    configuration_directory = get_working_directory().joinpath("configuration")
+
+    config_path = configuration_directory.joinpath("server_configuration.yaml")
 
     if not config_path.exists():
         message = (
@@ -488,18 +489,48 @@ def get_server_configuration() -> ServerConfiguration:
             f"{config_path}. Call the 'sl-configure server' CLI command to create the server configuration file."
         )
         console.error(message=message, error=FileNotFoundError)
-        raise FileNotFoundError(message)  # pragma: no cover
 
     configuration = ServerConfiguration.from_yaml(file_path=config_path)
 
-    if configuration.username == "" or configuration.password == "":
+    if not configuration.username or not configuration.password:
         message = (
-            "The 'server_configuration.yaml' file appears to be unconfigured or contains placeholder access "
-            "credentials. Call the 'sl-configure server' CLI command to reconfigure the server access credentials."
+            "Unable to load the server configuration. The 'server_configuration.yaml' file appears to be unconfigured "
+            "or contains placeholder access credentials. Call the 'sl-configure server' CLI command to reconfigure "
+            "the server access credentials."
         )
         console.error(message=message, error=ValueError)
-        raise ValueError(message)  # pragma: no cover
 
     message = f"Server configuration: Resolved. Using the {configuration.username} account."
     console.echo(message=message, level=LogLevel.SUCCESS)
     return configuration
+
+
+def _create_mesoscope_experiment_config(
+    template: TaskTemplate,
+    unity_scene_name: str,
+    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
+    cue_offset_cm: float,
+) -> MesoscopeExperimentConfiguration:
+    """Creates a Mesoscope-VR experiment configuration from a TaskTemplate.
+
+    Args:
+        template: The TaskTemplate containing the VR structure.
+        unity_scene_name: The Unity scene name for the experiment.
+        trial_structures: The converted trial structures dictionary.
+        cue_offset_cm: The cue offset in centimeters.
+
+    Returns:
+        The initialized MesoscopeExperimentConfiguration instance.
+    """
+    return MesoscopeExperimentConfiguration(
+        cues=deepcopy(template.cues),
+        segments=deepcopy(template.segments),
+        trial_structures=trial_structures,
+        experiment_states={},
+        vr_environment=deepcopy(template.vr_environment),
+        unity_scene_name=unity_scene_name,
+        cue_offset_cm=cue_offset_cm,
+    )
+
+
+_EXPERIMENT_CONFIG_FACTORIES[AcquisitionSystems.MESOSCOPE_VR] = _create_mesoscope_experiment_config

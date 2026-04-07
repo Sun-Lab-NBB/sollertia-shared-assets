@@ -369,8 +369,8 @@ processed_data: null
     assert loaded_session.processed_data_path == sample_session_hierarchy / "processed_data"
 
 
-def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
-    """Verifies that runtime_initialized() removes the nk.bin file.
+def test_session_data_mark_runtime_initialized_removes_nk_file(sample_session_hierarchy):
+    """Verifies that mark_runtime_initialized() removes the nk.bin file.
 
     This test ensures sessions can be marked as initialized.
     """
@@ -395,8 +395,8 @@ processed_data: null
     nk_path.touch()
     assert nk_path.exists()
 
-    # Calls runtime_initialized
-    loaded_session.runtime_initialized()
+    # Calls mark_runtime_initialized
+    loaded_session.mark_runtime_initialized()
 
     assert not nk_path.exists()
 

@@ -75,8 +75,8 @@ class DatasetData(YamlConfig):
         cls,
         name: str,
         project: str,
-        session_type: SessionTypes | str,
-        acquisition_system: AcquisitionSystems | str,
+        session_type: str | SessionTypes,
+        acquisition_system: str | AcquisitionSystems,
         sessions: tuple[DatasetSession, ...] | set[DatasetSession],
         datasets_root: Path,
     ) -> DatasetData:
@@ -206,7 +206,7 @@ class DatasetData(YamlConfig):
     @property
     def animals(self) -> tuple[str, ...]:
         """Returns a tuple of unique animal identifiers included in the dataset."""
-        return tuple(sorted({s.animal for s in self.sessions}))
+        return tuple(sorted({session.animal for session in self.sessions}))
 
     def get_sessions_for_animal(self, animal: str) -> tuple[DatasetSession, ...]:
         """Returns the DatasetSession instances for all sessions performed by the specified animal.
@@ -217,7 +217,7 @@ class DatasetData(YamlConfig):
         Returns:
             A tuple of DatasetSession instances for the specified animal.
         """
-        return tuple(s for s in self.sessions if s.animal == animal)
+        return tuple(session for session in self.sessions if session.animal == animal)
 
     def get_session(self, animal: str, session: str) -> DatasetSession:
         """Returns the DatasetSession instance for the specified animal and session pair.
@@ -242,5 +242,6 @@ class DatasetData(YamlConfig):
             f"session combination must exist in the '{self.name}' dataset, but no matching DatasetSession was found."
         )
         console.error(message=message, error=ValueError)
+        # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
         # noinspection PyUnreachableCode
-        raise ValueError(message)  # pragma: no cover  # Fallback for mypy.
+        raise ValueError(message)  # pragma: no cover

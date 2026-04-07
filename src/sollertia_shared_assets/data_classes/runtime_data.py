@@ -1,8 +1,8 @@
 """Provides assets for storing runtime data acquired by data acquisition systems."""
 
-from dataclasses import dataclass  # pragma: no cover
+from dataclasses import dataclass
 
-from ataraxis_data_structures import YamlConfig  # pragma: no cover
+from ataraxis_data_structures import YamlConfig
 
 
 @dataclass
@@ -231,9 +231,9 @@ class MesoscopePositions(YamlConfig):  # pragma: no cover
     mesoscope_fast_z: float = 0.0
     """The ScanImage's FastZ (virtual Z-axis) position, in micrometers."""
     mesoscope_tip: float = 0.0
-    """The ScanImage's Tilt position, in degrees."""
-    mesoscope_tilt: float = 0.0
     """The ScanImage's Tip position, in degrees."""
+    mesoscope_tilt: float = 0.0
+    """The ScanImage's Tilt position, in degrees."""
     laser_power_mw: float = 0.0
     """The laser excitation power at the sample, in milliwatts."""
     red_dot_alignment_z: float = 0.0
