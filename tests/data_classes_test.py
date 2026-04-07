@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-import appdirs
+import platformdirs
 
 from sollertia_shared_assets.data_classes import (
     DatasetData,
@@ -91,10 +91,10 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 @pytest.fixture
 def clean_working_directory(tmp_path, monkeypatch):
     """Sets up a clean temporary working directory for testing."""
-    # Patches appdirs to use temporary directory
+    # Patches platformdirs to use temporary directory
     app_dir = tmp_path / "app_data"
     app_dir.mkdir()
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     working_dir = tmp_path / "working_directory"
     working_dir.mkdir()
@@ -168,7 +168,7 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
     This test ensures only valid session types are accepted.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -196,7 +196,7 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     This test ensures all required directories are created.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -228,7 +228,7 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
     This test ensures session metadata is persisted.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -263,7 +263,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
     This test ensures the session is marked as not yet initialized.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -458,7 +458,7 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
     This test ensures sessions cannot be created for non-existent projects.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -491,7 +491,7 @@ def test_session_data_create_copies_experiment_configuration(
     This test ensures experiment configuration files are copied to session directories.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -534,7 +534,7 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
     This test ensures non-experiment sessions don't require experiment configuration.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -566,7 +566,7 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
     This test ensures system configuration is copied for reproducibility.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 

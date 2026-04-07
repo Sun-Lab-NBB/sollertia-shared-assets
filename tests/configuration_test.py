@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-import appdirs
+import platformdirs
 
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
@@ -99,10 +99,10 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 @pytest.fixture
 def clean_working_directory(tmp_path, monkeypatch):
     """Sets up a clean temporary working directory for testing."""
-    # Patches appdirs to use temporary directory
+    # Patches platformdirs to use temporary directory
     app_dir = tmp_path / "app_data"
     app_dir.mkdir()
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     working_dir = tmp_path / "working_directory"
     working_dir.mkdir()
@@ -941,9 +941,9 @@ def test_set_working_directory_creates_directory(clean_working_directory, monkey
     new_dir = clean_working_directory.parent / "new_working_dir"
     assert not new_dir.exists()
 
-    # Patches appdirs to use our test directory
+    # Patches platformdirs to use our test directory
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(new_dir)
 
@@ -956,7 +956,7 @@ def test_set_working_directory_writes_path_file(clean_working_directory, monkeyp
     This test ensures the working directory path is cached correctly.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -971,7 +971,7 @@ def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
     This test ensures the application data directory is created if missing.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     working_dir = tmp_path / "working"
     working_dir.mkdir()
@@ -987,7 +987,7 @@ def test_set_working_directory_overwrites_existing(clean_working_directory, monk
     This test ensures the function can update an existing working directory path.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     # Sets first directory
     first_dir = clean_working_directory / "first"
@@ -1012,7 +1012,7 @@ def test_get_working_directory_returns_cached_path(clean_working_directory, monk
     This test ensures the function retrieves the correct cached path.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
     retrieved_dir = get_working_directory()
@@ -1026,7 +1026,7 @@ def test_get_working_directory_raises_error_if_not_set(tmp_path, monkeypatch):
     This test ensures the function raises an appropriate error when unconfigured.
     """
     app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     with pytest.raises(FileNotFoundError):
         get_working_directory()
@@ -1038,7 +1038,7 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
     This test ensures the function detects when the cached path no longer exists.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1060,7 +1060,7 @@ def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
     This test ensures the credentials' path is properly cached.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -1078,7 +1078,7 @@ def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monk
     This test ensures the function validates file existence.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     non_existent_file = tmp_path / "missing.json"
 
@@ -1092,7 +1092,7 @@ def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monk
     This test ensures the function validates the file extension.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     wrong_extension = tmp_path / "credentials.txt"
     wrong_extension.write_text("not json")
@@ -1110,7 +1110,7 @@ def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
     This test ensures the function retrieves the correct cached credentials path.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -1127,7 +1127,7 @@ def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypat
     This test ensures the function raises an error when the credentials' path is not set.
     """
     app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     with pytest.raises(FileNotFoundError):
         get_google_credentials_path()
@@ -1139,7 +1139,7 @@ def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monk
     This test ensures the function detects when the cached credentials file is missing.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -1162,7 +1162,7 @@ def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, 
     This test ensures the function creates the correct configuration file.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
     monkeypatch.setattr("builtins.input", lambda _: "")  # Mocks user input
 
     set_working_directory(clean_working_directory)
@@ -1178,7 +1178,7 @@ def test_create_system_configuration_file_removes_existing(clean_working_directo
     This test ensures only one configuration file exists after creation.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
     monkeypatch.setattr("builtins.input", lambda _: "")
 
     set_working_directory(clean_working_directory)
@@ -1203,7 +1203,7 @@ def test_create_system_configuration_file_invalid_system(clean_working_directory
     This test ensures the function rejects unsupported acquisition systems.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1217,7 +1217,7 @@ def test_create_system_configuration_file_creates_valid_yaml(clean_working_direc
     This test ensures the created configuration file has a valid YAML structure.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
     monkeypatch.setattr("builtins.input", lambda _: "")
 
     set_working_directory(clean_working_directory)
@@ -1244,7 +1244,7 @@ def test_get_system_configuration_data_loads_mesoscope_config(
     This test ensures the function correctly loads configuration data.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1265,7 +1265,7 @@ def test_get_system_configuration_data_raises_error_no_config(clean_working_dire
     This test ensures the function raises an error when no configuration file is found.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1279,7 +1279,7 @@ def test_get_system_configuration_data_raises_error_multiple_configs(clean_worki
     This test ensures the function rejects directories with multiple configuration files.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1297,7 +1297,7 @@ def test_get_system_configuration_data_raises_error_unsupported_config(clean_wor
     This test ensures the function rejects unrecognized configuration file names.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1314,7 +1314,7 @@ def test_get_system_configuration_data_path_types(clean_working_directory, sampl
     This test ensures path fields are properly converted to Path objects after loading.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1337,7 +1337,7 @@ def test_get_system_configuration_data_valve_calibration_tuple(
     This test ensures valve calibration data is converted to tuple format after loading.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1440,7 +1440,7 @@ def test_create_server_configuration_file(clean_working_directory, monkeypatch):
     This test ensures the user server configuration is created correctly.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1464,7 +1464,7 @@ def test_create_server_configuration_file_custom_parameters(clean_working_direct
     This test ensures custom server parameters are preserved.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1495,7 +1495,7 @@ def test_get_server_configuration_user(clean_working_directory, monkeypatch):
     This test ensures user configuration can be retrieved.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1518,7 +1518,7 @@ def test_get_server_configuration_raises_error_if_missing(clean_working_director
     This test ensures proper error handling for missing configurations.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1536,7 +1536,7 @@ def test_get_server_configuration_raises_error_if_unconfigured(clean_working_dir
     This test ensures unconfigured files are detected.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(appdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
 
     set_working_directory(clean_working_directory)
 

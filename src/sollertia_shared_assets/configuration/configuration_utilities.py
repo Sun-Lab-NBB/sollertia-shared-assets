@@ -11,7 +11,7 @@ from pathlib import Path
 from dataclasses import field, dataclass
 from collections.abc import Callable
 
-import appdirs
+import platformdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
@@ -95,7 +95,7 @@ def set_working_directory(path: Path) -> None:
     Args:
         path: The path to the directory to set as the local Sollertia platform working directory.
     """
-    app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("working_directory_path.txt")
 
     ensure_directory_exists(path_file)
@@ -118,7 +118,7 @@ def get_working_directory() -> Path:
         FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
             currently configured directory does not exist at the expected path.
     """
-    app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("working_directory_path.txt")
 
     if not path_file.exists():
@@ -320,7 +320,7 @@ def set_google_credentials_path(path: Path) -> None:
         )
         console.error(message=message, error=ValueError)
 
-    app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("google_credentials_path.txt")
 
     ensure_directory_exists(path_file)
@@ -341,7 +341,7 @@ def get_google_credentials_path() -> Path:
         FileNotFoundError: If the Google service account credentials path has not been configured for the host-machine,
             or if the previously configured credentials file does not exist at the expected path.
     """
-    app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("google_credentials_path.txt")
 
     if not path_file.exists():
@@ -390,7 +390,7 @@ def set_task_templates_directory(path: Path) -> None:
         )
         console.error(message=message, error=ValueError)
 
-    app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("task_templates_directory_path.txt")
 
     ensure_directory_exists(path_file)
@@ -411,7 +411,7 @@ def get_task_templates_directory() -> Path:
         FileNotFoundError: If the task templates directory path has not been configured for the host-machine, or if
             the previously configured directory does not exist at the expected path.
     """
-    app_dir = Path(appdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("task_templates_directory_path.txt")
 
     if not path_file.exists():
