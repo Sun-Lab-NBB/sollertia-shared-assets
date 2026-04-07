@@ -1,0 +1,346 @@
+"""Provides configuration assets specific to the Mesoscope-VR data acquisition system.
+
+This module contains the system configuration dataclasses and the experiment configuration dataclass for the 2-Photon
+Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game engine.
+"""
+
+from copy import deepcopy
+from pathlib import Path
+from dataclasses import field, dataclass
+
+from ataraxis_base_utilities import console
+from ataraxis_data_structures import YamlConfig
+
+from .vr_configuration import Cue, Segment, VREnvironment  # noqa: TC001 (used in dataclass fields)
+from .experiment_configuration import (  # noqa: TC001 (used in dataclass fields)
+    GasPuffTrial,
+    ExperimentState,
+    WaterRewardTrial,
+)
+
+
+# noinspection PyArgumentList
+@dataclass
+class MesoscopeExperimentConfiguration(YamlConfig):
+    """Defines an experiment session that uses the Mesoscope_VR data acquisition system.
+
+    This is the unified configuration that serves both the data acquisition system (sollertia-experiment),
+    the analysis pipeline (sollertia-forgery), and the Unity VR environment (sollertia-unity-tasks).
+    """
+
+    # Virtual Reality building block configuration
+    cues: list[Cue]
+    """Defines the Virtual Reality environment wall cues used in the experiment."""
+    segments: list[Segment]
+    """Defines the Virtual Reality environment segments (sequences of wall cues) for the Unity corridor system."""
+
+    # Task configuration
+    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
+    """Defines experiment's structure by specifying the types of trials used by the phases (states) of the
+    experiment."""
+    experiment_states: dict[str, ExperimentState]
+    """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states
+    executed during runtime."""
+
+    # VR environment configuration
+    vr_environment: VREnvironment
+    """Defines the Virtual Reality corridor used during the experiment."""
+    unity_scene_name: str
+    """The name of the Virtual Reality task (Unity Scene) used during the experiment."""
+    cue_offset_cm: float = 0.0
+    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
+    sequence origin, in centimeters."""
+
+    @property
+    def _cue_by_name(self) -> dict[str, Cue]:
+        """Returns the mapping of cue names to their Cue class instances for all VR cues used in the experiment."""
+        return {cue.name: cue for cue in self.cues}
+
+    @property
+    def _cue_name_to_code(self) -> dict[str, int]:
+        """Returns the mapping of cue names to their unique identifier codes for all VR cues used in the experiment."""
+        return {cue.name: cue.code for cue in self.cues}
+
+    @property
+    def _segment_by_name(self) -> dict[str, Segment]:
+        """Returns the mapping of segment names to their Segment class instances for all VR segments used in the
+        experiment.
+        """
+        return {seg.name: seg for seg in self.segments}
+
+    def _get_segment_length_cm(self, segment_name: str) -> float:
+        """Returns the total length of the VR segment in centimeters."""
+        segment = self._segment_by_name[segment_name]
+        cue_map = self._cue_by_name
+        return sum(cue_map[cue_name].length_cm for cue_name in segment.cue_sequence)
+
+    def _get_segment_cue_codes(self, segment_name: str) -> list[int]:
+        """Returns the sequence of cue codes for the specified segment's cue sequence."""
+        segment = self._segment_by_name[segment_name]
+        return [self._cue_name_to_code[name] for name in segment.cue_sequence]
+
+    def __post_init__(self) -> None:
+        """Validates experiment configuration and populates derived trial fields."""
+        # Ensures cue codes are unique.
+        codes = [cue.code for cue in self.cues]
+        if len(codes) != len(set(codes)):
+            duplicate_codes = [c for c in codes if codes.count(c) > 1]
+            message = (
+                f"Duplicate cue codes found: {set(duplicate_codes)} in the {self.vr_environment} VR environment "
+                f"definition. Each cue must use a unique integer code."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Ensures cue names are unique.
+        names = [cue.name for cue in self.cues]
+        if len(names) != len(set(names)):
+            duplicate_names = [n for n in names if names.count(n) > 1]
+            message = (
+                f"Duplicate cue names found: {set(duplicate_names)} in the {self.vr_environment} VR environment "
+                f"definition. Each cue must use a unique name."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Ensures segment cue sequences reference valid cues.
+        cue_names = {cue.name for cue in self.cues}
+        for seg in self.segments:
+            for cue_name in seg.cue_sequence:
+                if cue_name not in cue_names:
+                    message = (
+                        f"Segment '{seg.name}' references unknown cue '{cue_name}'. "
+                        f"Available cues: {', '.join(sorted(cue_names))}."
+                    )
+                    console.error(message=message, error=ValueError)
+
+        # Populates the derived trial fields and validates them.
+        segment_names = {seg.name for seg in self.segments}
+        for trial_name, trial in self.trial_structures.items():
+            # Validates segment reference.
+            if trial.segment_name not in segment_names:
+                message = (
+                    f"Trial '{trial_name}' references unknown segment '{trial.segment_name}'. "
+                    f"Available segments: {', '.join(sorted(segment_names))}."
+                )
+                console.error(message=message, error=ValueError)
+
+            # Populates cue_sequence from segment.
+            trial.cue_sequence = self._get_segment_cue_codes(trial.segment_name)
+
+            # Populates trial_length_cm from segment.
+            trial.trial_length_cm = self._get_segment_length_cm(trial.segment_name)
+
+            # Validates zone positions with populated trial_length_cm.
+            trial.validate_zones()
+
+
+@dataclass
+class MesoscopeFileSystem:
+    """Stores the filesystem configuration of the Mesoscope-VR data acquisition system."""
+
+    root_directory: Path = Path()
+    """The absolute path to the directory where all projects are stored on the main data acquisition system PC."""
+    server_directory: Path = Path()
+    """The absolute path to the local-filesystem-mounted directory where all projects are stored on the remote compute
+    server."""
+    nas_directory: Path = Path()
+    """The absolute path to the local-filesystem-mounted directory where all projects are stored on the NAS backup
+    storage volume."""
+    mesoscope_directory: Path = Path()
+    """The absolute path to the local-filesystem-mounted directory where all Mesoscope-acquired data is aggregated
+    during acquisition by the PC that manages the Mesoscope during runtime."""
+
+
+@dataclass
+class MesoscopeGoogleSheets:
+    """Stores the identifiers for the Google Sheets used by the Mesoscope-VR data acquisition system."""
+
+    surgery_sheet_id: str = ""
+    """The identifier of the Google Sheet that stores information about surgical interventions performed on the animals
+    that participate in data acquisition sessions."""
+    water_log_sheet_id: str = ""
+    """The identifier of the Google Sheet that stores information about water restriction and handling for all
+    animals that participate in data acquisition sessions."""
+
+
+@dataclass
+class MesoscopeCameras:
+    """Stores the video camera configuration of the Mesoscope-VR data acquisition system."""
+
+    face_camera_index: int = 0
+    """The index of the face camera in the list of all available Harvester-managed cameras."""
+    body_camera_index: int = 1
+    """The index of the body camera in the list of all available Harvester-managed cameras."""
+    face_camera_quantization: int = 20
+    """The quantization parameter used by the face camera to encode acquired frames as video files."""
+    face_camera_preset: int = 7
+    """The encoding speed preset used by the face camera to encode acquired frames as video files. Must be one of the
+    valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
+    body_camera_quantization: int = 20
+    """The quantization parameter used by the body camera to encode acquired frames as video files."""
+    body_camera_preset: int = 7
+    """The encoding speed preset used by the body camera to encode acquired frames as video files. Must be one of the
+    valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
+
+
+@dataclass
+class MesoscopeMicroControllers:
+    """Stores the microcontroller configuration of the Mesoscope-VR data acquisition system."""
+
+    actor_port: str = "/dev/ttyACM0"
+    """The USB port used by the Actor Microcontroller."""
+    sensor_port: str = "/dev/ttyACM1"
+    """The USB port used by the Sensor Microcontroller."""
+    encoder_port: str = "/dev/ttyACM2"
+    """The USB port used by the Encoder Microcontroller."""
+    keepalive_interval_ms: int = 500
+    """The interval, in milliseconds, at which the microcontrollers are expected to receive and send the keepalive
+    messages used to ensure that all controllers function as expected during runtime."""
+    minimum_brake_strength_g_cm: float = 43.2047
+    """The torque applied by the running wheel brake at the minimum operational voltage, in gram centimeter."""
+    maximum_brake_strength_g_cm: float = 1152.1246
+    """The torque applied by the running wheel brake at the maximum operational voltage, in gram centimeter."""
+    wheel_diameter_cm: float = 15.0333
+    """The diameter of the running wheel, in centimeters."""
+    lick_threshold_adc: int = 600
+    """The threshold voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC),
+    interpreted as the animal's tongue contacting the lick sensor."""
+    lick_signal_threshold_adc: int = 300
+    """The minimum voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC),
+    reported to the PC as a non-zero value. Voltages below this level are interpreted as 'no-lick' noise and are
+    pulled to 0."""
+    lick_delta_threshold_adc: int = 300
+    """The minimum absolute difference between two consecutive lick sensor readouts, in raw analog units recorded by
+    a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
+    lick_averaging_pool_size: int = 2
+    """The number of lick sensor readouts to average together to produce the final lick sensor readout value."""
+    torque_baseline_voltage_adc: int = 2048
+    """The voltage level, in raw analog units measured by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC) after the
+    AD620 amplifier, that corresponds to no torque (0) readout."""
+    torque_maximum_voltage_adc: int = 3443
+    """The voltage level, in raw analog units measured by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC)
+    after the AD620 amplifier, that corresponds to the absolute maximum torque detectable by the sensor."""
+    torque_sensor_capacity_g_cm: float = 720.0779
+    """The maximum torque detectable by the sensor, in grams centimeter (g cm)."""
+    torque_report_cw: bool = True
+    """Determines whether the torque sensor should report torques in the Clockwise (CW) direction."""
+    torque_report_ccw: bool = True
+    """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction."""
+    torque_signal_threshold_adc: int = 150
+    """The minimum voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC),
+    reported to the PC as a non-zero value. Voltages below this level are interpreted as noise and are pulled to 0."""
+    torque_delta_threshold_adc: int = 100
+    """The minimum absolute difference between two consecutive torque sensor readouts, in raw analog units recorded by
+    a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC), for the change to be reported to the PC."""
+    torque_averaging_pool_size: int = 4
+    """The number of torque sensor readouts to average together to produce the final torque sensor readout value."""
+    wheel_encoder_ppr: int = 8192
+    """The resolution of the wheel's quadrature encoder, in Pulses Per Revolution (PPR)."""
+    wheel_encoder_report_cw: bool = False
+    """Determines whether the encoder should report rotation in the Clockwise (CW) direction."""
+    wheel_encoder_report_ccw: bool = True
+    """Determines whether the encoder should report rotation in the CounterClockwise (CCW) direction."""
+    wheel_encoder_delta_threshold_pulse: int = 15
+    """The minimum absolute difference between two consecutive encoder readouts, in encoder pulse counts, for the
+    change to be reported to the PC."""
+    wheel_encoder_polling_delay_us: int = 500
+    """The delay, in microseconds, between consecutive encoder state readouts."""
+    cm_per_unity_unit: float = 10.0
+    """The length of each Virtual Reality (VR) environment's distance 'unit' (Unity unit) in real-world centimeters."""
+    screen_trigger_pulse_duration_ms: int = 500
+    """The duration, in milliseconds, of the TTL pulse used to toggle the VR screen power state."""
+    sensor_polling_delay_ms: int = 1
+    """The delay, in milliseconds, between any two successive readouts of any sensor other than the encoder."""
+    mesoscope_frame_averaging_pool_size: int = 0
+    """The number of digital pin readouts to average together when determining the current logic level of the incoming
+    TTL signal sent by the mesoscope at the onset of each frame's acquisition."""
+    valve_calibration_data: dict[int | float, int | float] | tuple[tuple[int | float, int | float], ...] = (
+        (15000, 1.10),
+        (30000, 3.0),
+        (45000, 6.25),
+        (60000, 10.90),
+    )
+    """Maps water delivery solenoid valve open times, in microseconds, to the dispensed volumes of water, in
+    microliters."""
+
+
+@dataclass
+class MesoscopeExternalAssets:
+    """Stores the third-party asset configuration of the Mesoscope-VR data acquisition system."""
+
+    headbar_port: str = "/dev/ttyUSB0"
+    """The USB port used by the HeadBar Zaber motor controllers."""
+    lickport_port: str = "/dev/ttyUSB1"
+    """The USB port used by the LickPort Zaber motor controllers."""
+    wheel_port: str = "/dev/ttyUSB2"
+    """The USB port used by the Wheel Zaber motor controllers."""
+    unity_ip: str = "127.0.0.1"
+    """The IP address of the MQTT broker used to communicate with the Unity game engine."""
+    unity_port: int = 1883
+    """The port number of the MQTT broker used to communicate with the Unity game engine."""
+
+
+@dataclass
+class MesoscopeSystemConfiguration(YamlConfig):
+    """Defines the hardware and software asset configuration for the Mesoscope-VR data acquisition system."""
+
+    name: str = "mesoscope"
+    """The descriptive name of the data acquisition system."""
+    filesystem: MesoscopeFileSystem = field(default_factory=MesoscopeFileSystem)
+    """Stores the filesystem configuration."""
+    sheets: MesoscopeGoogleSheets = field(default_factory=MesoscopeGoogleSheets)
+    """Stores the identifiers and access credentials for the Google Sheets."""
+    cameras: MesoscopeCameras = field(default_factory=MesoscopeCameras)
+    """Stores the video cameras configuration."""
+    microcontrollers: MesoscopeMicroControllers = field(default_factory=MesoscopeMicroControllers)
+    """Stores the microcontrollers configuration."""
+    assets: MesoscopeExternalAssets = field(default_factory=MesoscopeExternalAssets)
+    """Stores the third-party hardware and firmware assets configuration."""
+
+    def __post_init__(self) -> None:
+        """Ensures that all instance assets are stored as the expected types."""
+        self.filesystem.root_directory = Path(self.filesystem.root_directory)
+        self.filesystem.server_directory = Path(self.filesystem.server_directory)
+        self.filesystem.nas_directory = Path(self.filesystem.nas_directory)
+        self.filesystem.mesoscope_directory = Path(self.filesystem.mesoscope_directory)
+
+        if not isinstance(self.microcontrollers.valve_calibration_data, tuple):
+            self.microcontrollers.valve_calibration_data = tuple(
+                (k, v) for k, v in self.microcontrollers.valve_calibration_data.items()
+            )
+
+        valve_calibration_data = self.microcontrollers.valve_calibration_data
+        element_count = 2
+        if not all(
+            isinstance(item, tuple)
+            and len(item) == element_count
+            and isinstance(item[0], (int | float))
+            and isinstance(item[1], (int | float))
+            for item in valve_calibration_data
+        ):
+            message = (
+                f"Unable to initialize the MesoscopeSystemConfiguration class. Expected each item under the "
+                f"'valve_calibration_data' field of the Mesoscope-VR acquisition system configuration .yaml file to be "
+                f"a tuple of two integer or float values, but instead encountered {valve_calibration_data} with at "
+                f"least one incompatible element."
+            )
+            console.error(message=message, error=TypeError)
+
+    def save(self, path: Path) -> None:
+        """Saves the instance's data to disk as a .YAML file.
+
+        Args:
+            path: The path to the .YAML file to save the data to.
+        """
+        original = deepcopy(self)
+
+        original.filesystem.root_directory = str(original.filesystem.root_directory)  # type: ignore[assignment]
+        original.filesystem.server_directory = str(original.filesystem.server_directory)  # type: ignore[assignment]
+        original.filesystem.nas_directory = str(original.filesystem.nas_directory)  # type: ignore[assignment]
+        original.filesystem.mesoscope_directory = str(  # type: ignore[assignment]
+            original.filesystem.mesoscope_directory
+        )
+
+        if isinstance(original.microcontrollers.valve_calibration_data, tuple):
+            original.microcontrollers.valve_calibration_data = dict(original.microcontrollers.valve_calibration_data)
+
+        original.to_yaml(file_path=path)

@@ -16,8 +16,8 @@ class TriggerType(StrEnum):
     """Enumerates the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
-        All Sun lab acquisition systems share these core trial types. LICK corresponds to GuidanceZone in Unity and
-        OCCUPANCY corresponds to OccupancyZone in Unity.
+        All Sollertia platform acquisition systems share these core trial types. LICK corresponds to GuidanceZone in
+        Unity and OCCUPANCY corresponds to OccupancyZone in Unity.
     """
 
     LICK = "lick"
@@ -148,7 +148,8 @@ class TaskTemplate(YamlConfig):
         parameters (rewards, guidance, experiment states) are NOT included here - those are added by system-specific
         experiment configuration classes that use the full trial structure classes inheriting from TrialStructure.
 
-        This dataclass can parse any valid task configuration (template) .yaml file from the sl-unity-tasks project.
+        This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-unity-tasks
+        project.
     """
 
     cues: list[Cue]

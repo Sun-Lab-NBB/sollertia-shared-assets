@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import appdirs
 
-from sl_shared_assets.configuration import (
+from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
     Cue,
     Segment,

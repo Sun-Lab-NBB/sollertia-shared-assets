@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "sl-shared-assets": {
-      "command": "sl-configure",
-      "args": ["mcp"]
-    }
-  }
-}

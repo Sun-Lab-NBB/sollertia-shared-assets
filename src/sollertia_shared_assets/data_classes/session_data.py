@@ -1,20 +1,23 @@
-"""Provides assets for maintaining the Sun lab project data hierarchy across all data acquisition and processing
-machines.
+"""Provides assets for maintaining the Sollertia platform project data hierarchy across all data acquisition and
+processing machines.
 """
 
 import copy
+import shutil
 from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
 
+from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from ..configuration import AcquisitionSystems
+from ..configuration import AcquisitionSystems, get_system_configuration_data
 
 
 class SessionTypes(StrEnum):
-    """Defines the data acquisition session types supported by all data acquisition systems used in the Sun lab."""
+    """Defines the data acquisition session types supported by all data acquisition systems in the Sollertia
+    platform."""
 
     LICK_TRAINING = "lick training"
     """Teaches animals to use the water delivery port while being head-fixed on the Mesoscope-VR system."""
@@ -34,9 +37,9 @@ class RawData:
     session's data acquisition runtime.
 
     Notes:
-        Only paths to files consumed by multiple sl libraries are exposed as fields. Internal files (session_data.yaml,
-        nk.bin, system_configuration.yaml) and data subdirectories (camera_data, mesoscope_data, behavior_data) are
-        resolved at runtime by the libraries that own them.
+        Only paths to files consumed by multiple Sollertia libraries are exposed as fields. Internal files
+        (session_data.yaml, nk.bin, system_configuration.yaml) and data subdirectories (camera_data, mesoscope_data,
+        behavior_data) are resolved at runtime by the libraries that own them.
     """
 
     raw_data_path: Path = Path()
@@ -127,8 +130,8 @@ class SessionData(YamlConfig):
     session."""
     python_version: str = "3.11.13"
     """The Python version used to acquire session's data."""
-    sl_experiment_version: str = "3.0.0"
-    """The sl-experiment library version used to acquire the session's data."""
+    sollertia_experiment_version: str = "3.0.0"
+    """The sollertia-experiment library version used to acquire the session's data."""
     raw_data: RawData = field(default_factory=lambda: RawData())
     """Defines the session's raw data hierarchy."""
     processed_data: ProcessedData = field(default_factory=lambda: ProcessedData())
@@ -149,23 +152,94 @@ class SessionData(YamlConfig):
         animal_id: str,
         session_type: SessionTypes | str,
         python_version: str,
-        sl_experiment_version: str,
+        sollertia_experiment_version: str,
         experiment_name: str | None = None,
     ) -> SessionData:
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
 
         Notes:
-            This method has been moved to sl-experiment. It depends on get_system_configuration_data() which is now
-            owned by sl-experiment. Use the sl-experiment session creation interface instead.
+            To access the data of an already existing session, use the load() method.
 
-        Raises:
-            NotImplementedError: Always. This method must be reimplemented in sl-experiment.
+        Args:
+            project_name: The name of the project for which the session is acquired.
+            animal_id: The unique identifier of the animal participating in the session.
+            session_type: The type of the session.
+            python_version: The Python version used to acquire the session's data.
+            sollertia_experiment_version: The sollertia-experiment library version used to acquire the session's data.
+            experiment_name: The name of the experiment performed during the session or None, if the session is
+                not an experiment session.
+
+        Returns:
+            An initialized SessionData instance that stores the structure and the metadata of the created session.
         """
-        message = (
-            "SessionData.create() has been moved to sl-experiment. This method depends on "
-            "get_system_configuration_data() which is now owned by sl-experiment."
+        if session_type not in SessionTypes:
+            message = (
+                f"Invalid session type '{session_type}' encountered when initializing a new data acquisition session. "
+                f"Use one of the supported session types from the SessionTypes enumeration."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Acquires the UTC timestamp to use as the session name
+        session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
+
+        # Resolves the acquisition system configuration. This queries the acquisition system configuration data used
+        # by the machine (PC) that calls this method.
+        acquisition_system = get_system_configuration_data()
+
+        # Constructs the root session directory path
+        session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, session_name)
+
+        # Prevents creating new sessions for non-existent projects.
+        if not acquisition_system.filesystem.root_directory.joinpath(project_name).exists():
+            message = (
+                f"Unable to initialize a new data acquisition session {session_name} for the animal '{animal_id}' and "
+                f"project '{project_name}'. The project does not exist on the local machine (PC). Use the "
+                f"'sl-project create' CLI command to create the project on the local machine before creating new "
+                f"sessions."
+            )
+            console.error(message=message, error=FileNotFoundError)
+
+        # Generates the session's raw data directory. This method assumes that the session is created on the
+        # data acquisition machine that only acquires the data and does not create the other session's directories used
+        # during data processing.
+        raw_data = RawData()
+        raw_data.resolve_paths(root_directory_path=session_path.joinpath("raw_data"))
+        raw_data.make_directories()  # Generates the local 'raw_data' directory tree
+
+        # Generates the SessionData instance.
+        instance = SessionData(
+            project_name=project_name,
+            animal_id=animal_id,
+            session_name=session_name,
+            session_type=session_type,
+            acquisition_system=acquisition_system.name,
+            raw_data=raw_data,
+            experiment_name=experiment_name,
+            python_version=python_version,
+            sollertia_experiment_version=sollertia_experiment_version,
         )
-        raise NotImplementedError(message)
+
+        # Saves the configured instance data to the session's directory so that it can be reused during processing or
+        # preprocessing.
+        instance.save()
+
+        # Dumps the acquisition system's configuration data to the session's directory
+        acquisition_system.save(path=instance.raw_data.raw_data_path.joinpath("system_configuration.yaml"))
+
+        if experiment_name is not None:
+            # Copies the experiment_configuration.yaml file to the session's directory
+            experiment_configuration_path = acquisition_system.filesystem.root_directory.joinpath(
+                project_name, "configuration", f"{experiment_name}.yaml"
+            )
+            shutil.copy2(experiment_configuration_path, instance.raw_data.experiment_configuration_path)
+
+        # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
+        # the session becomes a valid target for deletion (purging) runtimes operating from the main acquisition
+        # machine of any data acquisition system.
+        instance.raw_data.raw_data_path.joinpath("nk.bin").touch()
+
+        # Returns the initialized SessionData instance to caller
+        return instance
 
     @classmethod
     def load(cls, session_path: Path) -> SessionData:
@@ -220,8 +294,8 @@ class SessionData(YamlConfig):
         """Ensures that the 'nk.bin' marker file is removed from the session's raw_data directory.
 
         Notes:
-            This service method is used by the sl-experiment library to acquire the session's data. Do not call this
-            method manually.
+            This service method is used by the sollertia-experiment library to acquire the session's data. Do not call
+            this method manually.
         """
         self.raw_data.raw_data_path.joinpath("nk.bin").unlink(missing_ok=True)
 
