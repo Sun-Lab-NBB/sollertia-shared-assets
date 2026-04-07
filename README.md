@@ -104,7 +104,7 @@ sl-configure mcp
 | `set_working_directory_tool`                | Sets the Sollertia platform working directory                     |
 | `get_server_configuration_tool`             | Returns the compute server configuration (password masked)        |
 | `create_server_configuration_template_tool` | Creates a server configuration template for manual password entry |
-| `get_google_credentials_tool`               | Returns the path to the Google service account credentials file  |
+| `get_google_credentials_tool`               | Returns the path to the Google service account credentials file   |
 | `set_google_credentials_tool`               | Sets the path to the Google credentials file                      |
 | `get_task_templates_directory_tool`         | Returns the path to the sollertia-unity-tasks templates directory |
 | `set_task_templates_directory_tool`         | Sets the path to the task templates directory                     |
@@ -200,7 +200,7 @@ ___
 
 ## License
 
-This project is licensed under the GPL3 License: see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License: see the [LICENSE](LICENSE) file for details.
 
 ___
 

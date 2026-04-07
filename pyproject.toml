@@ -9,7 +9,7 @@ name = "sollertia-shared-assets"
 version = "8.0.0"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
-license = "GPL-3.0-or-later"
+license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.14,<3.15"
 authors = [
