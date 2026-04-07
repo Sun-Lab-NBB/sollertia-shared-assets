@@ -6,10 +6,8 @@ import pytest
 import appdirs
 
 from sollertia_shared_assets.data_classes import (
-    SessionTypes,
-    RawData,
-    ProcessedData,
     SessionData,
+    SessionTypes,
 )
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
@@ -138,89 +136,14 @@ def test_session_types_is_string_enum():
     assert isinstance(SessionTypes.WINDOW_CHECKING, str)
 
 
-# Tests for RawData dataclass
-
-
-def test_raw_data_default_initialization():
-    """Verifies default initialization of RawData.
-
-    This test ensures all path fields have default Path() values.
-    """
-    raw_data = RawData()
-
-    assert raw_data.raw_data_path == Path()
-    assert raw_data.session_descriptor_path == Path()
-    assert raw_data.hardware_state_path == Path()
-    assert raw_data.surgery_metadata_path == Path()
-    assert raw_data.experiment_configuration_path == Path()
-    assert raw_data.window_screenshot_path == Path()
-
-
-def test_raw_data_resolve_paths(tmp_path):
-    """Verifies that resolve_paths correctly generates all data paths.
-
-    This test ensures all paths are properly resolved from the root directory.
-    """
-    raw_data = RawData()
-    root_path = tmp_path / "raw_data"
-
-    raw_data.resolve_paths(root_directory_path=root_path)
-
-    assert raw_data.raw_data_path == root_path
-    assert raw_data.session_descriptor_path == root_path / "session_descriptor.yaml"
-    assert raw_data.hardware_state_path == root_path / "hardware_state.yaml"
-    assert raw_data.surgery_metadata_path == root_path / "surgery_metadata.yaml"
-    assert raw_data.experiment_configuration_path == root_path / "experiment_configuration.yaml"
-    assert raw_data.window_screenshot_path == root_path / "window_screenshot.png"
-
-
-def test_raw_data_make_directories(tmp_path):
-    """Verifies that make_directories creates the root raw data directory.
-
-    This test ensures the directory creation method works correctly.
-    """
-    raw_data = RawData()
-    root_path = tmp_path / "raw_data"
-
-    raw_data.resolve_paths(root_directory_path=root_path)
-    raw_data.make_directories()
-
-    assert root_path.exists()
-
-
-# Tests for ProcessedData dataclass
-
-
-def test_processed_data_default_initialization():
-    """Verifies default initialization of ProcessedData.
-
-    This test ensures the path field has a default Path() value.
-    """
-    processed_data = ProcessedData()
-
-    assert processed_data.processed_data_path == Path()
-
-
-def test_processed_data_resolve_paths(tmp_path):
-    """Verifies that resolve_paths correctly sets the processed data root path.
-
-    This test ensures the path is properly resolved from the root directory.
-    """
-    processed_data = ProcessedData()
-    root_path = tmp_path / "processed_data"
-
-    processed_data.resolve_paths(root_directory_path=root_path)
-
-    assert processed_data.processed_data_path == root_path
-
-
 # Tests for SessionData dataclass
 
 
-def test_session_data_post_init_creates_nested_instances():
-    """Verifies that __post_init__ creates nested dataclass instances.
+def test_session_data_default_path_fields():
+    """Verifies that raw_data_path and processed_data_path default to empty Path() values.
 
-    This test ensures RawData and ProcessedData are initialized.
+    This test ensures the bare-Path dataclass fields are populated when SessionData is constructed
+    without going through create() or load().
     """
     session_data = SessionData(
         project_name="test_project",
@@ -231,8 +154,10 @@ def test_session_data_post_init_creates_nested_instances():
         sollertia_experiment_version="3.0.0",
     )
 
-    assert isinstance(session_data.raw_data, RawData)
-    assert isinstance(session_data.processed_data, ProcessedData)
+    assert isinstance(session_data.raw_data_path, Path)
+    assert isinstance(session_data.processed_data_path, Path)
+    assert session_data.raw_data_path == Path()
+    assert session_data.processed_data_path == Path()
 
 
 def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
@@ -290,9 +215,9 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     )
 
     # Verifies session directory exists
-    session_path = session_data.raw_data.raw_data_path.parent
+    session_path = session_data.raw_data_path.parent
     assert session_path.exists()
-    assert session_data.raw_data.raw_data_path.exists()
+    assert session_data.raw_data_path.exists()
 
 
 def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
@@ -322,7 +247,7 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
     )
 
     # Verifies session_data.yaml exists
-    session_data_yaml = session_data.raw_data.raw_data_path.joinpath("session_data.yaml")
+    session_data_yaml = session_data.raw_data_path.joinpath("session_data.yaml")
     assert session_data_yaml.exists()
 
     content = session_data_yaml.read_text()
@@ -357,7 +282,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
     )
 
     # Verifies nk.bin exists
-    assert session_data.raw_data.raw_data_path.joinpath("nk.bin").exists()
+    assert session_data.raw_data_path.joinpath("nk.bin").exists()
 
 
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
@@ -438,8 +363,8 @@ processed_data: null
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
     # Verifies paths are resolved
-    assert loaded_session.raw_data.raw_data_path == sample_session_hierarchy / "raw_data"
-    assert loaded_session.processed_data.processed_data_path == sample_session_hierarchy / "processed_data"
+    assert loaded_session.raw_data_path == sample_session_hierarchy / "raw_data"
+    assert loaded_session.processed_data_path == sample_session_hierarchy / "processed_data"
 
 
 def test_session_data_runtime_initialized_removes_nk_file(sample_session_hierarchy):
@@ -464,7 +389,7 @@ processed_data: null
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
     # Creates the nk.bin file
-    nk_path = loaded_session.raw_data.raw_data_path.joinpath("nk.bin")
+    nk_path = loaded_session.raw_data_path.joinpath("nk.bin")
     nk_path.touch()
     assert nk_path.exists()
 
@@ -490,20 +415,19 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
+        raw_data_path=raw_data_path,
     )
-
-    session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
     session_data.save()
 
-    content = session_data.raw_data.raw_data_path.joinpath("session_data.yaml").read_text()
+    content = session_data.raw_data_path.joinpath("session_data.yaml").read_text()
     assert "session_type: mesoscope experiment" in content
     assert "acquisition_system: mesoscope" in content
 
 
-def test_session_data_save_does_not_include_path_objects(sample_session_hierarchy):
-    """Verifies that save() excludes path objects from the saved YAML.
+def test_session_data_save_serializes_path_fields(sample_session_hierarchy):
+    """Verifies that save() serializes the raw and processed data root paths as YAML scalars.
 
-    This test ensures only metadata is saved, not path instances.
+    This test ensures the path fields are written using the YamlConfig automatic Path serialization.
     """
     raw_data_path = sample_session_hierarchy / "raw_data"
     raw_data_path.mkdir(parents=True, exist_ok=True)
@@ -515,14 +439,13 @@ def test_session_data_save_does_not_include_path_objects(sample_session_hierarch
         session_type=SessionTypes.RUN_TRAINING,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
+        raw_data_path=raw_data_path,
     )
-
-    session_data.raw_data.resolve_paths(root_directory_path=raw_data_path)
     session_data.save()
 
-    content = session_data.raw_data.raw_data_path.joinpath("session_data.yaml").read_text()
-    assert "raw_data: null" in content
-    assert "processed_data: null" in content
+    content = session_data.raw_data_path.joinpath("session_data.yaml").read_text()
+    assert f"raw_data_path: {raw_data_path.as_posix()}" in content
+    assert "processed_data_path: ." in content
 
 
 def test_session_data_create_raises_error_if_project_does_not_exist(
@@ -594,7 +517,7 @@ def test_session_data_create_copies_experiment_configuration(
     )
 
     # Verifies experiment configuration was copied
-    session_experiment_config = session_data.raw_data.raw_data_path / "experiment_configuration.yaml"
+    session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
     assert session_experiment_config.exists()
 
     content = session_experiment_config.read_text()
@@ -631,7 +554,7 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
     )
 
     # Verifies experiment configuration was NOT created
-    session_experiment_config = session_data.raw_data.raw_data_path / "experiment_configuration.yaml"
+    session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
     assert not session_experiment_config.exists()
 
 
@@ -662,7 +585,7 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
     )
 
     # Verifies system configuration file exists
-    system_config_path = session_data.raw_data.raw_data_path.joinpath("system_configuration.yaml")
+    system_config_path = session_data.raw_data_path.joinpath("system_configuration.yaml")
     assert system_config_path.exists()
 
     # Verifies content can be loaded
