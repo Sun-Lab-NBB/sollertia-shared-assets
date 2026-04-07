@@ -1,6 +1,6 @@
 # sollertia-shared-assets
 
-A Python library that provides data acquisition and processing assets shared between Sollertia platform libraries.
+Provides data acquisition and processing assets shared between Sollertia platform libraries.
 
 ![PyPI - Version](https://img.shields.io/pypi/v/sollertia-shared-assets)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/sollertia-shared-assets)
@@ -15,10 +15,12 @@ ___
 
 ## Detailed Description
 
-Sollertia is an AI-assisted scientific data acquisition and processing platform built on the Ataraxis framework and
-developed in the Sun (NeuroAI) lab at Cornell University. This library makes the two main Sollertia libraries used for
-data acquisition ([sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-experiment)) and processing
-([sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)) independent of each other.
+This library is part of the [Sollertia](https://github.com/Sun-Lab-NBB/sollertia) AI-assisted scientific data
+acquisition and processing platform, built on the [Ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) framework and
+developed in the Sun (NeuroAI) lab at Cornell University. It keeps the two main Sollertia libraries used for data
+acquisition ([sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-experiment)) and processing
+([sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)) independent of each other by providing the
+shared assets both depend on.
 
 The library broadly stores two types of assets. First, it stores dataclasses used to save the data acquired with the
 Sollertia platform and configure data acquisition and processing runtimes. Second, it provides the low-level tools and
