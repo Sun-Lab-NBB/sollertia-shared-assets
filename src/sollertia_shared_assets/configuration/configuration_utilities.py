@@ -539,14 +539,13 @@ def get_server_configuration() -> ServerConfiguration:
     configuration = ServerConfiguration.from_yaml(file_path=config_path)
 
     sentinel_path = Path()
-    if (
-        not configuration.username
-        or not configuration.password
-        or not configuration.host
-        or not configuration.shared_directory_name
-        or configuration.storage_root == sentinel_path
-        or configuration.working_root == sentinel_path
-    ):
+    required_strings = (
+        configuration.username,
+        configuration.password,
+        configuration.host,
+        configuration.shared_directory_name,
+    )
+    if not all(required_strings) or sentinel_path in {configuration.storage_root, configuration.working_root}:
         message = (
             "Unable to load the server configuration. The 'server_configuration.yaml' file appears to be unconfigured "
             "or contains placeholder values for one or more required fields (username, password, host, storage_root, "
