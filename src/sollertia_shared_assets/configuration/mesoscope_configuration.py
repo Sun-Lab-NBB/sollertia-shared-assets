@@ -4,7 +4,6 @@ This module contains the system configuration dataclasses and the experiment con
 Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game engine.
 """
 
-from copy import deepcopy
 from pathlib import Path
 from dataclasses import field, dataclass
 
@@ -22,19 +21,19 @@ from .experiment_configuration import (  # noqa: TC001 (used in dataclass fields
 # noinspection PyArgumentList
 @dataclass
 class MesoscopeExperimentConfiguration(YamlConfig):
-    """Defines an experiment session that uses the Mesoscope_VR data acquisition system.
+    """Defines an experiment session that uses the Mesoscope-VR data acquisition system.
 
-    This is the unified configuration that serves both the data acquisition system (sollertia-experiment),
-    the analysis pipeline (sollertia-forgery), and the Unity VR environment (sollertia-unity-tasks).
+    Provides the unified configuration consumed by the data acquisition system (sollertia-experiment), the
+    analysis pipeline (sollertia-forgery), and the Unity VR environment (sollertia-unity-tasks).
     """
 
-    # Virtual Reality building block configuration
+    # Configures Virtual Reality building blocks.
     cues: list[Cue]
     """Defines the Virtual Reality environment wall cues used in the experiment."""
     segments: list[Segment]
     """Defines the Virtual Reality environment segments (sequences of wall cues) for the Unity corridor system."""
 
-    # Task configuration
+    # Configures task structure.
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
     """Defines experiment's structure by specifying the types of trials used by the phases (states) of the
     experiment."""
@@ -42,7 +41,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states
     executed during runtime."""
 
-    # VR environment configuration
+    # Configures the Virtual Reality environment.
     vr_environment: VREnvironment
     """Defines the Virtual Reality corridor used during the experiment."""
     unity_scene_name: str
@@ -66,7 +65,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         """Returns the mapping of segment names to their Segment class instances for all VR segments used in the
         experiment.
         """
-        return {seg.name: seg for seg in self.segments}
+        return {segment.name: segment for segment in self.segments}
 
     def _get_segment_length_cm(self, segment_name: str) -> float:
         """Returns the total length of the VR segment in centimeters."""
@@ -84,50 +83,51 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         # Ensures cue codes are unique.
         codes = [cue.code for cue in self.cues]
         if len(codes) != len(set(codes)):
-            duplicate_codes = [c for c in codes if codes.count(c) > 1]
+            duplicate_codes = {code for code in codes if codes.count(code) > 1}
             message = (
-                f"Duplicate cue codes found: {set(duplicate_codes)} in the {self.vr_environment} VR environment "
-                f"definition. Each cue must use a unique integer code."
+                f"Unable to initialize MesoscopeExperimentConfiguration. The cue codes must each be unique, but "
+                f"got duplicate codes {duplicate_codes}."
             )
             console.error(message=message, error=ValueError)
 
         # Ensures cue names are unique.
         names = [cue.name for cue in self.cues]
         if len(names) != len(set(names)):
-            duplicate_names = [n for n in names if names.count(n) > 1]
+            duplicate_names = {name for name in names if names.count(name) > 1}
             message = (
-                f"Duplicate cue names found: {set(duplicate_names)} in the {self.vr_environment} VR environment "
-                f"definition. Each cue must use a unique name."
+                f"Unable to initialize MesoscopeExperimentConfiguration. The cue names must each be unique, but "
+                f"got duplicate names {duplicate_names}."
             )
             console.error(message=message, error=ValueError)
 
         # Ensures segment cue sequences reference valid cues.
         cue_names = {cue.name for cue in self.cues}
-        for seg in self.segments:
-            for cue_name in seg.cue_sequence:
+        for segment in self.segments:
+            for cue_name in segment.cue_sequence:
                 if cue_name not in cue_names:
                     message = (
-                        f"Segment '{seg.name}' references unknown cue '{cue_name}'. "
-                        f"Available cues: {', '.join(sorted(cue_names))}."
+                        f"Unable to initialize MesoscopeExperimentConfiguration. Segment '{segment.name}' "
+                        f"references unknown cue '{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
                     )
                     console.error(message=message, error=ValueError)
 
         # Populates the derived trial fields and validates them.
-        segment_names = {seg.name for seg in self.segments}
+        segment_names = {segment.name for segment in self.segments}
         for trial_name, trial in self.trial_structures.items():
             # Validates segment reference.
             if trial.segment_name not in segment_names:
                 message = (
-                    f"Trial '{trial_name}' references unknown segment '{trial.segment_name}'. "
-                    f"Available segments: {', '.join(sorted(segment_names))}."
+                    f"Unable to initialize MesoscopeExperimentConfiguration. Trial '{trial_name}' references "
+                    f"unknown segment '{trial.segment_name}'. Available segments: "
+                    f"{', '.join(sorted(segment_names))}."
                 )
                 console.error(message=message, error=ValueError)
 
             # Populates cue_sequence from segment.
-            trial.cue_sequence = self._get_segment_cue_codes(trial.segment_name)
+            trial.cue_sequence = self._get_segment_cue_codes(segment_name=trial.segment_name)
 
             # Populates trial_length_cm from segment.
-            trial.trial_length_cm = self._get_segment_length_cm(trial.segment_name)
+            trial.trial_length_cm = self._get_segment_length_cm(segment_name=trial.segment_name)
 
             # Validates zone positions with populated trial_length_cm.
             trial.validate_zones()
@@ -222,9 +222,9 @@ class MesoscopeMicroControllers:
     torque_sensor_capacity_g_cm: float = 720.0779
     """The maximum torque detectable by the sensor, in grams centimeter (g cm)."""
     torque_report_cw: bool = True
-    """Determines whether the torque sensor should report torques in the Clockwise (CW) direction."""
+    """Determines whether the torque sensor should report torque in the Clockwise (CW) direction."""
     torque_report_ccw: bool = True
-    """Determines whether the sensor should report torque in the Counter-Clockwise (CCW) direction."""
+    """Determines whether the torque sensor should report torque in the Counter-Clockwise (CCW) direction."""
     torque_signal_threshold_adc: int = 150
     """The minimum voltage, in raw analog units recorded by a 3.3 Volt 12-bit Analog-to-Digital-Converter (ADC),
     reported to the PC as a non-zero value. Voltages below this level are interpreted as noise and are pulled to 0."""
@@ -238,7 +238,7 @@ class MesoscopeMicroControllers:
     wheel_encoder_report_cw: bool = False
     """Determines whether the encoder should report rotation in the Clockwise (CW) direction."""
     wheel_encoder_report_ccw: bool = True
-    """Determines whether the encoder should report rotation in the CounterClockwise (CCW) direction."""
+    """Determines whether the encoder should report rotation in the Counter-Clockwise (CCW) direction."""
     wheel_encoder_delta_threshold_pulse: int = 15
     """The minimum absolute difference between two consecutive encoder readouts, in encoder pulse counts, for the
     change to be reported to the PC."""
@@ -297,15 +297,10 @@ class MesoscopeSystemConfiguration(YamlConfig):
     """Stores the third-party hardware and firmware assets configuration."""
 
     def __post_init__(self) -> None:
-        """Ensures that all instance assets are stored as the expected types."""
-        self.filesystem.root_directory = Path(self.filesystem.root_directory)
-        self.filesystem.server_directory = Path(self.filesystem.server_directory)
-        self.filesystem.nas_directory = Path(self.filesystem.nas_directory)
-        self.filesystem.mesoscope_directory = Path(self.filesystem.mesoscope_directory)
-
+        """Normalizes the valve calibration data to a tuple representation and validates its shape."""
         if not isinstance(self.microcontrollers.valve_calibration_data, tuple):
             self.microcontrollers.valve_calibration_data = tuple(
-                (k, v) for k, v in self.microcontrollers.valve_calibration_data.items()
+                (open_time, volume) for open_time, volume in self.microcontrollers.valve_calibration_data.items()
             )
 
         valve_calibration_data = self.microcontrollers.valve_calibration_data
@@ -313,34 +308,33 @@ class MesoscopeSystemConfiguration(YamlConfig):
         if not all(
             isinstance(item, tuple)
             and len(item) == element_count
-            and isinstance(item[0], (int | float))
-            and isinstance(item[1], (int | float))
+            and isinstance(item[0], int | float)
+            and isinstance(item[1], int | float)
             for item in valve_calibration_data
         ):
             message = (
-                f"Unable to initialize the MesoscopeSystemConfiguration class. Expected each item under the "
-                f"'valve_calibration_data' field of the Mesoscope-VR acquisition system configuration .yaml file to be "
-                f"a tuple of two integer or float values, but instead encountered {valve_calibration_data} with at "
-                f"least one incompatible element."
+                f"Unable to initialize MesoscopeSystemConfiguration. Each item under the valve_calibration_data "
+                f"field of the Mesoscope-VR acquisition system configuration .yaml file must be a tuple of two "
+                f"integer or float values, but got {valve_calibration_data} with at least one incompatible "
+                f"element."
             )
             console.error(message=message, error=TypeError)
 
     def save(self, path: Path) -> None:
-        """Saves the instance's data to disk as a .YAML file.
+        """Saves the instance's data to disk as a .yaml file.
+
+        Notes:
+            Path and Enum fields are serialized automatically by YamlConfig. The valve_calibration_data
+            tuple is temporarily converted to a dict for serialization so that existing .yaml files
+            retain their mapping layout for the calibration table, then restored after the write.
 
         Args:
-            path: The path to the .YAML file to save the data to.
+            path: The path to the .yaml file to save the data to.
         """
-        original = deepcopy(self)
-
-        original.filesystem.root_directory = str(original.filesystem.root_directory)  # type: ignore[assignment]
-        original.filesystem.server_directory = str(original.filesystem.server_directory)  # type: ignore[assignment]
-        original.filesystem.nas_directory = str(original.filesystem.nas_directory)  # type: ignore[assignment]
-        original.filesystem.mesoscope_directory = str(  # type: ignore[assignment]
-            original.filesystem.mesoscope_directory
-        )
-
-        if isinstance(original.microcontrollers.valve_calibration_data, tuple):
-            original.microcontrollers.valve_calibration_data = dict(original.microcontrollers.valve_calibration_data)
-
-        original.to_yaml(file_path=path)
+        original_value = self.microcontrollers.valve_calibration_data
+        try:
+            if isinstance(original_value, tuple):
+                self.microcontrollers.valve_calibration_data = dict(original_value)
+            self.to_yaml(file_path=path)
+        finally:
+            self.microcontrollers.valve_calibration_data = original_value

@@ -11,9 +11,15 @@ from dataclasses import dataclass
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
+_UINT8_MAX: int = 255
+"""Maximum value for uint8 cue codes."""
+
+_PROBABILITY_SUM_TOLERANCE: float = 0.001
+"""Tolerance for validating that segment transition probabilities sum to 1.0."""
+
 
 class TriggerType(StrEnum):
-    """Enumerates the supported stimulus trigger zone activators for experiment trials.
+    """Defines the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
         All Sollertia platform acquisition systems share these core trial types. LICK corresponds to GuidanceZone in
@@ -21,18 +27,11 @@ class TriggerType(StrEnum):
     """
 
     LICK = "lick"
-    """Indicates a lick-triggered trial where the animal must lick inside the stimulus trigger zone to trigger the 
-    stimulus delivery."""
+    """Indicates a lick-triggered trial where the animal must lick inside the stimulus trigger zone to elicit stimulus
+    delivery."""
     OCCUPANCY = "occupancy"
     """Indicates an occupancy-triggered trial where the animal must occupy the trigger zone for a specified duration to
     disable the stimulus delivery."""
-
-
-# Maximum value for uint8 cue codes.
-_UINT8_MAX: int = 255
-
-# Tolerance for validating probability sums to 1.0.
-_PROBABILITY_SUM_TOLERANCE: float = 0.001
 
 
 @dataclass
@@ -55,10 +54,16 @@ class Cue:
     def __post_init__(self) -> None:
         """Validates cue definition parameters."""
         if not 0 <= self.code <= _UINT8_MAX:
-            message = f"Cue code must be a uint8 value (0-255), got {self.code} for cue '{self.name}'."
+            message = (
+                f"Unable to initialize Cue '{self.name}'. The code must be a uint8 value in range [0, 255], but got "
+                f"{self.code}."
+            )
             console.error(message=message, error=ValueError)
         if self.length_cm <= 0:
-            message = f"Cue length must be positive, got {self.length_cm} cm for cue '{self.name}'."
+            message = (
+                f"Unable to initialize Cue '{self.name}'. The length_cm must be greater than 0, but got "
+                f"{self.length_cm} cm."
+            )
             console.error(message=message, error=ValueError)
 
 
@@ -82,13 +87,19 @@ class Segment:
     def __post_init__(self) -> None:
         """Validates segment definition parameters."""
         if not self.cue_sequence:
-            message = f"Segment '{self.name}' must have at least one cue in its cue_sequence."
+            message = (
+                f"Unable to initialize Segment '{self.name}'. The cue_sequence must contain at least one cue, but "
+                f"got an empty sequence."
+            )
             console.error(message=message, error=ValueError)
 
         if self.transition_probabilities:
-            prob_sum = sum(self.transition_probabilities)
-            if abs(prob_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
-                message = f"Segment '{self.name}' transition probabilities sum to {prob_sum}, but must sum to 1.0."
+            probability_sum = sum(self.transition_probabilities)
+            if abs(probability_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
+                message = (
+                    f"Unable to initialize Segment '{self.name}'. The transition_probabilities must sum to 1.0, but "
+                    f"got {probability_sum}."
+                )
                 console.error(message=message, error=ValueError)
 
 
@@ -116,7 +127,7 @@ class TrialStructure:
     """Defines the spatial configuration of a trial structure for Unity prefabs.
 
     Notes:
-        This base class contains ONLY the spatial data needed by Unity for prefab generation and runtime zone
+        This base class contains only the spatial data needed by Unity for prefab generation and runtime zone
         configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) are added by subclasses
         in mesoscope_configuration.py.
 
@@ -144,8 +155,8 @@ class TaskTemplate(YamlConfig):
     """Defines a VR task template used by Unity for prefab generation and runtime configuration.
 
     Notes:
-        Task templates contain ONLY the data Unity needs for prefab generation and runtime. Experiment-specific
-        parameters (rewards, guidance, experiment states) are NOT included here - those are added by system-specific
+        Task templates contain only the data Unity needs for prefab generation and runtime. Experiment-specific
+        parameters (rewards, guidance, experiment states) are not included here — those are added by system-specific
         experiment configuration classes that use the full trial structure classes inheriting from TrialStructure.
 
         This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-unity-tasks
@@ -174,7 +185,7 @@ class TaskTemplate(YamlConfig):
         """Returns the mapping of segment names to their Segment class instances for all VR segments used in the
         template.
         """
-        return {seg.name: seg for seg in self.segments}
+        return {segment.name: segment for segment in self.segments}
 
     def _get_segment_length_cm(self, segment_name: str) -> float:
         """Returns the total length of the VR segment in centimeters."""
@@ -187,36 +198,42 @@ class TaskTemplate(YamlConfig):
         # Ensures cue codes are unique.
         codes = [cue.code for cue in self.cues]
         if len(codes) != len(set(codes)):
-            duplicate_codes = [c for c in codes if codes.count(c) > 1]
-            message = f"Duplicate cue codes found: {set(duplicate_codes)}. Each cue must use a unique integer code."
+            duplicate_codes = {code for code in codes if codes.count(code) > 1}
+            message = (
+                f"Unable to initialize TaskTemplate. The cue codes must each be unique, but got duplicate codes "
+                f"{duplicate_codes}."
+            )
             console.error(message=message, error=ValueError)
 
         # Ensures cue names are unique.
         names = [cue.name for cue in self.cues]
         if len(names) != len(set(names)):
-            duplicate_names = [n for n in names if names.count(n) > 1]
-            message = f"Duplicate cue names found: {set(duplicate_names)}. Each cue must use a unique name."
+            duplicate_names = {name for name in names if names.count(name) > 1}
+            message = (
+                f"Unable to initialize TaskTemplate. The cue names must each be unique, but got duplicate names "
+                f"{duplicate_names}."
+            )
             console.error(message=message, error=ValueError)
 
         # Ensures segment cue sequences reference valid cues.
         cue_names = {cue.name for cue in self.cues}
-        for seg in self.segments:
-            for cue_name in seg.cue_sequence:
+        for segment in self.segments:
+            for cue_name in segment.cue_sequence:
                 if cue_name not in cue_names:
                     message = (
-                        f"Segment '{seg.name}' references unknown cue '{cue_name}'. "
-                        f"Available cues: {', '.join(sorted(cue_names))}."
+                        f"Unable to initialize TaskTemplate. Segment '{segment.name}' references unknown cue "
+                        f"'{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
                     )
                     console.error(message=message, error=ValueError)
 
         # Validates trial structure segment references and trigger types.
-        segment_names = {seg.name for seg in self.segments}
-        valid_trigger_types = {t.value for t in TriggerType}
+        segment_names = {segment.name for segment in self.segments}
+        valid_trigger_types = {trigger_type.value for trigger_type in TriggerType}
         for trial_name, trial_structure in self.trial_structures.items():
             if trial_structure.segment_name not in segment_names:
                 message = (
-                    f"Trial structure '{trial_name}' references unknown segment '{trial_structure.segment_name}'. "
-                    f"Available segments: {', '.join(sorted(segment_names))}."
+                    f"Unable to initialize TaskTemplate. Trial structure '{trial_name}' references unknown segment "
+                    f"'{trial_structure.segment_name}'. Available segments: {', '.join(sorted(segment_names))}."
                 )
                 console.error(message=message, error=ValueError)
 
@@ -228,14 +245,18 @@ class TaskTemplate(YamlConfig):
             )
             if trigger_value not in valid_trigger_types:
                 message = (
-                    f"Trial structure '{trial_name}' has invalid trigger_type '{trial_structure.trigger_type}'. "
-                    f"Valid values: {', '.join(sorted(valid_trigger_types))}."
+                    f"Unable to initialize TaskTemplate. Trial structure '{trial_name}' has invalid trigger_type "
+                    f"'{trial_structure.trigger_type}'. Valid values: {', '.join(sorted(valid_trigger_types))}."
                 )
                 console.error(message=message, error=ValueError)
 
             # Validates zone positions are within segment bounds.
-            segment_length = self._get_segment_length_cm(trial_structure.segment_name)
-            self._validate_zone_positions(trial_name, trial_structure, segment_length)
+            segment_length = self._get_segment_length_cm(segment_name=trial_structure.segment_name)
+            self._validate_zone_positions(
+                trial_name=trial_name,
+                trial_structure=trial_structure,
+                segment_length=segment_length,
+            )
 
     @staticmethod
     def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, segment_length: float) -> None:
@@ -248,38 +269,42 @@ class TaskTemplate(YamlConfig):
         """
         if trial_structure.stimulus_trigger_zone_end_cm < trial_structure.stimulus_trigger_zone_start_cm:
             message = (
-                f"Trial '{trial_name}': stimulus_trigger_zone_end_cm "
-                f"({trial_structure.stimulus_trigger_zone_end_cm}) must be >= "
-                f"stimulus_trigger_zone_start_cm ({trial_structure.stimulus_trigger_zone_start_cm})."
+                f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_trigger_zone_end_cm must "
+                f"be greater than or equal to stimulus_trigger_zone_start_cm "
+                f"({trial_structure.stimulus_trigger_zone_start_cm}), but got "
+                f"{trial_structure.stimulus_trigger_zone_end_cm}."
             )
             console.error(message=message, error=ValueError)
 
         if not 0 <= trial_structure.stimulus_trigger_zone_start_cm <= segment_length:
             message = (
-                f"Trial '{trial_name}': stimulus_trigger_zone_start_cm "
-                f"({trial_structure.stimulus_trigger_zone_start_cm}) must be within "
-                f"segment length (0 to {segment_length} cm)."
+                f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_trigger_zone_start_cm "
+                f"must be within the segment length (0 to {segment_length} cm), but got "
+                f"{trial_structure.stimulus_trigger_zone_start_cm}."
             )
             console.error(message=message, error=ValueError)
 
         if not 0 <= trial_structure.stimulus_trigger_zone_end_cm <= segment_length:
             message = (
-                f"Trial '{trial_name}': stimulus_trigger_zone_end_cm "
-                f"({trial_structure.stimulus_trigger_zone_end_cm}) must be within "
-                f"segment length (0 to {segment_length} cm)."
+                f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_trigger_zone_end_cm must "
+                f"be within the segment length (0 to {segment_length} cm), but got "
+                f"{trial_structure.stimulus_trigger_zone_end_cm}."
             )
             console.error(message=message, error=ValueError)
 
         if not 0 <= trial_structure.stimulus_location_cm <= segment_length:
             message = (
-                f"Trial '{trial_name}': stimulus_location_cm ({trial_structure.stimulus_location_cm}) "
-                f"must be within segment length (0 to {segment_length} cm)."
+                f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_location_cm must be "
+                f"within the segment length (0 to {segment_length} cm), but got "
+                f"{trial_structure.stimulus_location_cm}."
             )
             console.error(message=message, error=ValueError)
 
         if trial_structure.stimulus_location_cm < trial_structure.stimulus_trigger_zone_start_cm:
             message = (
-                f"Trial '{trial_name}': stimulus_location_cm ({trial_structure.stimulus_location_cm}) "
-                f"cannot precede stimulus_trigger_zone_start_cm ({trial_structure.stimulus_trigger_zone_start_cm})."
+                f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_location_cm must not "
+                f"precede the stimulus_trigger_zone_start_cm "
+                f"({trial_structure.stimulus_trigger_zone_start_cm}), but got "
+                f"{trial_structure.stimulus_location_cm}."
             )
             console.error(message=message, error=ValueError)
