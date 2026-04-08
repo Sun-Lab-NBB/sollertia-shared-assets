@@ -1,9 +1,4 @@
-"""Provides configuration utilities shared across all data acquisition systems.
-
-This module contains the acquisition systems enumeration, system and server configuration dataclasses, working
-directory path utilities, system configuration registries and factories, Google credentials and task templates path
-utilities, and the experiment configuration factory.
-"""
+"""Provides configuration utilities shared across all data acquisition systems."""
 
 from copy import deepcopy
 from enum import StrEnum
@@ -36,29 +31,30 @@ class ServerConfiguration(YamlConfig):
     """The username to use for server authentication."""
     password: str = ""
     """The password to use for server authentication."""
-    host: str = "cbsuwsun.biohpc.cornell.edu"
+    host: str = ""
     """The hostname or IP address of the server to connect to."""
-    storage_root: str = "/local/storage"
-    """The path to the server's storage (slow) HDD RAID volume."""
-    working_root: str = "/local/workdir"
-    """The path to the server's working (fast) NVME RAID volume."""
-    shared_directory_name: str = "sun_data"
-    """The name of the shared directory that stores Sollertia platform project data on both server volumes."""
-    shared_storage_root: str = field(init=False, default="")
-    """The path to the root Sollertia platform shared directory on the storage server's volume."""
-    shared_working_root: str = field(init=False, default="")
-    """The path to the root Sollertia platform shared directory on the working server's volume."""
-    user_data_root: str = field(init=False, default="")
-    """The path to the root user's directory on the storage server's volume."""
-    user_working_root: str = field(init=False, default="")
-    """The path to the root user's directory on the working server's volume."""
+    storage_root: Path = field(default_factory=Path)
+    """The path to the server directory dedicated to general data storage. This is the primary location where all
+    Sollertia platform project data is kept on the server."""
+    working_root: Path = field(default_factory=Path)
+    """The path to the server directory dedicated to data processing operations."""
+    shared_directory_name: str = ""
+    """The name of the shared directory that stores Sollertia platform project data under both server roots."""
+    shared_storage_root: Path = field(init=False, default_factory=Path)
+    """The path to the root Sollertia platform shared directory under the server's storage root."""
+    shared_working_root: Path = field(init=False, default_factory=Path)
+    """The path to the root Sollertia platform shared directory under the server's working root."""
+    user_data_root: Path = field(init=False, default_factory=Path)
+    """The path to the user's directory under the server's storage root."""
+    user_working_root: Path = field(init=False, default_factory=Path)
+    """The path to the user's directory under the server's working root."""
 
     def __post_init__(self) -> None:
         """Resolves all server-side directory paths."""
-        self.shared_storage_root = str(Path(self.storage_root).joinpath(self.shared_directory_name))
-        self.shared_working_root = str(Path(self.working_root).joinpath(self.shared_directory_name))
-        self.user_data_root = str(Path(self.storage_root).joinpath(self.username))
-        self.user_working_root = str(Path(self.working_root).joinpath(self.username))
+        self.shared_storage_root = self.storage_root.joinpath(self.shared_directory_name)
+        self.shared_working_root = self.working_root.joinpath(self.shared_directory_name)
+        self.user_data_root = self.storage_root.joinpath(self.username)
+        self.user_working_root = self.working_root.joinpath(self.username)
 
 
 type SystemConfiguration = MesoscopeSystemConfiguration
@@ -236,7 +232,7 @@ def create_experiment_configuration(
     """Creates an experiment configuration for the specified acquisition system from a TaskTemplate.
 
     Args:
-        template: The TaskTemplate containing the VR structure (cues, segments, trial zones) to convert.
+        template: The TaskTemplate containing the VR structure (cues, segments, trial zones) of the experiment.
         system: The data acquisition system for which to create the configuration.
         unity_scene_name: The Unity scene name for the experiment. Must match the template's scene file name.
         default_reward_size_ul: Water reward volume in microliters for lick-type trials.
@@ -438,10 +434,10 @@ def get_task_templates_directory() -> Path:
 def create_server_configuration_file(
     username: str,
     password: str,
-    host: str = "cbsuwsun.biohpc.cornell.edu",
-    storage_root: str = "/local/storage",
-    working_root: str = "/local/workdir",
-    shared_directory_name: str = "sun_data",
+    host: str,
+    storage_root: Path,
+    working_root: Path,
+    shared_directory_name: str,
 ) -> None:
     """Creates the .YAML configuration file for the Sollertia platform compute server and configures the local machine
     (PC) to use this file for all future server-related calls.
@@ -450,10 +446,10 @@ def create_server_configuration_file(
         username: The username to use for server authentication.
         password: The password to use for server authentication.
         host: The hostname or IP address of the server to connect to.
-        storage_root: The path to the server's storage (slow) HDD RAID volume.
-        working_root: The path to the server's working (fast) NVME RAID volume.
-        shared_directory_name: The name of the shared directory that stores Sollertia platform project data on both
-            server volumes.
+        storage_root: The path to the server directory dedicated to general data storage.
+        working_root: The path to the server directory dedicated to data processing operations.
+        shared_directory_name: The name of the shared directory that stores Sollertia platform project data under both
+            server roots.
     """
     output_directory = get_working_directory().joinpath("configuration")
     ServerConfiguration(
@@ -492,11 +488,20 @@ def get_server_configuration() -> ServerConfiguration:
 
     configuration = ServerConfiguration.from_yaml(file_path=config_path)
 
-    if not configuration.username or not configuration.password:
+    sentinel_path = Path()
+    if (
+        not configuration.username
+        or not configuration.password
+        or not configuration.host
+        or not configuration.shared_directory_name
+        or configuration.storage_root == sentinel_path
+        or configuration.working_root == sentinel_path
+    ):
         message = (
             "Unable to load the server configuration. The 'server_configuration.yaml' file appears to be unconfigured "
-            "or contains placeholder access credentials. Call the 'sl-configure server' CLI command to reconfigure "
-            "the server access credentials."
+            "or contains placeholder values for one or more required fields (username, password, host, storage_root, "
+            "working_root, shared_directory_name). Call the 'sl-configure server' CLI command to reconfigure the "
+            "server access credentials and filesystem layout."
         )
         console.error(message=message, error=ValueError)
 

@@ -270,51 +270,45 @@ def generate_experiment_configuration_file(
     "-p",
     "--password",
     type=str,
-    required=True,
-    help="The password to use for server authentication.",
+    prompt=True,
+    hide_input=True,
+    confirmation_prompt=True,
+    help="The password to use for server authentication. Prompted interactively (with hidden input) if not provided.",
 )
 @click.option(
     "-h",
     "--host",
     type=str,
     required=True,
-    show_default=True,
-    default="cbsuwsun.biohpc.cornell.edu",
     help="The host name or IP address of the server.",
 )
 @click.option(
     "-sr",
     "--storage-root",
-    type=str,
+    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    show_default=True,
-    default="/local/storage",
-    help="The absolute path to to the server's slow HDD RAID volume.",
+    help="The absolute path to the server directory dedicated to general data storage.",
 )
 @click.option(
     "-wr",
     "--working-root",
-    type=str,
+    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    show_default=True,
-    default="/local/workdir",
-    help="The absolute path to to the server's fast NVME RAID volume.",
+    help="The absolute path to the server directory dedicated to data processing operations.",
 )
 @click.option(
     "-sd",
     "--shared-directory",
     type=str,
     required=True,
-    show_default=True,
-    default="sun_data",
-    help="The name of the shared directory used to store all Sollertia platform projects on both server's volumes.",
+    help="The name of the shared directory used to store all Sollertia platform projects under the server's roots.",
 )
 def generate_server_configuration_file(
     username: str,
     password: str,
     host: str,
-    storage_root: str,
-    working_root: str,
+    storage_root: Path,
+    working_root: Path,
     shared_directory: str,
 ) -> None:  # pragma: no cover
     """Creates the remote compute server configuration file."""

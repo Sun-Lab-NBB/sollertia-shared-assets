@@ -201,10 +201,10 @@ def get_server_configuration_tool() -> str:
 @mcp.tool()
 def create_server_configuration_template_tool(
     username: str,
-    host: str = "cbsuwsun.biohpc.cornell.edu",
-    storage_root: str = "/local/storage",
-    working_root: str = "/local/workdir",
-    shared_directory: str = "sun_data",
+    host: str,
+    storage_root: str,
+    working_root: str,
+    shared_directory: str,
 ) -> str:
     """Creates a server configuration template with a placeholder password.
 
@@ -214,8 +214,8 @@ def create_server_configuration_template_tool(
     Args:
         username: The username for server authentication.
         host: The server hostname or IP address.
-        storage_root: The path to the server's slow HDD RAID volume.
-        working_root: The path to the server's fast NVME RAID volume.
+        storage_root: The path to the server directory dedicated to general data storage.
+        working_root: The path to the server directory dedicated to data processing operations.
         shared_directory: The name of the shared directory for Sollertia platform data.
 
     Returns:
@@ -229,8 +229,8 @@ def create_server_configuration_template_tool(
             username=username,
             password="ENTER_YOUR_PASSWORD_HERE",  # noqa: S106
             host=host,
-            storage_root=storage_root,
-            working_root=working_root,
+            storage_root=Path(storage_root),
+            working_root=Path(working_root),
             shared_directory_name=shared_directory,
         ).to_yaml(file_path=config_path)
     except (FileNotFoundError, ValueError) as e:

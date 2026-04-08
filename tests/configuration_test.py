@@ -1363,10 +1363,10 @@ def test_server_configuration_default_initialization():
 
     assert config.username == ""
     assert config.password == ""
-    assert config.host == "cbsuwsun.biohpc.cornell.edu"
-    assert config.storage_root == "/local/storage"
-    assert config.working_root == "/local/workdir"
-    assert config.shared_directory_name == "sun_data"
+    assert config.host == ""
+    assert config.storage_root == Path()
+    assert config.working_root == Path()
+    assert config.shared_directory_name == ""
 
 
 def test_server_configuration_post_init_resolves_paths():
@@ -1376,15 +1376,15 @@ def test_server_configuration_post_init_resolves_paths():
     """
     config = ServerConfiguration(
         username="testuser",
-        storage_root="/mnt/storage",
-        working_root="/mnt/work",
+        storage_root=Path("/mnt/storage"),
+        working_root=Path("/mnt/work"),
         shared_directory_name="shared",
     )
 
-    assert config.shared_storage_root == "/mnt/storage/shared"
-    assert config.shared_working_root == "/mnt/work/shared"
-    assert config.user_data_root == "/mnt/storage/testuser"
-    assert config.user_working_root == "/mnt/work/testuser"
+    assert config.shared_storage_root == Path("/mnt/storage/shared")
+    assert config.shared_working_root == Path("/mnt/work/shared")
+    assert config.user_data_root == Path("/mnt/storage/testuser")
+    assert config.user_working_root == Path("/mnt/work/testuser")
 
 
 def test_server_configuration_custom_initialization():
@@ -1396,16 +1396,16 @@ def test_server_configuration_custom_initialization():
         username="myuser",
         password="mypass",
         host="example.com",
-        storage_root="/data",
-        working_root="/work",
+        storage_root=Path("/data"),
+        working_root=Path("/work"),
         shared_directory_name="lab_data",
     )
 
     assert config.username == "myuser"
     assert config.password == "mypass"
     assert config.host == "example.com"
-    assert config.storage_root == "/data"
-    assert config.working_root == "/work"
+    assert config.storage_root == Path("/data")
+    assert config.working_root == Path("/work")
     assert config.shared_directory_name == "lab_data"
 
 
@@ -1447,6 +1447,10 @@ def test_create_server_configuration_file(clean_working_directory, monkeypatch):
     create_server_configuration_file(
         username="testuser",
         password="testpass",
+        host="server.example.com",
+        storage_root=Path("/srv/storage"),
+        working_root=Path("/srv/work"),
+        shared_directory_name="shared",
     )
 
     config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
@@ -1472,8 +1476,8 @@ def test_create_server_configuration_file_custom_parameters(clean_working_direct
         username="myuser",
         password="mypass",
         host="custom.server.com",
-        storage_root="/custom/storage",
-        working_root="/custom/work",
+        storage_root=Path("/custom/storage"),
+        working_root=Path("/custom/work"),
         shared_directory_name="custom_shared",
     )
 
@@ -1481,8 +1485,8 @@ def test_create_server_configuration_file_custom_parameters(clean_working_direct
     loaded = ServerConfiguration.from_yaml(file_path=config_file)
 
     assert loaded.host == "custom.server.com"
-    assert loaded.storage_root == "/custom/storage"
-    assert loaded.working_root == "/custom/work"
+    assert loaded.storage_root == Path("/custom/storage")
+    assert loaded.working_root == Path("/custom/work")
     assert loaded.shared_directory_name == "custom_shared"
 
 
@@ -1503,6 +1507,10 @@ def test_get_server_configuration_user(clean_working_directory, monkeypatch):
     create_server_configuration_file(
         username="testuser",
         password="testpass",
+        host="server.example.com",
+        storage_root=Path("/srv/storage"),
+        working_root=Path("/srv/work"),
+        shared_directory_name="shared",
     )
 
     # Load it
