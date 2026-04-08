@@ -3,22 +3,6 @@
 Exposes the canonical MCP tool surface that all sibling Sollertia libraries (sollertia-experiment,
 sollertia-unity-tasks, sollertia-forgery, and downstream agents) use to discover, read, write, validate, and
 introspect the configuration and runtime data files defined in this library.
-
-Notes:
-    The tools provided by this server fall into seven purpose groups. Discovery tools recursively enumerate
-    projects, animals, sessions, experiments, datasets, templates, and subjects, mirroring the discovery
-    patterns used by the ataraxis-communication-interface and cindra MCP servers. Read tools provide typed
-    loaders that return the contents of YAML configuration and runtime data files. Write tools perform
-    whole-file create or replace operations for templates, experiment configurations, system configurations,
-    server configurations, datasets, and per-session runtime data files. Schema introspection tools return
-    dataclass field schemas so agents can construct valid write payloads without guessing field names. Validation
-    tools perform schema and cross-reference validation for configuration and dataset files. Status and health
-    tools report per-session lifecycle state, batch overviews, project summaries, and acquisition environment
-    health checks. Filesystem check tools verify mount accessibility for individual paths or for the full set
-    of paths declared by the active system configuration.
-
-    All tools return structured ``dict[str, Any]`` payloads with a ``success`` flag, mirroring the cindra MCP
-    server convention. Failure responses use ``{"success": False, "error": "<message>"}``.
 """
 
 from __future__ import annotations
