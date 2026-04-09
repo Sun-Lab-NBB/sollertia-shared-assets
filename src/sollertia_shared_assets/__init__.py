@@ -3,9 +3,10 @@
 This library is part of the Sollertia AI-assisted scientific data acquisition and processing platform, built on the
 Ataraxis framework and developed in the Sun (NeuroAI) lab at Cornell University.
 
-See https://github.com/Sun-Lab-NBB/sollertia for the Sollertia platform entry-point.
-See https://github.com/Sun-Lab-NBB/sollertia-shared-assets for the source code repository.
-API documentation: https://sollertia-shared-assets-api-docs.netlify.app/
+See the `API documentation <https://sollertia-shared-assets-api-docs.netlify.app/>`_ for the description of available
+assets. See the `source code repository <https://github.com/Sun-Lab-NBB/sollertia-shared-assets>`_ for more details.
+See the `Sollertia platform <https://github.com/Sun-Lab-NBB/sollertia>`_ for the top-level project entry-point.
+
 Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Natalie Yeung
 """
 

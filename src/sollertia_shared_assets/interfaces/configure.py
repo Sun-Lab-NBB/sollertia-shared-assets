@@ -42,7 +42,7 @@ def configure() -> None:  # pragma: no cover
 )
 def configure_directory(directory: Path) -> None:  # pragma: no cover
     """Sets the input directory as the local Sollertia platform working directory."""
-    ensure_directory_exists(directory)
+    ensure_directory_exists(path=directory)
     set_working_directory(path=directory)
 
 
@@ -87,11 +87,6 @@ def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
     """Sets the path to the Google service account credentials file."""
     set_google_credentials_path(path=credentials)
 
-    console.echo(
-        message=f"Google Sheets credentials path set to: {credentials.resolve()}.",
-        level=LogLevel.SUCCESS,
-    )
-
 
 @configure.command("templates", context_settings=CONTEXT_SETTINGS)
 @click.option(
@@ -119,7 +114,7 @@ def configure_project(project: str) -> None:  # pragma: no cover
     system_configuration = get_system_configuration_data()
     project_path = system_configuration.filesystem.root_directory.joinpath(project, "configuration")
 
-    ensure_directory_exists(project_path)
+    ensure_directory_exists(path=project_path)
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
 
 

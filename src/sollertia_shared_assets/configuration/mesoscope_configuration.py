@@ -133,7 +133,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             trial.validate_zones()
 
 
-@dataclass
+@dataclass(slots=True)
 class MesoscopeFileSystem:
     """Stores the filesystem configuration of the Mesoscope-VR data acquisition system."""
 
@@ -150,7 +150,7 @@ class MesoscopeFileSystem:
     during acquisition by the PC that manages the Mesoscope during runtime."""
 
 
-@dataclass
+@dataclass(slots=True)
 class MesoscopeGoogleSheets:
     """Stores the identifiers for the Google Sheets used by the Mesoscope-VR data acquisition system."""
 
@@ -162,7 +162,7 @@ class MesoscopeGoogleSheets:
     animals that participate in data acquisition sessions."""
 
 
-@dataclass
+@dataclass(slots=True)
 class MesoscopeCameras:
     """Stores the video camera configuration of the Mesoscope-VR data acquisition system."""
 
@@ -182,7 +182,7 @@ class MesoscopeCameras:
     valid members of the EncoderSpeedPresets enumeration from the ataraxis-video-system library."""
 
 
-@dataclass
+@dataclass(slots=True)
 class MesoscopeMicroControllers:
     """Stores the microcontroller configuration of the Mesoscope-VR data acquisition system."""
 
@@ -263,7 +263,7 @@ class MesoscopeMicroControllers:
     microliters."""
 
 
-@dataclass
+@dataclass(slots=True)
 class MesoscopeExternalAssets:
     """Stores the third-party asset configuration of the Mesoscope-VR data acquisition system."""
 

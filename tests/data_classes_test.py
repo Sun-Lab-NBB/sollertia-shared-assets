@@ -7,19 +7,19 @@ import platformdirs
 
 from sollertia_shared_assets.data_classes import (
     DatasetData,
-    DatasetSession,
     SessionData,
     SessionTypes,
+    DatasetSession,
 )
 from sollertia_shared_assets.configuration import (
-    AcquisitionSystems,
     Cue,
     Segment,
     VREnvironment,
-    WaterRewardTrial,
     ExperimentState,
-    MesoscopeExperimentConfiguration,
+    WaterRewardTrial,
+    AcquisitionSystems,
     MesoscopeSystemConfiguration,
+    MesoscopeExperimentConfiguration,
     set_working_directory,
 )
 
@@ -70,7 +70,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         show_stimulus_collision_boundary=False,
     )
 
-    config = MesoscopeExperimentConfiguration(
+    return MesoscopeExperimentConfiguration(
         cues=cues,
         segments=segments,
         trial_structures={"trial1": trial},
@@ -85,16 +85,14 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         cue_offset_cm=10.0,
     )
 
-    return config
-
 
 @pytest.fixture
-def clean_working_directory(tmp_path, monkeypatch):
+def clean_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Sets up a clean temporary working directory for testing."""
     # Patches platformdirs to use temporary directory
     app_dir = tmp_path / "app_data"
     app_dir.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     working_dir = tmp_path / "working_directory"
     working_dir.mkdir()
@@ -103,7 +101,7 @@ def clean_working_directory(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def sample_session_hierarchy(tmp_path) -> Path:
+def sample_session_hierarchy(tmp_path: Path) -> Path:
     """Creates a sample session directory hierarchy for testing."""
     # Creates the session hierarchy: root/project/animal/session/raw_data
     root = tmp_path / "data"
@@ -116,7 +114,7 @@ def sample_session_hierarchy(tmp_path) -> Path:
 # Tests for SessionTypes enumeration
 
 
-def test_session_types_values():
+def test_session_types_values() -> None:
     """Verifies all SessionTypes enumeration values.
 
     This test ensures the enumeration contains all expected session types.
@@ -127,7 +125,7 @@ def test_session_types_values():
     assert SessionTypes.WINDOW_CHECKING == "window checking"
 
 
-def test_session_types_is_string_enum():
+def test_session_types_is_string_enum() -> None:
     """Verifies that SessionTypes inherits from StrEnum.
 
     This test ensures the enumeration members behave as strings.
@@ -141,7 +139,7 @@ def test_session_types_is_string_enum():
 # Tests for SessionData dataclass
 
 
-def test_session_data_default_path_fields():
+def test_session_data_default_path_fields() -> None:
     """Verifies that raw_data_path and processed_data_path default to empty Path() values.
 
     This test ensures the bare-Path dataclass fields are populated when SessionData is constructed
@@ -162,13 +160,17 @@ def test_session_data_default_path_fields():
     assert session_data.processed_data_path == Path()
 
 
-def test_session_data_create_requires_valid_session_type(clean_working_directory, sample_mesoscope_config, monkeypatch):
+def test_session_data_create_requires_valid_session_type(
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() raises error for invalid session types.
 
     This test ensures only valid session types are accepted.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -180,7 +182,7 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
     # Creates project directory
     (clean_working_directory / "test_project").mkdir()
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"must be one of the SessionTypes"):
         SessionData.create(
             project_name="test_project",
             animal_id="test_animal",
@@ -190,13 +192,17 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
         )
 
 
-def test_session_data_create_generates_session_directory(clean_working_directory, sample_mesoscope_config, monkeypatch):
+def test_session_data_create_generates_session_directory(
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() generates the session directory structure.
 
     This test ensures all required directories are created.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -222,13 +228,17 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     assert session_data.raw_data_path.exists()
 
 
-def test_session_data_create_saves_session_data_yaml(clean_working_directory, sample_mesoscope_config, monkeypatch):
+def test_session_data_create_saves_session_data_yaml(
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() saves session_data.yaml file.
 
     This test ensures session metadata is persisted.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -257,13 +267,17 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory, sa
     assert "test_animal" in content
 
 
-def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_mesoscope_config, monkeypatch):
+def test_session_data_create_marks_with_nk_file(
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() creates the nk.bin marker file.
 
     This test ensures the session is marked as not yet initialized.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -287,7 +301,7 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory, sample_
     assert session_data.raw_data_path.joinpath("nk.bin").exists()
 
 
-def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy):
+def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy: Path) -> None:
     """Verifies that load() finds and loads session_data.yaml.
 
     This test ensures sessions can be loaded from disk.
@@ -314,7 +328,7 @@ processed_data: null
     assert loaded_session.session_type == SessionTypes.LICK_TRAINING
 
 
-def test_session_data_load_raises_error_no_session_data_file(tmp_path):
+def test_session_data_load_raises_error_no_session_data_file(tmp_path: Path) -> None:
     """Verifies that load() raises error when session_data.yaml is missing.
 
     This test ensures proper error handling for missing session files.
@@ -327,7 +341,7 @@ def test_session_data_load_raises_error_no_session_data_file(tmp_path):
         SessionData.load(session_path=session_path.parent)
 
 
-def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
+def test_session_data_load_raises_error_multiple_session_data_files(tmp_path: Path) -> None:
     """Verifies that load() raises error with multiple session_data files.
 
     This test ensures ambiguous sessions are rejected.
@@ -343,7 +357,7 @@ def test_session_data_load_raises_error_multiple_session_data_files(tmp_path):
         SessionData.load(session_path=session_path)
 
 
-def test_session_data_load_resolves_all_paths(sample_session_hierarchy):
+def test_session_data_load_resolves_all_paths(sample_session_hierarchy: Path) -> None:
     """Verifies that load() resolves all data paths.
 
     This test ensures raw_data and processed_data paths are set.
@@ -369,7 +383,7 @@ processed_data: null
     assert loaded_session.processed_data_path == sample_session_hierarchy / "processed_data"
 
 
-def test_session_data_mark_runtime_initialized_removes_nk_file(sample_session_hierarchy):
+def test_session_data_mark_runtime_initialized_removes_nk_file(sample_session_hierarchy: Path) -> None:
     """Verifies that mark_runtime_initialized() removes the nk.bin file.
 
     This test ensures sessions can be marked as initialized.
@@ -401,7 +415,7 @@ processed_data: null
     assert not nk_path.exists()
 
 
-def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
+def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy: Path) -> None:
     """Verifies that save() converts SessionTypes and AcquisitionSystems to strings.
 
     This test ensures enum values are properly serialized in YAML.
@@ -426,7 +440,7 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy):
     assert "acquisition_system: mesoscope" in content
 
 
-def test_session_data_save_serializes_path_fields(sample_session_hierarchy):
+def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path) -> None:
     """Verifies that save() serializes the raw and processed data root paths as YAML scalars.
 
     This test ensures the path fields are written using the YamlConfig automatic Path serialization.
@@ -451,14 +465,16 @@ def test_session_data_save_serializes_path_fields(sample_session_hierarchy):
 
 
 def test_session_data_create_raises_error_if_project_does_not_exist(
-    clean_working_directory, sample_mesoscope_config, monkeypatch
-):
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() raises FileNotFoundError when the project doesn't exist.
 
     This test ensures sessions cannot be created for non-existent projects.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -484,14 +500,17 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
 
 
 def test_session_data_create_copies_experiment_configuration(
-    clean_working_directory, sample_mesoscope_config, sample_experiment_config, monkeypatch
-):
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() copies experiment configuration when experiment_name is provided.
 
     This test ensures experiment configuration files are copied to session directories.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -527,14 +546,16 @@ def test_session_data_create_copies_experiment_configuration(
 
 
 def test_session_data_create_without_experiment_name_skips_experiment_config(
-    clean_working_directory, sample_mesoscope_config, monkeypatch
-):
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() without experiment_name does not copy experiment config.
 
     This test ensures non-experiment sessions don't require experiment configuration.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -560,13 +581,17 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
     assert not session_experiment_config.exists()
 
 
-def test_session_data_create_saves_system_configuration(clean_working_directory, sample_mesoscope_config, monkeypatch):
+def test_session_data_create_saves_system_configuration(
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create() saves system configuration to the session.
 
     This test ensures system configuration is copied for reproducibility.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -596,7 +621,7 @@ def test_session_data_create_saves_system_configuration(clean_working_directory,
     assert loaded_config.cameras.face_camera_index == sample_mesoscope_config.cameras.face_camera_index
 
 
-def test_session_data_post_init_coerces_string_session_type():
+def test_session_data_post_init_coerces_string_session_type() -> None:
     """Verifies that __post_init__ converts a string session_type into a SessionTypes enum member.
 
     This test ensures the manual-construction code path that bypasses YamlConfig type hooks still produces a
@@ -617,7 +642,7 @@ def test_session_data_post_init_coerces_string_session_type():
 # Tests for DatasetSession dataclass
 
 
-def test_dataset_session_default_initialization():
+def test_dataset_session_default_initialization() -> None:
     """Verifies default initialization of DatasetSession.
 
     This test ensures session_path defaults to an empty Path() when not provided.
@@ -629,7 +654,7 @@ def test_dataset_session_default_initialization():
     assert dataset_session.session_path == Path()
 
 
-def test_dataset_session_is_frozen():
+def test_dataset_session_is_frozen() -> None:
     """Verifies that DatasetSession instances are immutable.
 
     This test ensures the frozen=True dataclass option correctly forbids attribute reassignment.
@@ -647,7 +672,7 @@ def test_dataset_session_is_frozen():
 # Tests for DatasetData dataclass
 
 
-def test_dataset_data_post_init_coerces_string_enums():
+def test_dataset_data_post_init_coerces_string_enums() -> None:
     """Verifies that __post_init__ converts string session_type and acquisition_system into enum members.
 
     This test ensures the manual-construction code path that bypasses YamlConfig type hooks still produces
@@ -664,7 +689,7 @@ def test_dataset_data_post_init_coerces_string_enums():
     assert dataset_data.acquisition_system == AcquisitionSystems.MESOSCOPE_VR
 
 
-def test_dataset_data_create_generates_dataset_directory(tmp_path):
+def test_dataset_data_create_generates_dataset_directory(tmp_path: Path) -> None:
     """Verifies that create() generates the dataset root and per-session subdirectories.
 
     This test ensures the dataset hierarchy is fully laid out on disk after a successful create() call.
@@ -691,7 +716,7 @@ def test_dataset_data_create_generates_dataset_directory(tmp_path):
     assert dataset_data.dataset_data_path.exists()
 
 
-def test_dataset_data_create_resolves_session_paths(tmp_path):
+def test_dataset_data_create_resolves_session_paths(tmp_path: Path) -> None:
     """Verifies that create() rebuilds each input DatasetSession with its resolved session_path.
 
     This test ensures the session_path attribute on each entry of the resulting sessions tuple points to the
@@ -719,7 +744,7 @@ def test_dataset_data_create_resolves_session_paths(tmp_path):
     assert dataset_data.sessions[0].session_path == expected_path
 
 
-def test_dataset_data_create_accepts_session_set(tmp_path):
+def test_dataset_data_create_accepts_session_set(tmp_path: Path) -> None:
     """Verifies that create() accepts a set of DatasetSession instances and converts them to a tuple.
 
     This test ensures the set-to-tuple normalization branch is exercised.
@@ -742,7 +767,7 @@ def test_dataset_data_create_accepts_session_set(tmp_path):
     assert len(dataset_data.sessions) == 2
 
 
-def test_dataset_data_create_raises_error_with_empty_sessions(tmp_path):
+def test_dataset_data_create_raises_error_with_empty_sessions(tmp_path: Path) -> None:
     """Verifies that create() raises ValueError when no sessions are provided.
 
     This test ensures the empty-sessions guard branch in create() is exercised.
@@ -758,7 +783,7 @@ def test_dataset_data_create_raises_error_with_empty_sessions(tmp_path):
         )
 
 
-def test_dataset_data_create_raises_error_when_dataset_already_exists(tmp_path):
+def test_dataset_data_create_raises_error_when_dataset_already_exists(tmp_path: Path) -> None:
     """Verifies that create() raises FileExistsError when the destination directory already exists.
 
     This test ensures the duplicate-dataset guard branch in create() is exercised.
@@ -777,7 +802,7 @@ def test_dataset_data_create_raises_error_when_dataset_already_exists(tmp_path):
         )
 
 
-def test_dataset_data_load_round_trips(tmp_path):
+def test_dataset_data_load_round_trips(tmp_path: Path) -> None:
     """Verifies that load() reconstructs a DatasetData instance from a previously saved dataset.yaml file.
 
     This test ensures the create()/load() round-trip preserves all dataset metadata and re-resolves the
@@ -812,18 +837,18 @@ def test_dataset_data_load_round_trips(tmp_path):
         assert session.session_path == expected_paths[(session.animal, session.session)]
 
 
-def test_dataset_data_load_raises_error_no_dataset_file(tmp_path):
+def test_dataset_data_load_raises_error_no_dataset_file(tmp_path: Path) -> None:
     """Verifies that load() raises FileNotFoundError when the dataset.yaml file is missing.
 
     This test ensures the no-files branch of load()'s file count guard is exercised.
     """
     (tmp_path / "empty_dataset").mkdir()
 
-    with pytest.raises(FileNotFoundError, match="Expected a single dataset.yaml"):
+    with pytest.raises(FileNotFoundError, match=r"Expected a single dataset\.yaml"):
         DatasetData.load(dataset_path=tmp_path / "empty_dataset")
 
 
-def test_dataset_data_load_raises_error_with_multiple_dataset_files(tmp_path):
+def test_dataset_data_load_raises_error_with_multiple_dataset_files(tmp_path: Path) -> None:
     """Verifies that load() raises FileNotFoundError when multiple dataset.yaml files are found.
 
     This test ensures the multiple-files branch of load()'s file count guard is exercised.
@@ -835,11 +860,11 @@ def test_dataset_data_load_raises_error_with_multiple_dataset_files(tmp_path):
     (dataset_root / "first" / "dataset.yaml").write_text("placeholder")
     (dataset_root / "second" / "dataset.yaml").write_text("placeholder")
 
-    with pytest.raises(FileNotFoundError, match="Expected a single dataset.yaml"):
+    with pytest.raises(FileNotFoundError, match=r"Expected a single dataset\.yaml"):
         DatasetData.load(dataset_path=dataset_root)
 
 
-def test_dataset_data_animals_property_returns_unique_sorted_animals(tmp_path):
+def test_dataset_data_animals_property_returns_unique_sorted_animals(tmp_path: Path) -> None:
     """Verifies that the animals property returns a sorted tuple of unique animal identifiers.
 
     This test ensures the set-comprehension-and-sort logic correctly de-duplicates and orders the animals.
@@ -861,7 +886,7 @@ def test_dataset_data_animals_property_returns_unique_sorted_animals(tmp_path):
     assert dataset_data.animals == ("mouse_a", "mouse_b")
 
 
-def test_dataset_data_get_sessions_for_animal_filters_sessions(tmp_path):
+def test_dataset_data_get_sessions_for_animal_filters_sessions(tmp_path: Path) -> None:
     """Verifies that get_sessions_for_animal() returns only the sessions performed by the specified animal.
 
     This test ensures the filter comprehension correctly excludes sessions from other animals.
@@ -886,7 +911,7 @@ def test_dataset_data_get_sessions_for_animal_filters_sessions(tmp_path):
     assert all(s.animal == "mouse_a" for s in mouse_a_sessions)
 
 
-def test_dataset_data_get_session_returns_matching_session(tmp_path):
+def test_dataset_data_get_session_returns_matching_session(tmp_path: Path) -> None:
     """Verifies that get_session() returns the DatasetSession matching the specified animal and session.
 
     This test ensures the linear lookup hits the matching candidate and returns it.
@@ -911,7 +936,7 @@ def test_dataset_data_get_session_returns_matching_session(tmp_path):
     assert found.session_path == tmp_path / "test_dataset" / "mouse_b" / "2024-01-15-12-30-45-000002"
 
 
-def test_dataset_data_get_session_raises_error_for_unknown_session(tmp_path):
+def test_dataset_data_get_session_raises_error_for_unknown_session(tmp_path: Path) -> None:
     """Verifies that get_session() raises ValueError when the animal and session combination is missing.
 
     This test ensures the not-found branch of get_session() is exercised.

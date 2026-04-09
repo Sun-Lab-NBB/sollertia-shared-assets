@@ -106,9 +106,9 @@ def set_working_directory(path: Path) -> None:
     app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("working_directory_path.txt")
 
-    ensure_directory_exists(path_file)
-    ensure_directory_exists(path)
-    ensure_directory_exists(path.joinpath("configuration"))
+    ensure_directory_exists(path=path_file)
+    ensure_directory_exists(path=path)
+    ensure_directory_exists(path=path.joinpath("configuration"))
 
     with path_file.open("w") as file:
         file.write(str(path))
@@ -369,7 +369,7 @@ def set_google_credentials_path(path: Path) -> None:
     app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("google_credentials_path.txt")
 
-    ensure_directory_exists(path_file)
+    ensure_directory_exists(path=path_file)
 
     with path_file.open("w") as file:
         file.write(str(path.resolve()))
@@ -439,7 +439,7 @@ def set_task_templates_directory(path: Path) -> None:
     app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = app_dir.joinpath("task_templates_directory_path.txt")
 
-    ensure_directory_exists(path_file)
+    ensure_directory_exists(path=path_file)
 
     with path_file.open("w") as file:
         file.write(str(path.resolve()))

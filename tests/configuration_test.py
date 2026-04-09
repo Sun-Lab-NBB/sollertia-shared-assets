@@ -1,43 +1,41 @@
 """Contains tests for classes and methods provided by the configuration module."""
 
+import shutil
 from pathlib import Path
 
 import pytest
 import platformdirs
 
-from copy import deepcopy
-
 from sollertia_shared_assets.configuration import (
-    AcquisitionSystems,
-    BaseTrial,
     Cue,
     Segment,
-    TaskTemplate,
     TriggerType,
-    TrialStructure,
-    VREnvironment,
     GasPuffTrial,
-    WaterRewardTrial,
+    TaskTemplate,
+    VREnvironment,
+    TrialStructure,
     ExperimentState,
-    MesoscopeExperimentConfiguration,
-    MesoscopeFileSystem,
     MesoscopeCameras,
-    MesoscopeMicroControllers,
-    MesoscopeExternalAssets,
-    MesoscopeSystemConfiguration,
-    MesoscopeGoogleSheets,
+    WaterRewardTrial,
+    AcquisitionSystems,
+    MesoscopeFileSystem,
     ServerConfiguration,
+    MesoscopeGoogleSheets,
+    MesoscopeExternalAssets,
+    MesoscopeMicroControllers,
+    MesoscopeSystemConfiguration,
+    MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory,
-    get_system_configuration_data,
+    get_server_configuration,
     get_google_credentials_path,
     set_google_credentials_path,
-    get_server_configuration,
     get_task_templates_directory,
     set_task_templates_directory,
+    get_system_configuration_data,
     create_experiment_configuration,
-    create_system_configuration_file,
     create_server_configuration_file,
+    create_system_configuration_file,
     populate_default_experiment_states,
 )
 
@@ -88,7 +86,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         show_stimulus_collision_boundary=False,
     )
 
-    config = MesoscopeExperimentConfiguration(
+    return MesoscopeExperimentConfiguration(
         cues=cues,
         segments=segments,
         trial_structures={"trial1": trial},
@@ -103,16 +101,14 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         cue_offset_cm=10.0,
     )
 
-    return config
-
 
 @pytest.fixture
-def clean_working_directory(tmp_path, monkeypatch):
+def clean_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Sets up a clean temporary working directory for testing."""
     # Patches platformdirs to use temporary directory
     app_dir = tmp_path / "app_data"
     app_dir.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     working_dir = tmp_path / "working_directory"
     working_dir.mkdir()
@@ -123,7 +119,7 @@ def clean_working_directory(tmp_path, monkeypatch):
 # Tests for AcquisitionSystems enumeration
 
 
-def test_acquisition_systems_mesoscope_vr():
+def test_acquisition_systems_mesoscope_vr() -> None:
     """Verifies the MESOSCOPE_VR acquisition system enumeration value.
 
     This test ensures the enumeration contains the expected string value.
@@ -132,7 +128,7 @@ def test_acquisition_systems_mesoscope_vr():
     assert str(AcquisitionSystems.MESOSCOPE_VR) == "mesoscope"
 
 
-def test_acquisition_systems_is_string_enum():
+def test_acquisition_systems_is_string_enum() -> None:
     """Verifies that AcquisitionSystems inherits from StrEnum.
 
     This test ensures the enumeration members behave as strings.
@@ -143,7 +139,7 @@ def test_acquisition_systems_is_string_enum():
 # Tests for ExperimentState dataclass
 
 
-def test_mesoscope_experiment_state_initialization():
+def test_mesoscope_experiment_state_initialization() -> None:
     """Verifies basic initialization of ExperimentState.
 
     This test ensures all fields are properly assigned during initialization.
@@ -173,7 +169,7 @@ def test_mesoscope_experiment_state_initialization():
     assert state.aversive_recovery_guided_trials == 2
 
 
-def test_mesoscope_experiment_state_types():
+def test_mesoscope_experiment_state_types() -> None:
     """Verifies the data types of ExperimentState fields.
 
     This test ensures each field has the expected type.
@@ -240,7 +236,7 @@ def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> Me
     )
 
 
-def test_water_reward_trial_initialization():
+def test_water_reward_trial_initialization() -> None:
     """Verifies basic initialization of WaterRewardTrial.
 
     This test ensures all fields are properly assigned during initialization.
@@ -268,7 +264,7 @@ def test_water_reward_trial_initialization():
     assert populated_trial.reward_tone_duration_ms == 300
 
 
-def test_gas_puff_trial_initialization():
+def test_gas_puff_trial_initialization() -> None:
     """Verifies basic initialization of GasPuffTrial.
 
     This test ensures all fields are properly assigned during initialization.
@@ -296,7 +292,7 @@ def test_gas_puff_trial_initialization():
     assert populated_trial.occupancy_duration_ms == 1000
 
 
-def test_trial_types():
+def test_trial_types() -> None:
     """Verifies the data types of trial fields.
 
     This test ensures each field has the expected type for both trial classes.
@@ -344,7 +340,7 @@ def test_trial_types():
 # Tests for Trial validation
 
 
-def test_trial_zone_end_less_than_start():
+def test_trial_zone_end_less_than_start() -> None:
     """Verifies that zone_end < zone_start raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
@@ -353,11 +349,11 @@ def test_trial_zone_end_less_than_start():
         stimulus_location_cm=175.0,
         show_stimulus_collision_boundary=False,
     )
-    with pytest.raises(ValueError, match="must be greater than or equal to"):
+    with pytest.raises(ValueError, match=r"must be greater than or equal to"):
         _create_test_config_with_trial(trial)
 
 
-def test_trial_zone_start_outside_trial_length():
+def test_trial_zone_start_outside_trial_length() -> None:
     """Verifies that zone_start outside trial length raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
@@ -366,11 +362,11 @@ def test_trial_zone_start_outside_trial_length():
         stimulus_location_cm=255.0,
         show_stimulus_collision_boundary=False,
     )
-    with pytest.raises(ValueError, match="stimulus_trigger_zone_start_cm.*must be within"):
+    with pytest.raises(ValueError, match=r"stimulus_trigger_zone_start_cm.*must be within"):
         _create_test_config_with_trial(trial)
 
 
-def test_trial_zone_end_outside_trial_length():
+def test_trial_zone_end_outside_trial_length() -> None:
     """Verifies that zone_end outside trial length raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
@@ -379,11 +375,11 @@ def test_trial_zone_end_outside_trial_length():
         stimulus_location_cm=190.0,
         show_stimulus_collision_boundary=False,
     )
-    with pytest.raises(ValueError, match="stimulus_trigger_zone_end_cm.*must be within"):
+    with pytest.raises(ValueError, match=r"stimulus_trigger_zone_end_cm.*must be within"):
         _create_test_config_with_trial(trial)
 
 
-def test_trial_stimulus_location_outside_trial_length():
+def test_trial_stimulus_location_outside_trial_length() -> None:
     """Verifies that stimulus_location outside trial length raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
@@ -392,11 +388,11 @@ def test_trial_stimulus_location_outside_trial_length():
         stimulus_location_cm=250.0,  # Outside trial length (200)
         show_stimulus_collision_boundary=False,
     )
-    with pytest.raises(ValueError, match="stimulus_location_cm.*must be within"):
+    with pytest.raises(ValueError, match=r"stimulus_location_cm.*must be within"):
         _create_test_config_with_trial(trial)
 
 
-def test_trial_stimulus_location_precedes_trigger_zone():
+def test_trial_stimulus_location_precedes_trigger_zone() -> None:
     """Verifies that stimulus_location before trigger zone start raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
@@ -405,14 +401,14 @@ def test_trial_stimulus_location_precedes_trigger_zone():
         stimulus_location_cm=170.0,  # Before trigger zone start (180)
         show_stimulus_collision_boundary=False,
     )
-    with pytest.raises(ValueError, match="(?s)stimulus_location_cm.*must not precede"):
+    with pytest.raises(ValueError, match=r"(?s)stimulus_location_cm.*must not precede"):
         _create_test_config_with_trial(trial)
 
 
 # Tests for MesoscopeExperimentConfiguration validation
 
 
-def test_experiment_config_invalid_segment_reference():
+def test_experiment_config_invalid_segment_reference() -> None:
     """Verifies that a trial referencing an unknown segment raises ValueError."""
     state = ExperimentState(
         experiment_state_code=1,
@@ -435,7 +431,7 @@ def test_experiment_config_invalid_segment_reference():
         show_stimulus_collision_boundary=False,
     )
 
-    with pytest.raises(ValueError, match="references unknown segment.*NonexistentSegment"):
+    with pytest.raises(ValueError, match=r"references unknown segment.*NonexistentSegment"):
         MesoscopeExperimentConfiguration(
             cues=cues,
             segments=segments,
@@ -451,7 +447,7 @@ def test_experiment_config_invalid_segment_reference():
         )
 
 
-def test_experiment_config_invalid_cue_in_segment():
+def test_experiment_config_invalid_cue_in_segment() -> None:
     """Verifies that a segment referencing an unknown cue raises ValueError."""
     state = ExperimentState(
         experiment_state_code=1,
@@ -475,7 +471,7 @@ def test_experiment_config_invalid_cue_in_segment():
         show_stimulus_collision_boundary=False,
     )
 
-    with pytest.raises(ValueError, match="references unknown cue.*C"):
+    with pytest.raises(ValueError, match=r"references unknown cue.*C"):
         MesoscopeExperimentConfiguration(
             cues=cues,
             segments=segments,
@@ -491,7 +487,7 @@ def test_experiment_config_invalid_cue_in_segment():
         )
 
 
-def test_experiment_config_derives_trial_fields():
+def test_experiment_config_derives_trial_fields() -> None:
     """Verifies that trial cue_sequence and trial_length_cm are derived from segment."""
     state = ExperimentState(
         experiment_state_code=1,
@@ -539,7 +535,7 @@ def test_experiment_config_derives_trial_fields():
 # Tests for MesoscopeFileSystem dataclass
 
 
-def test_mesoscope_filesystem_default_initialization():
+def test_mesoscope_filesystem_default_initialization() -> None:
     """Verifies default initialization of MesoscopeFileSystem.
 
     This test ensures all fields have default Path() values.
@@ -552,7 +548,7 @@ def test_mesoscope_filesystem_default_initialization():
     assert filesystem.mesoscope_directory == Path()
 
 
-def test_mesoscope_filesystem_custom_initialization():
+def test_mesoscope_filesystem_custom_initialization() -> None:
     """Verifies custom initialization of MesoscopeFileSystem.
 
     This test ensures all fields accept custom Path values.
@@ -573,7 +569,7 @@ def test_mesoscope_filesystem_custom_initialization():
 # Tests for MesoscopeGoogleSheets dataclass
 
 
-def test_mesoscope_google_sheets_default_initialization():
+def test_mesoscope_google_sheets_default_initialization() -> None:
     """Verifies default initialization of MesoscopeGoogleSheets.
 
     This test ensures all fields have appropriate default values.
@@ -584,7 +580,7 @@ def test_mesoscope_google_sheets_default_initialization():
     assert sheets.water_log_sheet_id == ""
 
 
-def test_mesoscope_google_sheets_custom_initialization():
+def test_mesoscope_google_sheets_custom_initialization() -> None:
     """Verifies custom initialization of MesoscopeGoogleSheets.
 
     This test ensures all fields accept custom values.
@@ -601,7 +597,7 @@ def test_mesoscope_google_sheets_custom_initialization():
 # Tests for MesoscopeCameras dataclass
 
 
-def test_mesoscope_cameras_default_initialization():
+def test_mesoscope_cameras_default_initialization() -> None:
     """Verifies default initialization of MesoscopeCameras.
 
     This test ensures all fields have appropriate default values.
@@ -616,7 +612,7 @@ def test_mesoscope_cameras_default_initialization():
     assert cameras.body_camera_preset == 7
 
 
-def test_mesoscope_cameras_custom_initialization():
+def test_mesoscope_cameras_custom_initialization() -> None:
     """Verifies custom initialization of MesoscopeCameras.
 
     This test ensures all fields accept custom values.
@@ -641,7 +637,7 @@ def test_mesoscope_cameras_custom_initialization():
 # Tests for MesoscopeMicroControllers dataclass
 
 
-def test_mesoscope_microcontrollers_default_initialization():
+def test_mesoscope_microcontrollers_default_initialization() -> None:
     """Verifies default initialization of MesoscopeMicroControllers.
 
     This test ensures all fields have appropriate default values.
@@ -656,7 +652,7 @@ def test_mesoscope_microcontrollers_default_initialization():
     assert len(mcu.valve_calibration_data) == 4
 
 
-def test_mesoscope_microcontrollers_valve_calibration_tuple():
+def test_mesoscope_microcontrollers_valve_calibration_tuple() -> None:
     """Verifies valve_calibration_data is stored as a tuple of tuples.
 
     This test ensures the valve calibration data has the correct structure.
@@ -671,7 +667,7 @@ def test_mesoscope_microcontrollers_valve_calibration_tuple():
     )
 
 
-def test_mesoscope_microcontrollers_custom_valve_calibration():
+def test_mesoscope_microcontrollers_custom_valve_calibration() -> None:
     """Verifies custom valve_calibration_data initialization.
 
     This test ensures custom calibration data can be provided during initialization.
@@ -686,7 +682,7 @@ def test_mesoscope_microcontrollers_custom_valve_calibration():
 # Tests for MesoscopeExternalAssets dataclass
 
 
-def test_mesoscope_external_assets_default_initialization():
+def test_mesoscope_external_assets_default_initialization() -> None:
     """Verifies default initialization of MesoscopeExternalAssets.
 
     This test ensures all fields have appropriate default values.
@@ -700,7 +696,7 @@ def test_mesoscope_external_assets_default_initialization():
     assert assets.unity_port == 1883
 
 
-def test_mesoscope_external_assets_custom_initialization():
+def test_mesoscope_external_assets_custom_initialization() -> None:
     """Verifies custom initialization of MesoscopeExternalAssets.
 
     This test ensures all fields accept custom values.
@@ -723,7 +719,7 @@ def test_mesoscope_external_assets_custom_initialization():
 # Tests for MesoscopeSystemConfiguration dataclass
 
 
-def test_mesoscope_system_configuration_default_initialization():
+def test_mesoscope_system_configuration_default_initialization() -> None:
     """Verifies default initialization of MesoscopeSystemConfiguration.
 
     This test ensures the class initializes with default nested dataclasses.
@@ -738,7 +734,7 @@ def test_mesoscope_system_configuration_default_initialization():
     assert isinstance(config.assets, MesoscopeExternalAssets)
 
 
-def test_mesoscope_system_configuration_post_init_preserves_tuple_calibration():
+def test_mesoscope_system_configuration_post_init_preserves_tuple_calibration() -> None:
     """Verifies that __post_init__ preserves already-correct tuple valve calibration data.
 
     This test ensures existing tuple calibration data passes through __post_init__ unchanged.
@@ -752,7 +748,7 @@ def test_mesoscope_system_configuration_post_init_preserves_tuple_calibration():
     assert isinstance(config.microcontrollers.valve_calibration_data, tuple)
 
 
-def test_mesoscope_system_configuration_post_init_valve_calibration_dict():
+def test_mesoscope_system_configuration_post_init_valve_calibration_dict() -> None:
     """Verifies that __post_init__ converts valve_calibration_data dict to tuple.
 
     This test ensures valve calibration data is converted from dict to tuple format.
@@ -771,7 +767,7 @@ def test_mesoscope_system_configuration_post_init_valve_calibration_dict():
     assert (10000, 0.5) in config.microcontrollers.valve_calibration_data
 
 
-def test_mesoscope_system_configuration_post_init_invalid_valve_calibration():
+def test_mesoscope_system_configuration_post_init_invalid_valve_calibration() -> None:
     """Verifies that __post_init__ raises TypeError for invalid valve calibration data.
 
     This test ensures improper calibration data structure is detected and rejected.
@@ -780,11 +776,14 @@ def test_mesoscope_system_configuration_post_init_invalid_valve_calibration():
     # noinspection PyTypeChecker
     config.microcontrollers.valve_calibration_data = ((10000, "invalid"), (20000, 1.5))
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match=r"valve_calibration_data"):
         config.__post_init__()
 
 
-def test_mesoscope_system_configuration_save_yaml(tmp_path, sample_mesoscope_config):
+def test_mesoscope_system_configuration_save_yaml(
+    tmp_path: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+) -> None:
     """Verifies that save() correctly writes configuration to YAML file.
 
     This test ensures configuration data is properly saved as YAML.
@@ -802,7 +801,10 @@ def test_mesoscope_system_configuration_save_yaml(tmp_path, sample_mesoscope_con
     assert "mesoscope" in content
 
 
-def test_mesoscope_system_configuration_save_converts_paths(tmp_path, sample_mesoscope_config):
+def test_mesoscope_system_configuration_save_converts_paths(
+    tmp_path: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+) -> None:
     """Verifies that save() converts Path objects to strings in YAML.
 
     This test ensures Path objects are serialized as strings in the YAML file.
@@ -818,7 +820,10 @@ def test_mesoscope_system_configuration_save_converts_paths(tmp_path, sample_mes
     assert "Path(" not in content
 
 
-def test_mesoscope_system_configuration_save_converts_valve_calibration(tmp_path, sample_mesoscope_config):
+def test_mesoscope_system_configuration_save_converts_valve_calibration(
+    tmp_path: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+) -> None:
     """Verifies that save() converts valve calibration tuple to dict in YAML.
 
     This test ensures valve calibration data is serialized as a dictionary.
@@ -833,7 +838,10 @@ def test_mesoscope_system_configuration_save_converts_valve_calibration(tmp_path
     assert "valve_calibration_data:" in content
 
 
-def test_mesoscope_system_configuration_save_does_not_modify_original(tmp_path, sample_mesoscope_config):
+def test_mesoscope_system_configuration_save_does_not_modify_original(
+    tmp_path: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+) -> None:
     """Verifies that save() does not modify the original configuration instance.
 
     This test ensures the original instance remains unchanged after saving.
@@ -851,7 +859,10 @@ def test_mesoscope_system_configuration_save_does_not_modify_original(tmp_path, 
     assert sample_mesoscope_config.microcontrollers.valve_calibration_data == original_valve_data
 
 
-def test_mesoscope_system_configuration_yaml_round_trip(tmp_path, sample_mesoscope_config):
+def test_mesoscope_system_configuration_yaml_round_trip(
+    tmp_path: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+) -> None:
     """Verifies that configuration can be saved and loaded without data loss.
 
     This test ensures YAML serialization/deserialization preserves all data.
@@ -878,7 +889,9 @@ def test_mesoscope_system_configuration_yaml_round_trip(tmp_path, sample_mesosco
 # Tests for MesoscopeExperimentConfiguration
 
 
-def test_mesoscope_experiment_configuration_initialization(sample_experiment_config):
+def test_mesoscope_experiment_configuration_initialization(
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+) -> None:
     """Verifies basic initialization of MesoscopeExperimentConfiguration.
 
     This test ensures all fields are properly assigned during initialization.
@@ -891,7 +904,9 @@ def test_mesoscope_experiment_configuration_initialization(sample_experiment_con
     assert "trial1" in sample_experiment_config.trial_structures
 
 
-def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_config):
+def test_mesoscope_experiment_configuration_nested_structures(
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+) -> None:
     """Verifies nested dataclass structures in MesoscopeExperimentConfiguration.
 
     This test ensures nested experiment states and trials are properly initialized.
@@ -905,7 +920,10 @@ def test_mesoscope_experiment_configuration_nested_structures(sample_experiment_
     assert trial.cue_sequence == [1, 2, 3]  # Derived from Segment_abc
 
 
-def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_experiment_config):
+def test_mesoscope_experiment_configuration_yaml_serialization(
+    tmp_path: Path,
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+) -> None:
     """Verifies that MesoscopeExperimentConfiguration can be saved as YAML.
 
     This test ensures the experiment configuration is properly serialized to YAML.
@@ -921,7 +939,10 @@ def test_mesoscope_experiment_configuration_yaml_serialization(tmp_path, sample_
     assert "TestScene" in content
 
 
-def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sample_experiment_config):
+def test_mesoscope_experiment_configuration_yaml_deserialization(
+    tmp_path: Path,
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+) -> None:
     """Verifies that MesoscopeExperimentConfiguration can be loaded from YAML.
 
     This test ensures the experiment configuration is properly deserialized from YAML.
@@ -939,7 +960,10 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(tmp_path, sampl
 # Tests for set_working_directory function
 
 
-def test_set_working_directory_creates_directory(clean_working_directory, monkeypatch):
+def test_set_working_directory_creates_directory(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that set_working_directory creates the directory if it does not exist.
 
     This test ensures the function creates missing directories.
@@ -949,20 +973,20 @@ def test_set_working_directory_creates_directory(clean_working_directory, monkey
 
     # Patches platformdirs to use our test directory
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(new_dir)
 
     assert new_dir.exists()
 
 
-def test_set_working_directory_writes_path_file(clean_working_directory, monkeypatch):
+def test_set_working_directory_writes_path_file(clean_working_directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_working_directory writes the path to the cache file.
 
     This test ensures the working directory path is cached correctly.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -971,13 +995,13 @@ def test_set_working_directory_writes_path_file(clean_working_directory, monkeyp
     assert path_file.read_text() == str(clean_working_directory)
 
 
-def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
+def test_set_working_directory_creates_app_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_working_directory creates the app data directory.
 
     This test ensures the application data directory is created if missing.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     working_dir = tmp_path / "working"
     working_dir.mkdir()
@@ -987,13 +1011,16 @@ def test_set_working_directory_creates_app_directory(tmp_path, monkeypatch):
     assert app_dir.exists()
 
 
-def test_set_working_directory_overwrites_existing(clean_working_directory, monkeypatch):
+def test_set_working_directory_overwrites_existing(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that set_working_directory overwrites an existing cached path.
 
     This test ensures the function can update an existing working directory path.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     # Sets first directory
     first_dir = clean_working_directory / "first"
@@ -1012,13 +1039,16 @@ def test_set_working_directory_overwrites_existing(clean_working_directory, monk
 # Tests for get_working_directory function
 
 
-def test_get_working_directory_returns_cached_path(clean_working_directory, monkeypatch):
+def test_get_working_directory_returns_cached_path(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_working_directory returns the cached directory path.
 
     This test ensures the function retrieves the correct cached path.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
     retrieved_dir = get_working_directory()
@@ -1026,47 +1056,48 @@ def test_get_working_directory_returns_cached_path(clean_working_directory, monk
     assert retrieved_dir == clean_working_directory
 
 
-def test_get_working_directory_raises_error_if_not_set(tmp_path, monkeypatch):
+def test_get_working_directory_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_working_directory raises FileNotFoundError if not configured.
 
     This test ensures the function raises an appropriate error when unconfigured.
     """
     app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"has not been set"):
         get_working_directory()
 
 
-def test_get_working_directory_raises_error_if_directory_missing(clean_working_directory, monkeypatch):
+def test_get_working_directory_raises_error_if_directory_missing(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_working_directory raises error if cached directory does not exist.
 
     This test ensures the function detects when the cached path no longer exists.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
     # Deletes the working directory
-    import shutil
-
     shutil.rmtree(clean_working_directory)
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"currently configured"):
         get_working_directory()
 
 
 # Tests for set_google_credentials_path function
 
 
-def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
+def test_set_google_credentials_path_creates_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_google_credentials_path creates the credentials' cache file.
 
     This test ensures the credentials' path is properly cached.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -1078,45 +1109,51 @@ def test_set_google_credentials_path_creates_cache_file(tmp_path, monkeypatch):
     assert cache_file.read_text() == str(credentials_file.resolve())
 
 
-def test_set_google_credentials_path_raises_error_file_not_exists(tmp_path, monkeypatch):
+def test_set_google_credentials_path_raises_error_file_not_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that set_google_credentials_path raises error for non-existent files.
 
     This test ensures the function validates file existence.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     non_existent_file = tmp_path / "missing.json"
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"does not exist"):
         set_google_credentials_path(non_existent_file)
 
 
-def test_set_google_credentials_path_raises_error_wrong_extension(tmp_path, monkeypatch):
+def test_set_google_credentials_path_raises_error_wrong_extension(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that set_google_credentials_path raises error for non-JSON files.
 
     This test ensures the function validates the file extension.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     wrong_extension = tmp_path / "credentials.txt"
     wrong_extension.write_text("not json")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"\.json"):
         set_google_credentials_path(wrong_extension)
 
 
 # Tests for get_google_credentials_path function
 
 
-def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
+def test_get_google_credentials_path_returns_cached_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_google_credentials_path returns the cached credentials path.
 
     This test ensures the function retrieves the correct cached credentials path.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -1127,25 +1164,28 @@ def test_get_google_credentials_path_returns_cached_path(tmp_path, monkeypatch):
     assert retrieved_path == credentials_file.resolve()
 
 
-def test_get_google_credentials_path_raises_error_if_not_set(tmp_path, monkeypatch):
+def test_get_google_credentials_path_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_google_credentials_path raises an error if not configured.
 
     This test ensures the function raises an error when the credentials' path is not set.
     """
     app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"has not been set"):
         get_google_credentials_path()
 
 
-def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monkeypatch):
+def test_get_google_credentials_path_raises_error_if_file_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_google_credentials_path raises an error if the cached file no longer exists.
 
     This test ensures the function detects when the cached credentials file is missing.
     """
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -1155,20 +1195,23 @@ def test_get_google_credentials_path_raises_error_if_file_missing(tmp_path, monk
     # Deletes the credentials' file
     credentials_file.unlink()
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"previously configured"):
         get_google_credentials_path()
 
 
 # Tests for the create_system_configuration_file function
 
 
-def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, monkeypatch):
+def test_create_system_configuration_file_mesoscope_vr(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create_system_configuration_file creates a Mesoscope-VR config file.
 
     This test ensures the function creates the correct configuration file.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
     monkeypatch.setattr("builtins.input", lambda _: "")  # Mocks user input
 
     set_working_directory(clean_working_directory)
@@ -1178,13 +1221,16 @@ def test_create_system_configuration_file_mesoscope_vr(clean_working_directory, 
     assert config_file.exists()
 
 
-def test_create_system_configuration_file_removes_existing(clean_working_directory, monkeypatch):
+def test_create_system_configuration_file_removes_existing(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create_system_configuration_file removes existing config files.
 
     This test ensures only one configuration file exists after creation.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
     monkeypatch.setattr("builtins.input", lambda _: "")
 
     set_working_directory(clean_working_directory)
@@ -1203,27 +1249,33 @@ def test_create_system_configuration_file_removes_existing(clean_working_directo
     assert new_config.exists()
 
 
-def test_create_system_configuration_file_invalid_system(clean_working_directory, monkeypatch):
+def test_create_system_configuration_file_invalid_system(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create_system_configuration_file raises ValueError for invalid systems.
 
     This test ensures the function rejects unsupported acquisition systems.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"not supported"):
         create_system_configuration_file("invalid-system")
 
 
-def test_create_system_configuration_file_creates_valid_yaml(clean_working_directory, monkeypatch):
+def test_create_system_configuration_file_creates_valid_yaml(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create_system_configuration_file creates valid YAML content.
 
     This test ensures the created configuration file has a valid YAML structure.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
     monkeypatch.setattr("builtins.input", lambda _: "")
 
     set_working_directory(clean_working_directory)
@@ -1243,14 +1295,16 @@ def test_create_system_configuration_file_creates_valid_yaml(clean_working_direc
 
 
 def test_get_system_configuration_data_loads_mesoscope_config(
-    clean_working_directory, sample_mesoscope_config, monkeypatch
-):
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_system_configuration_data loads MesoscopeSystemConfiguration.
 
     This test ensures the function correctly loads configuration data.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1265,27 +1319,33 @@ def test_get_system_configuration_data_loads_mesoscope_config(
     assert loaded_config.name == sample_mesoscope_config.name
 
 
-def test_get_system_configuration_data_raises_error_no_config(clean_working_directory, monkeypatch):
+def test_get_system_configuration_data_raises_error_no_config(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_system_configuration_data raises an error when no config exists.
 
     This test ensures the function raises an error when no configuration file is found.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"Expected a single"):
         get_system_configuration_data()
 
 
-def test_get_system_configuration_data_raises_error_multiple_configs(clean_working_directory, monkeypatch):
+def test_get_system_configuration_data_raises_error_multiple_configs(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_system_configuration_data raises error with multiple configs.
 
     This test ensures the function rejects directories with multiple configuration files.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1293,34 +1353,41 @@ def test_get_system_configuration_data_raises_error_multiple_configs(clean_worki
     (clean_working_directory / "config1_configuration.yaml").write_text("config1")
     (clean_working_directory / "config2_configuration.yaml").write_text("config2")
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"Expected a single"):
         get_system_configuration_data()
 
 
-def test_get_system_configuration_data_raises_error_unsupported_config(clean_working_directory, monkeypatch):
+def test_get_system_configuration_data_raises_error_unsupported_config(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_system_configuration_data raises error for unsupported config names.
 
     This test ensures the function rejects unrecognized configuration file names.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
     # Creates unsupported config file
     (clean_working_directory / "configuration" / "unsupported_system_configuration.yaml").write_text("config")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"does not match"):
         get_system_configuration_data()
 
 
-def test_get_system_configuration_data_path_types(clean_working_directory, sample_mesoscope_config, monkeypatch):
+def test_get_system_configuration_data_path_types(
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_system_configuration_data returns Path objects (not strings).
 
     This test ensures path fields are properly converted to Path objects after loading.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1336,14 +1403,16 @@ def test_get_system_configuration_data_path_types(clean_working_directory, sampl
 
 
 def test_get_system_configuration_data_valve_calibration_tuple(
-    clean_working_directory, sample_mesoscope_config, monkeypatch
-):
+    clean_working_directory: Path,
+    sample_mesoscope_config: MesoscopeSystemConfiguration,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_system_configuration_data returns valve_calibration_data as a tuple.
 
     This test ensures valve calibration data is converted to tuple format after loading.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1360,7 +1429,7 @@ def test_get_system_configuration_data_valve_calibration_tuple(
 # Tests for ServerConfiguration dataclass
 
 
-def test_server_configuration_default_initialization():
+def test_server_configuration_default_initialization() -> None:
     """Verifies default initialization of ServerConfiguration.
 
     This test ensures the class initializes with expected default values.
@@ -1375,7 +1444,7 @@ def test_server_configuration_default_initialization():
     assert config.shared_directory_name == ""
 
 
-def test_server_configuration_post_init_resolves_paths():
+def test_server_configuration_post_init_resolves_paths() -> None:
     """Verifies that __post_init__ correctly resolves derived paths.
 
     This test ensures all paths are properly constructed.
@@ -1393,7 +1462,7 @@ def test_server_configuration_post_init_resolves_paths():
     assert config.user_working_root == Path("/mnt/work/testuser")
 
 
-def test_server_configuration_custom_initialization():
+def test_server_configuration_custom_initialization() -> None:
     """Verifies custom initialization of ServerConfiguration.
 
     This test ensures all fields accept custom values.
@@ -1415,7 +1484,7 @@ def test_server_configuration_custom_initialization():
     assert config.shared_directory_name == "lab_data"
 
 
-def test_server_configuration_yaml_round_trip(tmp_path):
+def test_server_configuration_yaml_round_trip(tmp_path: Path) -> None:
     """Verifies that ServerConfiguration survives YAML serialization.
 
     This test ensures YAML round-trip preserves all data.
@@ -1440,13 +1509,13 @@ def test_server_configuration_yaml_round_trip(tmp_path):
 # Tests for the create_server_configuration_file function
 
 
-def test_create_server_configuration_file(clean_working_directory, monkeypatch):
+def test_create_server_configuration_file(clean_working_directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that create_server_configuration_file creates user config.
 
     This test ensures the user server configuration is created correctly.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1468,13 +1537,16 @@ def test_create_server_configuration_file(clean_working_directory, monkeypatch):
     assert loaded.password == "testpass"
 
 
-def test_create_server_configuration_file_custom_parameters(clean_working_directory, monkeypatch):
+def test_create_server_configuration_file_custom_parameters(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that create_server_configuration_file accepts custom parameters.
 
     This test ensures custom server parameters are preserved.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1499,13 +1571,13 @@ def test_create_server_configuration_file_custom_parameters(clean_working_direct
 # Tests for the get_server_configuration function
 
 
-def test_get_server_configuration_user(clean_working_directory, monkeypatch):
+def test_get_server_configuration_user(clean_working_directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_server_configuration loads user config.
 
     This test ensures user configuration can be retrieved.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1526,31 +1598,37 @@ def test_get_server_configuration_user(clean_working_directory, monkeypatch):
     assert config.password == "testpass"
 
 
-def test_get_server_configuration_raises_error_if_missing(clean_working_directory, monkeypatch):
+def test_get_server_configuration_raises_error_if_missing(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_server_configuration raises error when config missing.
 
     This test ensures proper error handling for missing configurations.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
     # Don't create any config files
 
-    with pytest.raises(FileNotFoundError) as exc_info:
+    with pytest.raises(FileNotFoundError, match=r"server_configuration\.yaml") as exc_info:
         get_server_configuration()
 
     assert "server_configuration.yaml" in str(exc_info.value)
 
 
-def test_get_server_configuration_raises_error_if_unconfigured(clean_working_directory, monkeypatch):
+def test_get_server_configuration_raises_error_if_unconfigured(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_server_configuration raises an error for placeholder credentials.
 
     This test ensures unconfigured files are detected.
     """
     app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
@@ -1558,7 +1636,7 @@ def test_get_server_configuration_raises_error_if_unconfigured(clean_working_dir
     config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
     ServerConfiguration().to_yaml(file_path=config_file)
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(ValueError, match=r"(?i)unconfigured") as exc_info:
         get_server_configuration()
 
     assert "unconfigured" in str(exc_info.value).lower()
@@ -1567,52 +1645,52 @@ def test_get_server_configuration_raises_error_if_unconfigured(clean_working_dir
 # Tests for Cue validation
 
 
-def test_cue_code_above_uint8_raises_error():
+def test_cue_code_above_uint8_raises_error() -> None:
     """Verifies that a Cue code above 255 raises ValueError."""
-    with pytest.raises(ValueError, match="uint8"):
+    with pytest.raises(ValueError, match=r"uint8"):
         Cue(name="X", code=256, length_cm=50.0)
 
 
-def test_cue_code_negative_raises_error():
+def test_cue_code_negative_raises_error() -> None:
     """Verifies that a negative Cue code raises ValueError."""
-    with pytest.raises(ValueError, match="uint8"):
+    with pytest.raises(ValueError, match=r"uint8"):
         Cue(name="X", code=-1, length_cm=50.0)
 
 
-def test_cue_length_zero_raises_error():
+def test_cue_length_zero_raises_error() -> None:
     """Verifies that a Cue with length_cm <= 0 raises ValueError."""
-    with pytest.raises(ValueError, match="length_cm must be greater than 0"):
+    with pytest.raises(ValueError, match=r"length_cm must be greater than 0"):
         Cue(name="X", code=1, length_cm=0.0)
 
 
-def test_cue_length_negative_raises_error():
+def test_cue_length_negative_raises_error() -> None:
     """Verifies that a Cue with negative length_cm raises ValueError."""
-    with pytest.raises(ValueError, match="length_cm must be greater than 0"):
+    with pytest.raises(ValueError, match=r"length_cm must be greater than 0"):
         Cue(name="X", code=1, length_cm=-10.0)
 
 
 # Tests for Segment validation
 
 
-def test_segment_empty_cue_sequence_raises_error():
+def test_segment_empty_cue_sequence_raises_error() -> None:
     """Verifies that a Segment with an empty cue_sequence raises ValueError."""
-    with pytest.raises(ValueError, match="must contain at least one cue"):
+    with pytest.raises(ValueError, match=r"must contain at least one cue"):
         Segment(name="Empty", cue_sequence=[], transition_probabilities=None)
 
 
-def test_segment_invalid_probability_sum_raises_error():
+def test_segment_invalid_probability_sum_raises_error() -> None:
     """Verifies that a Segment with transition_probabilities not summing to 1.0 raises ValueError."""
-    with pytest.raises(ValueError, match="must sum to 1.0"):
+    with pytest.raises(ValueError, match=r"must sum to 1\.0"):
         Segment(name="Bad", cue_sequence=["A"], transition_probabilities=[0.3, 0.3])
 
 
-def test_segment_valid_probabilities():
+def test_segment_valid_probabilities() -> None:
     """Verifies that a Segment with valid transition_probabilities initializes correctly."""
     segment = Segment(name="Valid", cue_sequence=["A", "B"], transition_probabilities=[0.5, 0.5])
     assert segment.transition_probabilities == [0.5, 0.5]
 
 
-def test_segment_none_probabilities():
+def test_segment_none_probabilities() -> None:
     """Verifies that a Segment with None transition_probabilities initializes correctly."""
     segment = Segment(name="NoProb", cue_sequence=["A"], transition_probabilities=None)
     assert segment.transition_probabilities is None
@@ -1659,7 +1737,7 @@ def _create_base_task_template(
     )
 
 
-def test_task_template_valid_initialization():
+def test_task_template_valid_initialization() -> None:
     """Verifies that a valid TaskTemplate initializes without errors."""
     template = _create_base_task_template()
     assert len(template.cues) == 2
@@ -1667,35 +1745,35 @@ def test_task_template_valid_initialization():
     assert "trial1" in template.trial_structures
 
 
-def test_task_template_duplicate_cue_codes_raises_error():
+def test_task_template_duplicate_cue_codes_raises_error() -> None:
     """Verifies that duplicate cue codes raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
         Cue(name="B", code=1, length_cm=50.0),  # Duplicate code
     ]
-    with pytest.raises(ValueError, match="duplicate codes"):
+    with pytest.raises(ValueError, match=r"duplicate codes"):
         _create_base_task_template(cues=cues)
 
 
-def test_task_template_duplicate_cue_names_raises_error():
+def test_task_template_duplicate_cue_names_raises_error() -> None:
     """Verifies that duplicate cue names raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
         Cue(name="A", code=2, length_cm=50.0),  # Duplicate name
     ]
-    with pytest.raises(ValueError, match="duplicate names"):
+    with pytest.raises(ValueError, match=r"duplicate names"):
         _create_base_task_template(cues=cues)
 
 
-def test_task_template_segment_references_unknown_cue_raises_error():
+def test_task_template_segment_references_unknown_cue_raises_error() -> None:
     """Verifies that a segment referencing an unknown cue raises ValueError."""
     cues = [Cue(name="A", code=1, length_cm=50.0)]
     segments = [Segment(name="Seg", cue_sequence=["A", "Z"], transition_probabilities=None)]
-    with pytest.raises(ValueError, match="references unknown cue.*Z"):
+    with pytest.raises(ValueError, match=r"references unknown cue.*Z"):
         _create_base_task_template(cues=cues, segments=segments)
 
 
-def test_task_template_trial_references_unknown_segment_raises_error():
+def test_task_template_trial_references_unknown_segment_raises_error() -> None:
     """Verifies that a trial referencing an unknown segment raises ValueError."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1707,11 +1785,11 @@ def test_task_template_trial_references_unknown_segment_raises_error():
             trigger_type=TriggerType.LICK,
         ),
     }
-    with pytest.raises(ValueError, match="references unknown segment.*Nonexistent"):
+    with pytest.raises(ValueError, match=r"references unknown segment.*Nonexistent"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_invalid_trigger_type_raises_error():
+def test_task_template_invalid_trigger_type_raises_error() -> None:
     """Verifies that an invalid trigger_type raises ValueError."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1723,18 +1801,18 @@ def test_task_template_invalid_trigger_type_raises_error():
             trigger_type="invalid_type",
         ),
     }
-    with pytest.raises(ValueError, match="invalid trigger_type"):
+    with pytest.raises(ValueError, match=r"invalid trigger_type"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_trigger_type_as_enum():
+def test_task_template_trigger_type_as_enum() -> None:
     """Verifies that trigger_type accepts TriggerType enum values."""
     template = _create_base_task_template()
     trial = template.trial_structures["trial1"]
     assert trial.trigger_type == TriggerType.LICK
 
 
-def test_task_template_zone_end_less_than_start_raises_error():
+def test_task_template_zone_end_less_than_start_raises_error() -> None:
     """Verifies that zone_end < zone_start raises ValueError in TaskTemplate validation."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1746,11 +1824,11 @@ def test_task_template_zone_end_less_than_start_raises_error():
             trigger_type=TriggerType.LICK,
         ),
     }
-    with pytest.raises(ValueError, match="must be greater than or equal to"):
+    with pytest.raises(ValueError, match=r"must be greater than or equal to"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_zone_start_outside_segment_raises_error():
+def test_task_template_zone_start_outside_segment_raises_error() -> None:
     """Verifies that zone_start outside segment length raises ValueError."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1762,11 +1840,11 @@ def test_task_template_zone_start_outside_segment_raises_error():
             trigger_type=TriggerType.LICK,
         ),
     }
-    with pytest.raises(ValueError, match="stimulus_trigger_zone_start_cm.*must be within"):
+    with pytest.raises(ValueError, match=r"stimulus_trigger_zone_start_cm.*must be within"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_zone_end_outside_segment_raises_error():
+def test_task_template_zone_end_outside_segment_raises_error() -> None:
     """Verifies that zone_end outside segment length raises ValueError."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1778,11 +1856,11 @@ def test_task_template_zone_end_outside_segment_raises_error():
             trigger_type=TriggerType.LICK,
         ),
     }
-    with pytest.raises(ValueError, match="stimulus_trigger_zone_end_cm.*must be within"):
+    with pytest.raises(ValueError, match=r"stimulus_trigger_zone_end_cm.*must be within"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_location_outside_segment_raises_error():
+def test_task_template_location_outside_segment_raises_error() -> None:
     """Verifies that stimulus_location outside segment length raises ValueError."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1794,11 +1872,11 @@ def test_task_template_location_outside_segment_raises_error():
             trigger_type=TriggerType.LICK,
         ),
     }
-    with pytest.raises(ValueError, match="stimulus_location_cm.*must be within"):
+    with pytest.raises(ValueError, match=r"stimulus_location_cm.*must be within"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_location_precedes_start_raises_error():
+def test_task_template_location_precedes_start_raises_error() -> None:
     """Verifies that stimulus_location before zone start raises ValueError."""
     trial_structures = {
         "trial1": TrialStructure(
@@ -1810,11 +1888,11 @@ def test_task_template_location_precedes_start_raises_error():
             trigger_type=TriggerType.LICK,
         ),
     }
-    with pytest.raises(ValueError, match="(?s)stimulus_location_cm.*must not precede"):
+    with pytest.raises(ValueError, match=r"(?s)stimulus_location_cm.*must not precede"):
         _create_base_task_template(trial_structures=trial_structures)
 
 
-def test_task_template_properties():
+def test_task_template_properties() -> None:
     """Verifies the internal properties of TaskTemplate."""
     template = _create_base_task_template()
 
@@ -1833,7 +1911,7 @@ def test_task_template_properties():
 # Tests for MesoscopeExperimentConfiguration duplicate validation
 
 
-def test_experiment_config_duplicate_cue_codes_raises_error():
+def test_experiment_config_duplicate_cue_codes_raises_error() -> None:
     """Verifies that duplicate cue codes in MesoscopeExperimentConfiguration raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
@@ -1848,20 +1926,23 @@ def test_experiment_config_duplicate_cue_codes_raises_error():
         show_stimulus_collision_boundary=False,
     )
     state = ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0)
-    with pytest.raises(ValueError, match="duplicate codes"):
+    with pytest.raises(ValueError, match=r"duplicate codes"):
         MesoscopeExperimentConfiguration(
             cues=cues,
             segments=segments,
             trial_structures={"trial1": trial},
             experiment_states={"state1": state},
             vr_environment=VREnvironment(
-                corridor_spacing_cm=100.0, segments_per_corridor=3, padding_prefab_name="P", cm_per_unity_unit=10.0
+                corridor_spacing_cm=100.0,
+                segments_per_corridor=3,
+                padding_prefab_name="P",
+                cm_per_unity_unit=10.0,
             ),
             unity_scene_name="Test",
         )
 
 
-def test_experiment_config_duplicate_cue_names_raises_error():
+def test_experiment_config_duplicate_cue_names_raises_error() -> None:
     """Verifies that duplicate cue names in MesoscopeExperimentConfiguration raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
@@ -1876,14 +1957,17 @@ def test_experiment_config_duplicate_cue_names_raises_error():
         show_stimulus_collision_boundary=False,
     )
     state = ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0)
-    with pytest.raises(ValueError, match="duplicate names"):
+    with pytest.raises(ValueError, match=r"duplicate names"):
         MesoscopeExperimentConfiguration(
             cues=cues,
             segments=segments,
             trial_structures={"trial1": trial},
             experiment_states={"state1": state},
             vr_environment=VREnvironment(
-                corridor_spacing_cm=100.0, segments_per_corridor=3, padding_prefab_name="P", cm_per_unity_unit=10.0
+                corridor_spacing_cm=100.0,
+                segments_per_corridor=3,
+                padding_prefab_name="P",
+                cm_per_unity_unit=10.0,
             ),
             unity_scene_name="Test",
         )
@@ -1892,7 +1976,7 @@ def test_experiment_config_duplicate_cue_names_raises_error():
 # Tests for BaseTrial.validate_zones trial_length_cm validation
 
 
-def test_trial_validate_zones_zero_length_raises_error():
+def test_trial_validate_zones_zero_length_raises_error() -> None:
     """Verifies that validate_zones raises ValueError when trial_length_cm is zero."""
     trial = WaterRewardTrial(
         segment_name="Seg",
@@ -1902,17 +1986,17 @@ def test_trial_validate_zones_zero_length_raises_error():
         show_stimulus_collision_boundary=False,
     )
     # trial_length_cm defaults to 0.0 when not populated by config __post_init__
-    with pytest.raises(ValueError, match="trial_length_cm must be populated"):
+    with pytest.raises(ValueError, match=r"trial_length_cm must be populated"):
         trial.validate_zones()
 
 
 # Tests for set_task_templates_directory and get_task_templates_directory
 
 
-def test_set_task_templates_directory_creates_cache_file(tmp_path, monkeypatch):
+def test_set_task_templates_directory_creates_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_task_templates_directory caches the directory path."""
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()
@@ -1924,33 +2008,36 @@ def test_set_task_templates_directory_creates_cache_file(tmp_path, monkeypatch):
     assert cache_file.read_text() == str(templates_dir.resolve())
 
 
-def test_set_task_templates_directory_raises_error_not_exists(tmp_path, monkeypatch):
+def test_set_task_templates_directory_raises_error_not_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_task_templates_directory raises error for non-existent directory."""
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     nonexistent = tmp_path / "missing_dir"
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"does not exist"):
         set_task_templates_directory(nonexistent)
 
 
-def test_set_task_templates_directory_raises_error_not_directory(tmp_path, monkeypatch):
+def test_set_task_templates_directory_raises_error_not_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that set_task_templates_directory raises error when path is a file."""
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     file_path = tmp_path / "a_file.txt"
     file_path.write_text("content")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"does not point to a directory"):
         set_task_templates_directory(file_path)
 
 
-def test_get_task_templates_directory_returns_cached_path(tmp_path, monkeypatch):
+def test_get_task_templates_directory_returns_cached_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_task_templates_directory returns the cached directory path."""
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()
@@ -1961,21 +2048,22 @@ def test_get_task_templates_directory_returns_cached_path(tmp_path, monkeypatch)
     assert retrieved == templates_dir.resolve()
 
 
-def test_get_task_templates_directory_raises_error_if_not_set(tmp_path, monkeypatch):
+def test_get_task_templates_directory_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_task_templates_directory raises error if not configured."""
     app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"has not been set"):
         get_task_templates_directory()
 
 
-def test_get_task_templates_directory_raises_error_if_directory_missing(tmp_path, monkeypatch):
+def test_get_task_templates_directory_raises_error_if_directory_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verifies that get_task_templates_directory raises error if cached directory was deleted."""
-    import shutil
-
     app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()
@@ -1983,14 +2071,14 @@ def test_get_task_templates_directory_raises_error_if_directory_missing(tmp_path
     set_task_templates_directory(templates_dir)
     shutil.rmtree(templates_dir)
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(FileNotFoundError, match=r"does not exist"):
         get_task_templates_directory()
 
 
 # Tests for create_experiment_configuration
 
 
-def test_create_experiment_configuration_mesoscope_vr():
+def test_create_experiment_configuration_mesoscope_vr() -> None:
     """Verifies that create_experiment_configuration creates a valid MesoscopeExperimentConfiguration."""
     template = _create_base_task_template()
 
@@ -2009,7 +2097,7 @@ def test_create_experiment_configuration_mesoscope_vr():
     assert trial.reward_size_ul == 5.0
 
 
-def test_create_experiment_configuration_with_occupancy_trial():
+def test_create_experiment_configuration_with_occupancy_trial() -> None:
     """Verifies that create_experiment_configuration handles occupancy (gas puff) trials."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
@@ -2031,7 +2119,10 @@ def test_create_experiment_configuration_with_occupancy_trial():
         segments=segments,
         trial_structures=trial_structures,
         vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0, segments_per_corridor=3, padding_prefab_name="P", cm_per_unity_unit=10.0
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="P",
+            cm_per_unity_unit=10.0,
         ),
         cue_offset_cm=5.0,
     )
@@ -2052,11 +2143,11 @@ def test_create_experiment_configuration_with_occupancy_trial():
     assert config.cue_offset_cm == 5.0
 
 
-def test_create_experiment_configuration_invalid_system_raises_error():
+def test_create_experiment_configuration_invalid_system_raises_error() -> None:
     """Verifies that create_experiment_configuration raises ValueError for unsupported systems."""
     template = _create_base_task_template()
 
-    with pytest.raises(ValueError, match="not supported"):
+    with pytest.raises(ValueError, match=r"not supported"):
         create_experiment_configuration(
             template=template,
             system="nonexistent_system",
@@ -2067,7 +2158,7 @@ def test_create_experiment_configuration_invalid_system_raises_error():
 # Tests for populate_default_experiment_states
 
 
-def test_populate_default_experiment_states_with_water_reward():
+def test_populate_default_experiment_states_with_water_reward() -> None:
     """Verifies that populate_default_experiment_states adds states with water reward guidance."""
     config = _create_test_config_with_trial(
         WaterRewardTrial(
@@ -2076,7 +2167,7 @@ def test_populate_default_experiment_states_with_water_reward():
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
             show_stimulus_collision_boundary=False,
-        )
+        ),
     )
 
     populate_default_experiment_states(experiment_configuration=config, state_count=3)
@@ -2093,7 +2184,7 @@ def test_populate_default_experiment_states_with_water_reward():
     assert state_1.aversive_initial_guided_trials == 0  # No gas puff trials
 
 
-def test_populate_default_experiment_states_with_gas_puff():
+def test_populate_default_experiment_states_with_gas_puff() -> None:
     """Verifies that populate_default_experiment_states adds states with gas puff guidance."""
     config = _create_test_config_with_trial(
         GasPuffTrial(
@@ -2102,7 +2193,7 @@ def test_populate_default_experiment_states_with_gas_puff():
             stimulus_trigger_zone_end_cm=200.0,
             stimulus_location_cm=190.0,
             show_stimulus_collision_boundary=False,
-        )
+        ),
     )
 
     populate_default_experiment_states(experiment_configuration=config, state_count=2)

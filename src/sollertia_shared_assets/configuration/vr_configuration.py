@@ -34,7 +34,7 @@ class TriggerType(StrEnum):
     disable the stimulus delivery."""
 
 
-@dataclass
+@dataclass(slots=True)
 class Cue:
     """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
 
@@ -71,7 +71,7 @@ class Cue:
             console.error(message=message, error=ValueError)
 
 
-@dataclass
+@dataclass(slots=True)
 class Segment:
     """Defines a visual segment (sequence of cues) used in the experiment task's Virtual Reality (VR) environment.
 
@@ -107,7 +107,7 @@ class Segment:
                 console.error(message=message, error=ValueError)
 
 
-@dataclass
+@dataclass(slots=True)
 class VREnvironment:
     """Defines the Unity Virtual Reality (VR) corridor system configuration.
 
@@ -126,7 +126,7 @@ class VREnvironment:
     """The conversion factor from centimeters to Unity units."""
 
 
-@dataclass
+@dataclass(slots=True)
 class TrialStructure:
     """Defines the spatial configuration of a trial structure for Unity prefabs.
 

@@ -23,7 +23,7 @@ from .mcp_instance import (
     _INCOMPLETE_SESSION_MARKER,
     _ok,
     mcp,
-    _err,
+    _error,
     _read_yaml,
     _serialize,
     _safe_iterdir,
@@ -90,7 +90,7 @@ def discover_experiments_tool(
     if project is not None:
         project_path = root.joinpath(project)  # type: ignore[union-attr]
         if not project_path.is_dir():
-            return _err(message=f"Project '{project}' not found at {project_path}")
+            return _error(message=f"Project '{project}' not found at {project_path}")
         project_paths = [project_path]
     else:
         project_paths = [child for child in _safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
@@ -123,7 +123,7 @@ def discover_templates_tool() -> dict[str, Any]:
     try:
         templates_directory = get_task_templates_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
 
     templates: list[dict[str, Any]] = []
     for template_file in sorted(templates_directory.glob("*.yaml")):
@@ -180,7 +180,7 @@ def read_template_tool(template_name: str) -> dict[str, Any]:
     try:
         templates_directory = get_task_templates_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     template_path = templates_directory.joinpath(f"{template_name}.yaml")
     return _read_yaml(file_path=template_path, validator_cls=TaskTemplate)
 
@@ -195,7 +195,7 @@ def read_system_configuration_tool() -> dict[str, Any]:
     try:
         instance = get_system_configuration_data()
     except (FileNotFoundError, OSError, ValueError) as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(data=_serialize(value=instance))
 
 
@@ -210,7 +210,7 @@ def read_server_configuration_tool() -> dict[str, Any]:
     try:
         instance = get_server_configuration()
     except (FileNotFoundError, OSError, ValueError) as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     serialized = _serialize(value=instance)
     if isinstance(serialized, dict) and "password" in serialized:
         serialized["password"] = "<masked>"  # noqa: S105 - literal masking placeholder, not a real password.
@@ -227,7 +227,7 @@ def read_working_directory_tool() -> dict[str, Any]:
     try:
         path = get_working_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(working_directory=str(path))
 
 
@@ -241,7 +241,7 @@ def read_google_credentials_tool() -> dict[str, Any]:
     try:
         path = get_google_credentials_path()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(google_credentials_path=str(path))
 
 
@@ -255,7 +255,7 @@ def read_task_templates_directory_tool() -> dict[str, Any]:
     try:
         path = get_task_templates_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(task_templates_directory=str(path))
 
 
@@ -283,7 +283,7 @@ def write_template_tool(
     try:
         templates_directory = get_task_templates_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     file_path = templates_directory.joinpath(f"{template_name}.yaml")
     return _write_yaml_validated(
         file_path=file_path,
@@ -320,7 +320,7 @@ def write_experiment_configuration_tool(
         return error
     project_path = root.joinpath(project)  # type: ignore[union-attr]
     if not project_path.is_dir():
-        return _err(message=f"Project '{project}' does not exist at {project_path}. Use create_project_tool first.")
+        return _error(message=f"Project '{project}' does not exist at {project_path}. Use create_project_tool first.")
     file_path = project_path.joinpath(_CONFIGURATION_DIR, f"{experiment}.yaml")
     return _write_yaml_validated(
         file_path=file_path,
@@ -351,12 +351,12 @@ def write_system_configuration_tool(
         AcquisitionSystems(system)
     except ValueError:
         valid = ", ".join(member.value for member in AcquisitionSystems)
-        return _err(message=f"Invalid acquisition system '{system}'. Valid values: {valid}")
+        return _error(message=f"Invalid acquisition system '{system}'. Valid values: {valid}")
 
     try:
         working_directory = get_working_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
 
     file_path = working_directory.joinpath(_CONFIGURATION_DIR, f"{system}_system_configuration.yaml")
     return _write_yaml_validated(
@@ -387,7 +387,7 @@ def write_server_configuration_tool(
     try:
         working_directory = get_working_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     file_path = working_directory.joinpath(_CONFIGURATION_DIR, _SERVER_CONFIG_FILENAME)
     response = _write_yaml_validated(
         file_path=file_path,
@@ -419,9 +419,9 @@ def create_project_tool(project: str) -> dict[str, Any]:
     if project_path.exists():
         return _ok(project=project, project_path=str(project_path), already_exists=True)
     try:
-        ensure_directory_exists(configuration_path)
+        ensure_directory_exists(path=configuration_path)
     except (FileNotFoundError, OSError) as exception:
-        return _err(message=f"Failed to create project directory: {exception}")
+        return _error(message=f"Failed to create project directory: {exception}")
     return _ok(project=project, project_path=str(project_path), already_exists=False)
 
 
@@ -456,20 +456,20 @@ def create_experiment_config_tool(
         return error
     project_path = root.joinpath(project)  # type: ignore[union-attr]
     if not project_path.exists():
-        return _err(message=f"Project '{project}' does not exist. Use create_project_tool to create it first.")
+        return _error(message=f"Project '{project}' does not exist. Use create_project_tool to create it first.")
 
     file_path = project_path.joinpath(_CONFIGURATION_DIR, f"{experiment}.yaml")
     if file_path.exists() and not overwrite:
-        return _err(message=f"Experiment '{experiment}' already exists in project '{project}'.")
+        return _error(message=f"Experiment '{experiment}' already exists in project '{project}'.")
 
     try:
         templates_directory = get_task_templates_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     template_path = templates_directory.joinpath(f"{template}.yaml")
     if not template_path.exists():
         available = sorted(template_file.stem for template_file in templates_directory.glob("*.yaml"))
-        return _err(
+        return _error(
             message=(
                 f"Template '{template}' not found. Available templates: {', '.join(available) if available else 'none'}"
             ),
@@ -489,7 +489,7 @@ def create_experiment_config_tool(
         )
         experiment_configuration.to_yaml(file_path=file_path)
     except Exception as exception:
-        return _err(message=f"Failed to create experiment configuration: {exception}")
+        return _error(message=f"Failed to create experiment configuration: {exception}")
 
     return _ok(
         project=project,
@@ -514,7 +514,7 @@ def set_working_directory_tool(directory: str) -> dict[str, Any]:
         path = Path(directory)
         _set_working_directory(path=path)
     except (FileNotFoundError, OSError, ValueError) as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(working_directory=str(path))
 
 
@@ -532,7 +532,7 @@ def set_google_credentials_tool(credentials_path: str) -> dict[str, Any]:
         path = Path(credentials_path)
         _set_google_credentials_path(path=path)
     except (FileNotFoundError, ValueError) as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(google_credentials_path=str(path))
 
 
@@ -550,7 +550,7 @@ def set_task_templates_directory_tool(directory: str) -> dict[str, Any]:
         path = Path(directory)
         _set_task_templates_directory(path=path)
     except (FileNotFoundError, ValueError) as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     return _ok(task_templates_directory=str(path))
 
 
@@ -589,7 +589,7 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
         AcquisitionSystems(acquisition_system)
     except ValueError:
         valid = ", ".join(member.value for member in AcquisitionSystems)
-        return _err(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+        return _error(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
     schema = _describe_dataclass(cls=MesoscopeExperimentConfiguration)
     schema["nested_classes"] = {
         "Cue": _describe_dataclass(cls=Cue),
@@ -617,7 +617,7 @@ def describe_system_configuration_schema_tool(acquisition_system: str = "mesosco
         AcquisitionSystems(acquisition_system)
     except ValueError:
         valid = ", ".join(member.value for member in AcquisitionSystems)
-        return _err(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+        return _error(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
     schema = _describe_dataclass(cls=MesoscopeSystemConfiguration)
     schema["nested_classes"] = {
         "MesoscopeFileSystem": _describe_dataclass(cls=MesoscopeFileSystem),
@@ -643,10 +643,10 @@ def validate_template_tool(template_name: str) -> dict[str, Any]:
     try:
         templates_directory = get_task_templates_directory()
     except FileNotFoundError as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
     template_path = templates_directory.joinpath(f"{template_name}.yaml")
     if not template_path.exists():
-        return _err(message=f"Template '{template_name}' not found at {template_path}")
+        return _error(message=f"Template '{template_name}' not found at {template_path}")
     try:
         template = TaskTemplate.from_yaml(file_path=template_path)
     except Exception as exception:
@@ -676,7 +676,7 @@ def validate_experiment_configuration_tool(project: str, experiment: str) -> dic
         return error
     configuration_path = root.joinpath(project, _CONFIGURATION_DIR, f"{experiment}.yaml")  # type: ignore[union-attr]
     if not configuration_path.exists():
-        return _err(message=f"Experiment '{experiment}' not found at {configuration_path}")
+        return _error(message=f"Experiment '{experiment}' not found at {configuration_path}")
     try:
         experiment_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=configuration_path)
     except Exception as exception:
@@ -743,7 +743,7 @@ def get_project_overview_tool(project: str) -> dict[str, Any]:
 
     project_path = root.joinpath(project)  # type: ignore[union-attr]
     if not project_path.is_dir():
-        return _err(message=f"Project '{project}' not found at {project_path}")
+        return _error(message=f"Project '{project}' not found at {project_path}")
 
     animals = [
         child.name
@@ -875,7 +875,7 @@ def check_system_mounts_tool() -> dict[str, Any]:
     try:
         system_configuration = get_system_configuration_data()
     except (FileNotFoundError, OSError, ValueError) as exception:
-        return _err(message=str(exception))
+        return _error(message=str(exception))
 
     filesystem = system_configuration.filesystem
     paths: dict[str, dict[str, Any]] = {
@@ -981,8 +981,8 @@ def _check_path(path: Path) -> dict[str, Any]:
         writable = True
     except PermissionError:
         error = "Permission denied"
-    except OSError as os_error:
-        error = str(os_error)
+    except OSError as os_erroror:
+        error = str(os_erroror)
 
     result: dict[str, Any] = {
         "path": path_str,

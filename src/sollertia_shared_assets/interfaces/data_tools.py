@@ -26,7 +26,7 @@ from .mcp_instance import (
     _SESSION_EXPERIMENT_CONFIG_FILENAME,
     _ok,
     mcp,
-    _err,
+    _error,
     _read_yaml,
     _serialize,
     _safe_iterdir,
@@ -118,7 +118,7 @@ def discover_animals_tool(project: str, root_directory: str | None = None) -> di
 
     project_path = root.joinpath(project)  # type: ignore[union-attr]
     if not project_path.is_dir():
-        return _err(message=f"Project '{project}' not found at {project_path}")
+        return _error(message=f"Project '{project}' not found at {project_path}")
 
     animals: list[dict[str, Any]] = []
     for child in sorted(_safe_iterdir(directory=project_path), key=lambda candidate: candidate.name):
@@ -160,7 +160,7 @@ def discover_sessions_tool(
             session_type_filter: SessionTypes | None = SessionTypes(session_type)
         except ValueError:
             valid = ", ".join(member.value for member in SessionTypes)
-            return _err(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+            return _error(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
     else:
         session_type_filter = None
 
@@ -168,11 +168,11 @@ def discover_sessions_tool(
     if project is not None:
         search_root = root.joinpath(project)  # type: ignore[union-attr]
         if not search_root.is_dir():
-            return _err(message=f"Project '{project}' not found at {search_root}")
+            return _error(message=f"Project '{project}' not found at {search_root}")
         if animal_id is not None:
             search_root = search_root.joinpath(animal_id)
             if not search_root.is_dir():
-                return _err(message=f"Animal '{animal_id}' not found at {search_root}")
+                return _error(message=f"Animal '{animal_id}' not found at {search_root}")
 
     markers = sorted(search_root.rglob(_SESSION_MARKER_FILENAME))  # type: ignore[union-attr]
     sessions: list[dict[str, Any]] = []
@@ -208,7 +208,7 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
 
     raw_data_dir = session_root.joinpath(_RAW_DATA_DIR)  # type: ignore[union-attr]
     if not raw_data_dir.is_dir():
-        return _err(message=f"raw_data directory not found at {raw_data_dir}")
+        return _error(message=f"raw_data directory not found at {raw_data_dir}")
 
     known_kinds = {
         _SESSION_MARKER_FILENAME: "session_data",
@@ -287,7 +287,7 @@ def discover_subjects_tool(project: str | None = None) -> dict[str, Any]:
     if project is not None:
         project_path = root.joinpath(project)  # type: ignore[union-attr]
         if not project_path.is_dir():
-            return _err(message=f"Project '{project}' not found at {project_path}")
+            return _error(message=f"Project '{project}' not found at {project_path}")
         project_paths = [project_path]
     else:
         project_paths = [child for child in _safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
@@ -334,7 +334,7 @@ def read_session_data_tool(session_path: str) -> dict[str, Any]:
     try:
         instance = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
     except Exception as exception:
-        return _err(message=f"Failed to load SessionData: {exception}")
+        return _error(message=f"Failed to load SessionData: {exception}")
     incomplete = instance.raw_data_path.joinpath(_INCOMPLETE_SESSION_MARKER).exists()
     return _ok(data=_serialize(value=instance), incomplete=incomplete, session_path=str(session_root))
 
@@ -356,7 +356,7 @@ def read_session_descriptor_tool(session_path: str) -> dict[str, Any]:
     try:
         session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
     except Exception as exception:
-        return _err(message=f"Failed to load SessionData: {exception}")
+        return _error(message=f"Failed to load SessionData: {exception}")
 
     session_type = (
         session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
@@ -366,7 +366,7 @@ def read_session_descriptor_tool(session_path: str) -> dict[str, Any]:
         session_type=session_type,
     )
     if descriptor_path is None:
-        return _err(
+        return _error(
             message=(
                 f"Could not locate a descriptor file for session_type '{session_type.value}' under "
                 f"{session_root}/{_RAW_DATA_DIR}"
@@ -480,11 +480,11 @@ def read_dataset_tool(dataset_path: str) -> dict[str, Any]:
     """
     path = Path(dataset_path)
     if not path.exists():
-        return _err(message=f"Dataset path does not exist: {path}")
+        return _error(message=f"Dataset path does not exist: {path}")
     try:
         instance = DatasetData.load(dataset_path=path)
     except Exception as exception:
-        return _err(message=f"Failed to load DatasetData: {exception}")
+        return _error(message=f"Failed to load DatasetData: {exception}")
     return _ok(data=_serialize(value=instance), dataset_path=str(path))
 
 
@@ -508,7 +508,7 @@ def read_subject_tool(subject_id: str, project: str | None = None) -> dict[str, 
     data = response.get("data", {})
     subject = data.get("subject") if isinstance(data, dict) else None
     if subject is None:
-        return _err(message=f"SurgeryData at {surgery_path} does not contain a subject section")
+        return _error(message=f"SurgeryData at {surgery_path} does not contain a subject section")
     return _ok(data=subject, surgery_data_path=str(surgery_path))
 
 
@@ -593,7 +593,7 @@ def read_subject_drugs_tool(subject_id: str, project: str | None = None) -> dict
         return response
     drugs = response.get("data", {}).get("drugs") if isinstance(response.get("data"), dict) else None
     if drugs is None:
-        return _err(message=f"SurgeryData at {surgery_path} does not contain a drugs section")
+        return _error(message=f"SurgeryData at {surgery_path} does not contain a drugs section")
     return _ok(data=drugs, surgery_data_path=str(surgery_path))
 
 
@@ -629,21 +629,21 @@ def write_dataset_tool(
         session_type_enum = SessionTypes(session_type)
     except ValueError:
         valid = ", ".join(member.value for member in SessionTypes)
-        return _err(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+        return _error(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
 
     try:
         acquisition_system_enum = AcquisitionSystems(acquisition_system)
     except ValueError:
         valid = ", ".join(member.value for member in AcquisitionSystems)
-        return _err(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+        return _error(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
 
     if not sessions:
-        return _err(message="The 'sessions' argument must contain at least one entry.")
+        return _error(message="The 'sessions' argument must contain at least one entry.")
 
     dataset_session_objects: list[DatasetSession] = []
     for entry in sessions:
         if not isinstance(entry, dict) or "session" not in entry or "animal" not in entry:
-            return _err(
+            return _error(
                 message=f"Invalid session entry {entry!r}. Each entry must be a dict with 'session' and 'animal' keys.",
             )
         dataset_session_objects.append(DatasetSession(session=entry["session"], animal=entry["animal"]))
@@ -652,13 +652,13 @@ def write_dataset_tool(
     root: Path
     if datasets_root is not None:
         root = Path(datasets_root)
-        ensure_directory_exists(root)
+        ensure_directory_exists(path=root)
     else:
         try:
             system_configuration = get_system_configuration_data()
             root = system_configuration.filesystem.root_directory
         except (FileNotFoundError, OSError, ValueError) as exception:
-            return _err(message=f"Unable to resolve datasets root directory: {exception}")
+            return _error(message=f"Unable to resolve datasets root directory: {exception}")
 
     try:
         instance = DatasetData.create(
@@ -670,7 +670,7 @@ def write_dataset_tool(
             datasets_root=root,
         )
     except Exception as exception:
-        return _err(message=f"Failed to create dataset: {exception}")
+        return _error(message=f"Failed to create dataset: {exception}")
 
     return _ok(
         dataset_path=str(instance.dataset_data_path.parent),
@@ -706,7 +706,7 @@ def write_session_descriptor_tool(
     try:
         session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
     except Exception as exception:
-        return _err(message=f"Failed to load SessionData: {exception}")
+        return _error(message=f"Failed to load SessionData: {exception}")
 
     session_type = (
         session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
@@ -936,7 +936,7 @@ def get_session_status_tool(session_path: str) -> dict[str, Any]:
         return error
     raw_data_dir = session_root.joinpath(_RAW_DATA_DIR)  # type: ignore[union-attr]
     if not raw_data_dir.is_dir():
-        return _err(message=f"raw_data directory not found at {raw_data_dir}")
+        return _error(message=f"raw_data directory not found at {raw_data_dir}")
     incomplete = raw_data_dir.joinpath(_INCOMPLETE_SESSION_MARKER).exists()
     processed_data_dir = session_root.joinpath(_PROCESSED_DATA_DIR)  # type: ignore[union-attr]
     has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
@@ -1031,7 +1031,7 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
         session_type_enum = SessionTypes(session_type)
     except ValueError:
         valid = ", ".join(member.value for member in SessionTypes)
-        return _err(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+        return _error(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
     canonical_filename, descriptor_class = _DESCRIPTOR_REGISTRY[session_type_enum]
     return _ok(
         session_type=session_type_enum.value,
@@ -1059,11 +1059,6 @@ def describe_surgery_schema_tool() -> dict[str, Any]:
     return _ok(schema=schema)
 
 
-# ------------------------------------------------------------------
-# Private helpers
-# ------------------------------------------------------------------
-
-
 def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any] | None]:
     """Resolves an input session path to its root directory (the parent of ``raw_data``).
 
@@ -1078,12 +1073,12 @@ def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any
     """
     path = Path(session_path)
     if not path.exists():
-        return None, _err(message=f"Session path does not exist: {path}")
+        return None, _error(message=f"Session path does not exist: {path}")
     if path.joinpath(_RAW_DATA_DIR).is_dir():
         return path, None
     if path.name == _RAW_DATA_DIR and path.is_dir():
         return path.parent, None
-    return None, _err(message=f"Could not locate the {_RAW_DATA_DIR} directory under {path}")
+    return None, _error(message=f"Could not locate the {_RAW_DATA_DIR} directory under {path}")
 
 
 def _load_session_summary(marker: Path) -> dict[str, Any]:
@@ -1091,6 +1086,10 @@ def _load_session_summary(marker: Path) -> dict[str, Any]:
 
     Args:
         marker: The path to the ``session_data.yaml`` marker file.
+
+    Returns:
+        A flat dict with session identity metadata, paths, and completeness status, or an error dict
+        if the session could not be loaded.
     """
     session_root = _session_root_from_marker(marker=marker)
     try:
@@ -1121,6 +1120,10 @@ def _load_dataset_summary(marker: Path) -> dict[str, Any]:
 
     Args:
         marker: The path to the ``dataset.yaml`` marker file.
+
+    Returns:
+        A flat dict with dataset identity metadata, session counts, and paths, or an error dict if the
+        dataset could not be loaded.
     """
     dataset_root = marker.parent
     try:
@@ -1229,7 +1232,7 @@ def _resolve_surgery_path(
         if candidate.exists():
             return candidate, None
 
-    return None, _err(
+    return None, _error(
         message=(
             f"Could not locate a cached SurgeryData file for subject '{subject_id}'. Searched under the working "
             f"directory and the system root directory using conventional paths "

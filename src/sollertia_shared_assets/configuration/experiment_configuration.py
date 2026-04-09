@@ -12,7 +12,7 @@ from ataraxis_base_utilities import console
 from .vr_configuration import TriggerType, TrialStructure
 
 
-@dataclass
+@dataclass(slots=True)
 class ExperimentState:
     """Defines the structure and runtime parameters of an experiment state (phase)."""
 
@@ -41,7 +41,7 @@ class ExperimentState:
     """The number of guided aversive trials to use in the recovery guidance mode."""
 
 
-@dataclass
+@dataclass(slots=True)
 class BaseTrial(TrialStructure):
     """Extends TrialStructure with experiment runtime fields common to all supported experiment trial types.
 
@@ -113,7 +113,7 @@ class BaseTrial(TrialStructure):
             console.error(message=message, error=ValueError)
 
 
-@dataclass
+@dataclass(slots=True)
 class WaterRewardTrial(BaseTrial):
     """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal licks in the trigger zone.
 
@@ -129,7 +129,7 @@ class WaterRewardTrial(BaseTrial):
     """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
 
 
-@dataclass
+@dataclass(slots=True)
 class GasPuffTrial(BaseTrial):
     """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails to meet occupancy duration.
 

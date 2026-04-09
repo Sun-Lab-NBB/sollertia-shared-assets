@@ -95,7 +95,7 @@ def _ok(**payload: Any) -> dict[str, Any]:  # noqa: ANN401 - response builder ac
     return {"success": True, **payload}
 
 
-def _err(message: str) -> dict[str, Any]:
+def _error(message: str) -> dict[str, Any]:
     """Constructs a failure response dict with a ``success`` flag set to False and the provided error message."""
     return {"success": False, "error": message}
 
@@ -218,7 +218,7 @@ def _write_yaml_validated(
         A response dict with the file path and serialized data on success, or an error dict on failure.
     """
     if file_path.exists() and not overwrite:
-        return _err(message=f"File already exists: {file_path}. Pass overwrite=True to replace.")
+        return _error(message=f"File already exists: {file_path}. Pass overwrite=True to replace.")
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
     # Keeps the temp file ending in .yaml because YamlConfig.from_yaml rejects non-.yaml paths.
@@ -232,7 +232,7 @@ def _write_yaml_validated(
     except Exception as exception:
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
-        return _err(message=f"Validation failed for {validator_cls.__name__}: {exception}")
+        return _error(message=f"Validation failed for {validator_cls.__name__}: {exception}")
     finally:
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
@@ -243,7 +243,7 @@ def _write_yaml_validated(
         else:
             instance.to_yaml(file_path=file_path)
     except Exception as exception:
-        return _err(message=f"Failed to persist {validator_cls.__name__} to {file_path}: {exception}")
+        return _error(message=f"Failed to persist {validator_cls.__name__} to {file_path}: {exception}")
 
     return _ok(file_path=str(file_path), data=_serialize(value=instance))
 
@@ -260,11 +260,11 @@ def _read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, An
         on failure.
     """
     if not file_path.exists():
-        return _err(message=f"File not found: {file_path}")
+        return _error(message=f"File not found: {file_path}")
     try:
         instance = validator_cls.from_yaml(file_path=file_path)
     except Exception as exception:
-        return _err(message=f"Failed to load {file_path} as {validator_cls.__name__}: {exception}")
+        return _error(message=f"Failed to load {file_path} as {validator_cls.__name__}: {exception}")
     return _ok(file_path=str(file_path), data=_serialize(value=instance))
 
 
@@ -281,14 +281,14 @@ def _resolve_root_directory(root_directory: str | None) -> tuple[Path | None, di
     if root_directory is not None:
         path = Path(root_directory)
         if not path.exists():
-            return None, _err(message=f"Root directory does not exist: {path}")
+            return None, _error(message=f"Root directory does not exist: {path}")
         if not path.is_dir():
-            return None, _err(message=f"Root directory is not a directory: {path}")
+            return None, _error(message=f"Root directory is not a directory: {path}")
         return path, None
     try:
         system_configuration = get_system_configuration_data()
     except (FileNotFoundError, OSError, ValueError) as exception:
-        return None, _err(message=f"Unable to resolve root directory from system configuration: {exception}")
+        return None, _error(message=f"Unable to resolve root directory from system configuration: {exception}")
     return system_configuration.filesystem.root_directory, None
 
 
@@ -312,6 +312,9 @@ def _safe_iterdir(directory: Path) -> list[Path]:
 
     Args:
         directory: The directory whose children to list.
+
+    Returns:
+        A list of non-hidden child paths, or an empty list if a permission error occurs.
     """
     try:
         return [child for child in directory.iterdir() if not child.name.startswith(".")]

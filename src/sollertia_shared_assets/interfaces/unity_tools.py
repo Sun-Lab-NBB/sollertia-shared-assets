@@ -14,7 +14,7 @@ import urllib.request
 from .mcp_instance import (
     _UNITY_BRIDGE_URL,
     mcp,
-    _err,
+    _error,
 )
 
 
@@ -205,9 +205,9 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         with urllib.request.urlopen(url=request, timeout=30) as response:  # noqa: S310 - same localhost URL.
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.URLError:
-        return _err(
+        return _error(
             message="Unity Editor is not reachable. Ensure the Editor is open with the McpBridge plugin loaded "
             f"and listening on {_UNITY_BRIDGE_URL}."
         )
     except json.JSONDecodeError:
-        return _err(message="Unity bridge returned invalid JSON.")
+        return _error(message="Unity bridge returned invalid JSON.")
