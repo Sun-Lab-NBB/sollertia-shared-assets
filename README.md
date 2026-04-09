@@ -22,9 +22,12 @@ acquisition ([sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-exp
 ([sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)) independent of each other by providing the
 shared assets both depend on.
 
-The library broadly stores two types of assets. First, it stores dataclasses used to save the data acquired with the
-Sollertia platform and configure data acquisition and processing runtimes. Second, it provides the low-level tools and
-methods used to manage the data at all stages of the Sollertia data workflow: acquisition, processing, and analysis.
+The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, datasets, subjects,
+hardware state) and configure data acquisition and processing runtimes. It also provides a CLI (`sl-configure`) for
+platform configuration and an MCP server with tools for agentic configuration management, session and dataset
+operations, and Unity Editor integration. A subset of the MCP tools relay commands to a running Unity Editor instance
+via the McpBridge plugin from [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), enabling
+agents to generate task prefabs, manage scenes, and control Play Mode.
 
 ___
 
@@ -33,9 +36,10 @@ ___
 - [Dependencies](#dependencies)
 - [Installation](#installation)
 - [Usage](#usage)
+  - [CLI Commands](#cli-commands)
   - [MCP Server](#mcp-server)
 - [API Documentation](#api-documentation)
-- [Development](#development)
+- [Developers](#developers)
   - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
 - [Versioning](#versioning)
 - [Authors](#authors)
@@ -46,8 +50,9 @@ ___
 
 ## Dependencies
 
-All library dependencies are installed automatically by all supported installation methods 
-(see the [Installation](#installation) section).
+For users, all library dependencies are installed automatically by all supported installation
+methods. For developers, see the [Developers](#developers) section for information on installing
+additional development dependencies.
 
 ___
 
@@ -55,19 +60,21 @@ ___
 
 ### Source
 
-Note, installation from source is ***highly discouraged*** for anyone who is not an active project developer.
+***Note,*** installation from source is ***highly discouraged*** for anyone who is not an active
+project developer.
 
-1. Download this repository to the local machine using the preferred method, such as git-cloning. Use one of the 
-   [stable releases](https://github.com/Sun-Lab-NBB/sollertia-shared-assets/releases) that include precompiled binary
-   and source code distribution (sdist) wheels.
-2. If the downloaded distribution is stored as a compressed archive, unpack it using the appropriate decompression tool.
-3. ```cd``` to the root directory of the prepared project distribution.
-4. Run ```python -m pip install .``` to install the project. Alternatively, if using a distribution with precompiled
-   binaries, use ```python -m pip install WHEEL_PATH```, replacing 'WHEEL_PATH' with the path to the wheel file.
+1. Download this repository to the local machine using the preferred method, such as git-cloning.
+   Use one of the [stable releases](https://github.com/Sun-Lab-NBB/sollertia-shared-assets/tags)
+   that include precompiled binary and source code distribution (sdist) wheels.
+2. If the downloaded distribution is stored as a compressed archive, unpack it using the
+   appropriate decompression tool.
+3. `cd` to the root directory of the prepared project distribution.
+4. Run `pip install .` to install the project and its dependencies.
 
 ### pip
 
-Use the following command to install the library using pip: ```pip install sollertia-shared-assets```.
+Use the following command to install the library and all of its dependencies via
+[pip](https://pip.pypa.io/en/stable/): `pip install sollertia-shared-assets`
 
 ___
 
@@ -83,10 +90,28 @@ for data processing and dataset formation, see the
 environment. All assets from this library are intended to be used exclusively by developers working on other Sollertia
 platform libraries.
 
+### CLI Commands
+
+This library provides the `sl-configure` CLI that exposes the following commands:
+
+| Command      | Description                                                          |
+|--------------|----------------------------------------------------------------------|
+| `directory`  | Sets the local Sollertia platform working directory                  |
+| `mcp`        | Starts the MCP server for agentic configuration management           |
+| `system`     | Creates the data acquisition system configuration file               |
+| `google`     | Sets the path to the Google service account credentials file         |
+| `templates`  | Sets the path to the sollertia-unity-tasks task templates directory  |
+| `project`    | Creates a project directory structure for data acquisition           |
+| `experiment` | Creates an experiment configuration from a task template             |
+| `server`     | Creates the remote compute server configuration file                 |
+
+Use `sl-configure --help` or `sl-configure COMMAND --help` for detailed usage information.
+
 ### MCP Server
 
-This library provides an MCP server that exposes configuration management tools for AI agent integration. The server
-enables agents to query and configure shared Sollertia platform workflow components.
+This library provides an MCP server that exposes configuration management, session and dataset operations, and Unity
+Editor relay tools for AI agent integration. The server enables agents to query and configure shared Sollertia platform
+workflow components.
 
 #### Starting the Server
 
@@ -98,50 +123,163 @@ sl-configure mcp
 
 #### Available Tools
 
-| Tool                                        | Description                                                       |
-|---------------------------------------------|-------------------------------------------------------------------|
-| `get_working_directory_tool`                | Returns the current Sollertia platform working directory path     |
-| `set_working_directory_tool`                | Sets the Sollertia platform working directory                     |
-| `get_server_configuration_tool`             | Returns the compute server configuration (password masked)        |
-| `create_server_configuration_template_tool` | Creates a server configuration template for manual password entry |
-| `get_google_credentials_tool`               | Returns the path to the Google service account credentials file   |
-| `set_google_credentials_tool`               | Sets the path to the Google credentials file                      |
-| `get_task_templates_directory_tool`         | Returns the path to the sollertia-unity-tasks templates directory |
-| `set_task_templates_directory_tool`         | Sets the path to the task templates directory                     |
-| `list_available_templates_tool`             | Lists all available task templates                                |
-| `get_template_info_tool`                    | Returns detailed information about a specific task template       |
+| Tool                                            | Description                                                                                    |
+|-------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `check_mount_accessibility_tool`                | Verifies that a filesystem path is accessible and writable                                     |
+| `check_system_mounts_tool`                      | Verifies all filesystem paths in the active system configuration                               |
+| `create_experiment_config_tool`                 | Creates an experiment configuration from a task template using sensible defaults               |
+| `create_project_tool`                           | Creates a new project directory and its configuration subdirectory                             |
+| `create_scene_tool`                             | Creates a new Unity scene by copying ExperimentTemplate and optionally adding a task prefab    |
+| `describe_dataset_schema_tool`                  | Returns the schema for DatasetData and its nested DatasetSession                               |
+| `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system              |
+| `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
+| `describe_surgery_schema_tool`                  | Returns the schema for SurgeryData and its nested subclasses                                   |
+| `describe_system_configuration_schema_tool`     | Returns the schema for the system configuration of a given acquisition system                  |
+| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, Segment, TrialStructure, and VREnvironment |
+| `discover_animals_tool`                         | Lists animal subdirectories within a project                                                   |
+| `discover_datasets_tool`                        | Recursively discovers all dataset directories under the datasets root                          |
+| `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
+| `discover_projects_tool`                        | Lists all projects accessible to the data acquisition system                                   |
+| `discover_session_descriptors_tool`             | Returns the inventory of descriptor, hardware state, and position files in a session           |
+| `discover_sessions_tool`                        | Recursively discovers all sessions under the data root                                         |
+| `discover_subjects_tool`                        | Discovers subjects by scanning project directories on disk                                     |
+| `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
+| `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
+| `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
+| `generate_task_prefab_tool`                     | Generates a Task prefab in Unity from a YAML task template                                     |
+| `get_acquisition_environment_status_tool`       | Returns a comprehensive health report for the local acquisition environment                    |
+| `get_batch_session_status_overview_tool`        | Aggregates session lifecycle status across every session under the data root                   |
+| `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
+| `get_project_overview_tool`                     | Returns aggregate counts for animals, sessions, experiments, and datasets                      |
+| `get_session_status_tool`                       | Returns lifecycle status for a single session                                                  |
+| `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab           |
+| `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
+| `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
+| `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
+| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                            |
+| `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
+| `list_unity_assets_tool`                        | Lists Unity assets of a given type within a search path                                        |
+| `open_scene_tool`                               | Opens a Unity scene in the Editor                                                              |
+| `read_dataset_tool`                             | Loads the DatasetData YAML for a dataset                                                       |
+| `read_experiment_configuration_tool`            | Loads the experiment configuration YAML for a project                                          |
+| `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                     |
+| `read_server_configuration_tool`                | Loads the ServerConfiguration from the working directory with the password masked              |
+| `read_session_data_tool`                        | Loads the SessionData YAML for a session                                                       |
+| `read_session_descriptor_tool`                  | Detects the appropriate descriptor class and loads the descriptor YAML                         |
+| `read_session_experiment_configuration_tool`    | Loads the per-session snapshot of the experiment configuration                                 |
+| `read_session_hardware_state_tool`              | Loads the MesoscopeHardwareState YAML for a session                                            |
+| `read_session_mesoscope_positions_tool`         | Loads the MesoscopePositions YAML for a session                                                |
+| `read_session_system_configuration_tool`        | Loads the per-session snapshot of the system configuration                                     |
+| `read_session_zaber_positions_tool`             | Loads the ZaberPositions YAML for a session                                                    |
+| `read_subject_drugs_tool`                       | Loads the DrugData payload for a subject from the cached SurgeryData YAML                      |
+| `read_subject_implants_tool`                    | Loads the list of ImplantData for a subject from the cached SurgeryData YAML                   |
+| `read_subject_injections_tool`                  | Loads the list of InjectionData for a subject from the cached SurgeryData YAML                 |
+| `read_subject_surgery_tool`                     | Loads the full SurgeryData payload for a subject                                               |
+| `read_subject_tool`                             | Loads SubjectData for a subject from the cached SurgeryData YAML                               |
+| `read_system_configuration_tool`                | Loads the active system configuration from the working directory                               |
+| `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
+| `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                      |
+| `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
+| `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                   |
+| `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                  |
+| `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                            |
+| `validate_dataset_tool`                         | Validates a dataset and verifies that all referenced session paths exist                       |
+| `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                       |
+| `validate_prefab_against_template_tool`         | Validates that Unity prefab zone positions match the template configuration                    |
+| `validate_session_tool`                         | Validates that a session has the expected files for its session type                           |
+| `validate_system_configuration_tool`            | Validates the active system configuration and all configured filesystem paths                  |
+| `validate_template_tool`                        | Validates a TaskTemplate against its schema and cross-reference constraints                    |
+| `write_dataset_tool`                            | Creates a new dataset by materializing the dataset hierarchy on disk                           |
+| `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                             |
+| `write_server_configuration_tool`               | Creates or replaces the ServerConfiguration YAML in the working directory                      |
+| `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
+| `write_session_hardware_state_tool`             | Creates or replaces the MesoscopeHardwareState YAML for a session                              |
+| `write_session_mesoscope_positions_tool`        | Creates or replaces the MesoscopePositions YAML for a session                                  |
+| `write_session_zaber_positions_tool`            | Creates or replaces the ZaberPositions YAML for a session                                      |
+| `write_system_configuration_tool`               | Creates or replaces a system configuration YAML in the working directory                       |
+| `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                  |
 
-#### Claude Desktop Configuration
+***Note,*** tools that interact with Unity (`create_scene_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`,
+`generate_task_prefab_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `list_scenes_tool`, `list_unity_assets_tool`,
+`open_scene_tool`, `validate_prefab_against_template_tool`) require the Unity Editor to be running on the local machine
+with the McpBridge plugin from [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks) active.
+These tools relay commands to the Editor via HTTP at `localhost:8090`.
 
-Add the following to the Claude Desktop configuration file:
+#### Client Registration
 
-```json
-{
-  "mcpServers": {
-    "sollertia-shared-assets": {
-      "command": "sl-configure",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+MCP server registration and Claude Code skill assets for this library are distributed through the
+[sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace as part of the **configuration** plugin. Install the
+plugin from the marketplace to automatically register the MCP server with compatible clients and make all associated
+skills available.
 
 ___
 
 ## API Documentation
 
-Developers working on integrating sollertia-shared-assets into other libraries should see the
-[API documentation](https://sollertia-shared-assets-api-docs.netlify.app/) for the detailed description of the methods
-and classes exposed by components of this library.
+See the [API documentation](https://sollertia-shared-assets-api-docs.netlify.app/) for the detailed description of the
+methods and classes exposed by components of this library.
 
-**Note!** The API documentation includes important information about the 'configuration' Command-Line Interface (CLI)
-exposed by this library.
+***Note,*** the API documentation includes additional details about the `sl-configure` CLI commands and their
+parameters beyond what is covered in the [CLI Commands](#cli-commands) section above.
 
 ___
 
-## Development
+## Developers
 
-This section provides guidance for developers extending this library.
+This section provides installation, dependency, and build-system instructions for the developers
+that want to modify the source code of this library.
+
+### Installing the Project
+
+***Note,*** this installation method requires **mamba version 2.3.2 or above**. Currently, all
+Sun lab automation pipelines require that mamba is installed through the
+[miniforge3](https://github.com/conda-forge/miniforge) installer.
+
+1. Download this repository to the local machine using the preferred method, such as git-cloning.
+2. If the downloaded distribution is stored as a compressed archive, unpack it using the
+   appropriate decompression tool.
+3. `cd` to the root directory of the prepared project distribution.
+4. Install the core Sun lab development dependencies into the ***base*** mamba environment via the
+   `mamba install tox uv tox-uv` command.
+5. Use the `tox -e create` command to create the project-specific development environment followed
+   by `tox -e install` command to install the project into that environment as a library.
+
+### Additional Dependencies
+
+In addition to installing the project and all user dependencies, install the following
+dependencies:
+
+1. [Python](https://www.python.org/downloads/) distributions, one for each version supported by
+   the developed project. Currently, this library supports Python 3.14 only. It is recommended to
+   use a tool like [pyenv](https://github.com/pyenv/pyenv) to install and manage the required
+   versions.
+
+### Development Automation
+
+This project uses `tox` for development automation. The following tox environments are available:
+
+| Environment    | Description                                                  |
+|----------------|--------------------------------------------------------------|
+| `lint`         | Runs ruff formatting, ruff linting, and mypy type checking   |
+| `stubs`        | Generates py.typed marker and .pyi stub files                |
+| `py314-test`   | Runs the test suite via pytest for Python 3.14               |
+| `coverage`     | Aggregates test coverage into an HTML report                 |
+| `docs`         | Builds the API documentation via Sphinx                      |
+| `build`        | Builds sdist and wheel distributions                         |
+| `upload`       | Uploads distributions to PyPI via twine                      |
+| `install`      | Builds and installs the project into its mamba environment   |
+| `uninstall`    | Uninstalls the project from its mamba environment            |
+| `create`       | Creates the project's mamba development environment          |
+| `remove`       | Removes the project's mamba development environment          |
+| `provision`    | Recreates the mamba environment from scratch                 |
+| `export`       | Exports the mamba environment as .yml and spec.txt files     |
+| `import`       | Creates or updates the mamba environment from a .yml file    |
+
+Run any environment using `tox -e ENVIRONMENT`. For example, `tox -e lint`.
+
+***Note,*** all pull requests for this project have to successfully complete the `tox` task before
+being merged. To expedite the task's runtime, use the `tox --parallel` command to run some tasks
+in parallel.
 
 ### Adding New Acquisition Systems
 
@@ -172,13 +310,37 @@ Create a new file (e.g., `new_system_configuration.py`) containing:
 In `configuration_utilities.py`:
 
 1. Extend the `SystemConfiguration` type alias to include the new configuration class
-2. Extend the `ExperimentConfiguration` type alias to include the new experiment configuration class
+2. Extend the `ExperimentConfigFactory` type alias to include the new experiment configuration class in the return type
 3. Add an entry to `_SYSTEM_CONFIG_CLASSES` mapping the system name to its configuration class
 4. Create an experiment factory function and register it in `_EXPERIMENT_CONFIG_FACTORIES`
 
 **Step 4: Update downstream libraries**
 
 Coordinate changes with sollertia-experiment (data acquisition) and sollertia-forgery (data processing) as needed.
+
+### AI-Assisted Development
+
+Claude Code skills and AI development assets for this project are distributed through two marketplaces:
+
+- [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace: Provides MCP server registration,
+  configuration-specific skills for working directory management, system and experiment configuration, session data,
+  subject metadata, dataset management, task templates, and MCP environment setup via the **configuration** plugin.
+  Install this plugin to register the `sl-configure mcp` server with compatible MCP clients and make all configuration
+  workflow skills available.
+- [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace: Provides shared development skills that enforce
+  Sun Lab coding conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and
+  general-purpose codebase exploration tools via the **automation** plugin.
+
+Install both marketplace plugins to make all associated skills and development tools available to compatible AI coding
+agents.
+
+### Automation Troubleshooting
+
+Many packages used in `tox` automation pipelines (uv, mypy, ruff) and `tox` itself may experience
+runtime failures. In most cases, this is related to their caching behavior. If an unintelligible
+error is encountered with any of the automation components, deleting the corresponding cache
+directories (`.tox`, `.ruff_cache`, `.mypy_cache`, etc.) manually or via a CLI command typically
+resolves the issue.
 
 ___
 
@@ -200,14 +362,14 @@ ___
 
 ## License
 
-This project is licensed under the Apache 2.0 License: see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache 2.0 License: see the [LICENSE](LICENSE) file for
+details.
 
 ___
 
 ## Acknowledgments
 
-- All Sun (NeuroAI) lab [members](https://neuroai.github.io/sunlab/people) for providing the inspiration and comments
-  during the development of this library and the broader Sollertia platform.
-- The creators of all other dependencies and projects listed in the [pyproject.toml](pyproject.toml) file.
-
-___
+- All Sun lab [members](https://neuroai.github.io/sunlab/people) for providing the inspiration
+  and comments during the development of this library.
+- The creators of all other dependencies and projects listed in the
+  [pyproject.toml](pyproject.toml) file.
