@@ -21,7 +21,7 @@ maintainers = [
     { name = "Ivan Kondratyev", email = "ik278@cornell.edu" },
 ]
 
-keywords = ["sollertia", "ataraxis", "data", "assets", "acquisition", "processing", "server"]
+keywords = ["sollertia", "ataraxis", "dataclasses", "configuration"]
 
 classifiers = [
     # Development status
