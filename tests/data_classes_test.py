@@ -52,9 +52,9 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 
     # Cues: A->50, B->75, C->50 = 175 total for Segment_abc
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=75.0),
-        Cue(name="C", code=3, length_cm=50.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
+        Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
+        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
     ]
 
     segments = [

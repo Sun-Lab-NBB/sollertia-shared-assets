@@ -60,9 +60,9 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 
     # Cues: A->50, B->75, C->50 = 175 total for Segment_abc
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=75.0),
-        Cue(name="C", code=3, length_cm=50.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
+        Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
+        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
     ]
 
     segments = [
@@ -203,10 +203,10 @@ def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> Me
     The segment "TestSegment" has cues that sum to 200.0 cm.
     """
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=50.0),
-        Cue(name="C", code=3, length_cm=50.0),
-        Cue(name="D", code=4, length_cm=50.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
+        Cue(name="B", code=2, length_cm=50.0, texture="Cue 001 - 4x1.png"),
+        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
+        Cue(name="D", code=4, length_cm=50.0, texture="Cue 002 - 4x1.png"),
     ]
     segments = [Segment(name="TestSegment", cue_sequence=["A", "B", "C", "D"], transition_probabilities=None)]
     state = ExperimentState(
@@ -412,8 +412,8 @@ def test_experiment_config_invalid_segment_reference():
     )
 
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=75.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
+        Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
     ]
     segments = [Segment(name="Segment_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
 
@@ -451,8 +451,8 @@ def test_experiment_config_invalid_cue_in_segment():
     )
 
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=75.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
+        Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
     ]
     # Segment references cue "C" which doesn't exist
     segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None)]
@@ -492,9 +492,9 @@ def test_experiment_config_derives_trial_fields():
 
     # Cues: A->50, B->75, C->50 = 175 total
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=75.0),
-        Cue(name="C", code=3, length_cm=50.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
+        Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
+        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
     ]
     segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None)]
 
