@@ -164,6 +164,9 @@ exclude = [
 ]
 
 # This is used by the 'test' tox tasks to aggregate coverage data produced during pytest runtimes.
+[tool.coverage.run]
+omit = ["src/sollertia_shared_assets/interfaces/*"]
+
 [tool.coverage.paths]
 
 # Maps coverage measured in site-packages to source files in src

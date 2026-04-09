@@ -5,10 +5,16 @@ from pathlib import Path
 import pytest
 import platformdirs
 
+from copy import deepcopy
+
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
+    BaseTrial,
     Cue,
     Segment,
+    TaskTemplate,
+    TriggerType,
+    TrialStructure,
     VREnvironment,
     GasPuffTrial,
     WaterRewardTrial,
@@ -27,8 +33,12 @@ from sollertia_shared_assets.configuration import (
     get_google_credentials_path,
     set_google_credentials_path,
     get_server_configuration,
+    get_task_templates_directory,
+    set_task_templates_directory,
+    create_experiment_configuration,
     create_system_configuration_file,
     create_server_configuration_file,
+    populate_default_experiment_states,
 )
 
 
@@ -395,7 +405,7 @@ def test_trial_stimulus_location_precedes_trigger_zone():
         stimulus_location_cm=170.0,  # Before trigger zone start (180)
         show_stimulus_collision_boundary=False,
     )
-    with pytest.raises(ValueError, match="stimulus_location_cm.*cannot precede"):
+    with pytest.raises(ValueError, match="(?s)stimulus_location_cm.*must not precede"):
         _create_test_config_with_trial(trial)
 
 
@@ -728,22 +738,18 @@ def test_mesoscope_system_configuration_default_initialization():
     assert isinstance(config.assets, MesoscopeExternalAssets)
 
 
-def test_mesoscope_system_configuration_post_init_path_conversion():
-    """Verifies that __post_init__ converts string paths to Path objects.
+def test_mesoscope_system_configuration_post_init_preserves_tuple_calibration():
+    """Verifies that __post_init__ preserves already-correct tuple valve calibration data.
 
-    This test ensures path fields are properly converted during initialization.
+    This test ensures existing tuple calibration data passes through __post_init__ unchanged.
     """
     config = MesoscopeSystemConfiguration()
-    # noinspection PyTypeChecker
-    config.filesystem.root_directory = "/data/projects"
-    # noinspection PyTypeChecker
-    config.filesystem.server_directory = "/mnt/server"
+    original_calibration = config.microcontrollers.valve_calibration_data
 
-    # Simulates re-initialization (would happen during YAML loading)
     config.__post_init__()
 
-    assert isinstance(config.filesystem.root_directory, Path)
-    assert isinstance(config.filesystem.server_directory, Path)
+    assert config.microcontrollers.valve_calibration_data == original_calibration
+    assert isinstance(config.microcontrollers.valve_calibration_data, tuple)
 
 
 def test_mesoscope_system_configuration_post_init_valve_calibration_dict():
@@ -1556,3 +1562,553 @@ def test_get_server_configuration_raises_error_if_unconfigured(clean_working_dir
         get_server_configuration()
 
     assert "unconfigured" in str(exc_info.value).lower()
+
+
+# Tests for Cue validation
+
+
+def test_cue_code_above_uint8_raises_error():
+    """Verifies that a Cue code above 255 raises ValueError."""
+    with pytest.raises(ValueError, match="uint8"):
+        Cue(name="X", code=256, length_cm=50.0)
+
+
+def test_cue_code_negative_raises_error():
+    """Verifies that a negative Cue code raises ValueError."""
+    with pytest.raises(ValueError, match="uint8"):
+        Cue(name="X", code=-1, length_cm=50.0)
+
+
+def test_cue_length_zero_raises_error():
+    """Verifies that a Cue with length_cm <= 0 raises ValueError."""
+    with pytest.raises(ValueError, match="length_cm must be greater than 0"):
+        Cue(name="X", code=1, length_cm=0.0)
+
+
+def test_cue_length_negative_raises_error():
+    """Verifies that a Cue with negative length_cm raises ValueError."""
+    with pytest.raises(ValueError, match="length_cm must be greater than 0"):
+        Cue(name="X", code=1, length_cm=-10.0)
+
+
+# Tests for Segment validation
+
+
+def test_segment_empty_cue_sequence_raises_error():
+    """Verifies that a Segment with an empty cue_sequence raises ValueError."""
+    with pytest.raises(ValueError, match="must contain at least one cue"):
+        Segment(name="Empty", cue_sequence=[], transition_probabilities=None)
+
+
+def test_segment_invalid_probability_sum_raises_error():
+    """Verifies that a Segment with transition_probabilities not summing to 1.0 raises ValueError."""
+    with pytest.raises(ValueError, match="must sum to 1.0"):
+        Segment(name="Bad", cue_sequence=["A"], transition_probabilities=[0.3, 0.3])
+
+
+def test_segment_valid_probabilities():
+    """Verifies that a Segment with valid transition_probabilities initializes correctly."""
+    segment = Segment(name="Valid", cue_sequence=["A", "B"], transition_probabilities=[0.5, 0.5])
+    assert segment.transition_probabilities == [0.5, 0.5]
+
+
+def test_segment_none_probabilities():
+    """Verifies that a Segment with None transition_probabilities initializes correctly."""
+    segment = Segment(name="NoProb", cue_sequence=["A"], transition_probabilities=None)
+    assert segment.transition_probabilities is None
+
+
+# Tests for TaskTemplate validation
+
+
+def _create_base_task_template(
+    cues: list[Cue] | None = None,
+    segments: list[Segment] | None = None,
+    trial_structures: dict[str, TrialStructure] | None = None,
+) -> TaskTemplate:
+    """Helper to create a TaskTemplate with sensible defaults."""
+    if cues is None:
+        cues = [
+            Cue(name="A", code=1, length_cm=50.0),
+            Cue(name="B", code=2, length_cm=50.0),
+        ]
+    if segments is None:
+        segments = [Segment(name="Seg_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
+    if trial_structures is None:
+        trial_structures = {
+            "trial1": TrialStructure(
+                segment_name="Seg_ab",
+                stimulus_trigger_zone_start_cm=80.0,
+                stimulus_trigger_zone_end_cm=100.0,
+                stimulus_location_cm=90.0,
+                show_stimulus_collision_boundary=False,
+                trigger_type=TriggerType.LICK,
+            ),
+        }
+    return TaskTemplate(
+        cues=cues,
+        segments=segments,
+        trial_structures=trial_structures,
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+        ),
+        cue_offset_cm=0.0,
+    )
+
+
+def test_task_template_valid_initialization():
+    """Verifies that a valid TaskTemplate initializes without errors."""
+    template = _create_base_task_template()
+    assert len(template.cues) == 2
+    assert len(template.segments) == 1
+    assert "trial1" in template.trial_structures
+
+
+def test_task_template_duplicate_cue_codes_raises_error():
+    """Verifies that duplicate cue codes raise ValueError."""
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=1, length_cm=50.0),  # Duplicate code
+    ]
+    with pytest.raises(ValueError, match="duplicate codes"):
+        _create_base_task_template(cues=cues)
+
+
+def test_task_template_duplicate_cue_names_raises_error():
+    """Verifies that duplicate cue names raise ValueError."""
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="A", code=2, length_cm=50.0),  # Duplicate name
+    ]
+    with pytest.raises(ValueError, match="duplicate names"):
+        _create_base_task_template(cues=cues)
+
+
+def test_task_template_segment_references_unknown_cue_raises_error():
+    """Verifies that a segment referencing an unknown cue raises ValueError."""
+    cues = [Cue(name="A", code=1, length_cm=50.0)]
+    segments = [Segment(name="Seg", cue_sequence=["A", "Z"], transition_probabilities=None)]
+    with pytest.raises(ValueError, match="references unknown cue.*Z"):
+        _create_base_task_template(cues=cues, segments=segments)
+
+
+def test_task_template_trial_references_unknown_segment_raises_error():
+    """Verifies that a trial referencing an unknown segment raises ValueError."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Nonexistent",
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match="references unknown segment.*Nonexistent"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_invalid_trigger_type_raises_error():
+    """Verifies that an invalid trigger_type raises ValueError."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type="invalid_type",
+        ),
+    }
+    with pytest.raises(ValueError, match="invalid trigger_type"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_trigger_type_as_enum():
+    """Verifies that trigger_type accepts TriggerType enum values."""
+    template = _create_base_task_template()
+    trial = template.trial_structures["trial1"]
+    assert trial.trigger_type == TriggerType.LICK
+
+
+def test_task_template_zone_end_less_than_start_raises_error():
+    """Verifies that zone_end < zone_start raises ValueError in TaskTemplate validation."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=90.0,
+            stimulus_trigger_zone_end_cm=80.0,  # Less than start
+            stimulus_location_cm=85.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match="must be greater than or equal to"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_zone_start_outside_segment_raises_error():
+    """Verifies that zone_start outside segment length raises ValueError."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=150.0,  # Outside segment (100 cm)
+            stimulus_trigger_zone_end_cm=160.0,
+            stimulus_location_cm=155.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match="stimulus_trigger_zone_start_cm.*must be within"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_zone_end_outside_segment_raises_error():
+    """Verifies that zone_end outside segment length raises ValueError."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=150.0,  # Outside segment (100 cm)
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match="stimulus_trigger_zone_end_cm.*must be within"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_location_outside_segment_raises_error():
+    """Verifies that stimulus_location outside segment length raises ValueError."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=150.0,  # Outside segment (100 cm)
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match="stimulus_location_cm.*must be within"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_location_precedes_start_raises_error():
+    """Verifies that stimulus_location before zone start raises ValueError."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=70.0,  # Before zone start
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match="(?s)stimulus_location_cm.*must not precede"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_properties():
+    """Verifies the internal properties of TaskTemplate."""
+    template = _create_base_task_template()
+
+    cue_map = template._cue_by_name
+    assert "A" in cue_map
+    assert "B" in cue_map
+    assert cue_map["A"].code == 1
+
+    segment_map = template._segment_by_name
+    assert "Seg_ab" in segment_map
+
+    length = template._get_segment_length_cm("Seg_ab")
+    assert length == 100.0  # 50 + 50
+
+
+# Tests for MesoscopeExperimentConfiguration duplicate validation
+
+
+def test_experiment_config_duplicate_cue_codes_raises_error():
+    """Verifies that duplicate cue codes in MesoscopeExperimentConfiguration raise ValueError."""
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=1, length_cm=50.0),  # Duplicate code
+    ]
+    segments = [Segment(name="Seg", cue_sequence=["A", "B"], transition_probabilities=None)]
+    trial = WaterRewardTrial(
+        segment_name="Seg",
+        stimulus_trigger_zone_start_cm=80.0,
+        stimulus_trigger_zone_end_cm=100.0,
+        stimulus_location_cm=90.0,
+        show_stimulus_collision_boundary=False,
+    )
+    state = ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0)
+    with pytest.raises(ValueError, match="duplicate codes"):
+        MesoscopeExperimentConfiguration(
+            cues=cues,
+            segments=segments,
+            trial_structures={"trial1": trial},
+            experiment_states={"state1": state},
+            vr_environment=VREnvironment(
+                corridor_spacing_cm=100.0, segments_per_corridor=3, padding_prefab_name="P", cm_per_unity_unit=10.0
+            ),
+            unity_scene_name="Test",
+        )
+
+
+def test_experiment_config_duplicate_cue_names_raises_error():
+    """Verifies that duplicate cue names in MesoscopeExperimentConfiguration raise ValueError."""
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="A", code=2, length_cm=50.0),  # Duplicate name
+    ]
+    segments = [Segment(name="Seg", cue_sequence=["A"], transition_probabilities=None)]
+    trial = WaterRewardTrial(
+        segment_name="Seg",
+        stimulus_trigger_zone_start_cm=30.0,
+        stimulus_trigger_zone_end_cm=50.0,
+        stimulus_location_cm=40.0,
+        show_stimulus_collision_boundary=False,
+    )
+    state = ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0)
+    with pytest.raises(ValueError, match="duplicate names"):
+        MesoscopeExperimentConfiguration(
+            cues=cues,
+            segments=segments,
+            trial_structures={"trial1": trial},
+            experiment_states={"state1": state},
+            vr_environment=VREnvironment(
+                corridor_spacing_cm=100.0, segments_per_corridor=3, padding_prefab_name="P", cm_per_unity_unit=10.0
+            ),
+            unity_scene_name="Test",
+        )
+
+
+# Tests for BaseTrial.validate_zones trial_length_cm validation
+
+
+def test_trial_validate_zones_zero_length_raises_error():
+    """Verifies that validate_zones raises ValueError when trial_length_cm is zero."""
+    trial = WaterRewardTrial(
+        segment_name="Seg",
+        stimulus_trigger_zone_start_cm=10.0,
+        stimulus_trigger_zone_end_cm=20.0,
+        stimulus_location_cm=15.0,
+        show_stimulus_collision_boundary=False,
+    )
+    # trial_length_cm defaults to 0.0 when not populated by config __post_init__
+    with pytest.raises(ValueError, match="trial_length_cm must be populated"):
+        trial.validate_zones()
+
+
+# Tests for set_task_templates_directory and get_task_templates_directory
+
+
+def test_set_task_templates_directory_creates_cache_file(tmp_path, monkeypatch):
+    """Verifies that set_task_templates_directory caches the directory path."""
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+
+    set_task_templates_directory(templates_dir)
+
+    cache_file = app_dir / "task_templates_directory_path.txt"
+    assert cache_file.exists()
+    assert cache_file.read_text() == str(templates_dir.resolve())
+
+
+def test_set_task_templates_directory_raises_error_not_exists(tmp_path, monkeypatch):
+    """Verifies that set_task_templates_directory raises error for non-existent directory."""
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    nonexistent = tmp_path / "missing_dir"
+
+    with pytest.raises(FileNotFoundError):
+        set_task_templates_directory(nonexistent)
+
+
+def test_set_task_templates_directory_raises_error_not_directory(tmp_path, monkeypatch):
+    """Verifies that set_task_templates_directory raises error when path is a file."""
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    file_path = tmp_path / "a_file.txt"
+    file_path.write_text("content")
+
+    with pytest.raises(ValueError):
+        set_task_templates_directory(file_path)
+
+
+def test_get_task_templates_directory_returns_cached_path(tmp_path, monkeypatch):
+    """Verifies that get_task_templates_directory returns the cached directory path."""
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+
+    set_task_templates_directory(templates_dir)
+    retrieved = get_task_templates_directory()
+
+    assert retrieved == templates_dir.resolve()
+
+
+def test_get_task_templates_directory_raises_error_if_not_set(tmp_path, monkeypatch):
+    """Verifies that get_task_templates_directory raises error if not configured."""
+    app_dir = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    with pytest.raises(FileNotFoundError):
+        get_task_templates_directory()
+
+
+def test_get_task_templates_directory_raises_error_if_directory_missing(tmp_path, monkeypatch):
+    """Verifies that get_task_templates_directory raises error if cached directory was deleted."""
+    import shutil
+
+    app_dir = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda appname, appauthor: str(app_dir))
+
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+
+    set_task_templates_directory(templates_dir)
+    shutil.rmtree(templates_dir)
+
+    with pytest.raises(FileNotFoundError):
+        get_task_templates_directory()
+
+
+# Tests for create_experiment_configuration
+
+
+def test_create_experiment_configuration_mesoscope_vr():
+    """Verifies that create_experiment_configuration creates a valid MesoscopeExperimentConfiguration."""
+    template = _create_base_task_template()
+
+    config = create_experiment_configuration(
+        template=template,
+        system=AcquisitionSystems.MESOSCOPE_VR,
+        unity_scene_name="TestScene",
+    )
+
+    assert isinstance(config, MesoscopeExperimentConfiguration)
+    assert config.unity_scene_name == "TestScene"
+    assert len(config.cues) == 2
+    assert len(config.trial_structures) == 1
+    trial = config.trial_structures["trial1"]
+    assert isinstance(trial, WaterRewardTrial)
+    assert trial.reward_size_ul == 5.0
+
+
+def test_create_experiment_configuration_with_occupancy_trial():
+    """Verifies that create_experiment_configuration handles occupancy (gas puff) trials."""
+    cues = [
+        Cue(name="A", code=1, length_cm=50.0),
+        Cue(name="B", code=2, length_cm=50.0),
+    ]
+    segments = [Segment(name="Seg_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
+    trial_structures = {
+        "occ_trial": TrialStructure(
+            segment_name="Seg_ab",
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.OCCUPANCY,
+        ),
+    }
+    template = TaskTemplate(
+        cues=cues,
+        segments=segments,
+        trial_structures=trial_structures,
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0, segments_per_corridor=3, padding_prefab_name="P", cm_per_unity_unit=10.0
+        ),
+        cue_offset_cm=5.0,
+    )
+
+    config = create_experiment_configuration(
+        template=template,
+        system=AcquisitionSystems.MESOSCOPE_VR,
+        unity_scene_name="OccScene",
+        default_puff_duration_ms=200,
+        default_occupancy_duration_ms=2000,
+    )
+
+    assert isinstance(config, MesoscopeExperimentConfiguration)
+    trial = config.trial_structures["occ_trial"]
+    assert isinstance(trial, GasPuffTrial)
+    assert trial.puff_duration_ms == 200
+    assert trial.occupancy_duration_ms == 2000
+    assert config.cue_offset_cm == 5.0
+
+
+def test_create_experiment_configuration_invalid_system_raises_error():
+    """Verifies that create_experiment_configuration raises ValueError for unsupported systems."""
+    template = _create_base_task_template()
+
+    with pytest.raises(ValueError, match="not supported"):
+        create_experiment_configuration(
+            template=template,
+            system="nonexistent_system",
+            unity_scene_name="Test",
+        )
+
+
+# Tests for populate_default_experiment_states
+
+
+def test_populate_default_experiment_states_with_water_reward():
+    """Verifies that populate_default_experiment_states adds states with water reward guidance."""
+    config = _create_test_config_with_trial(
+        WaterRewardTrial(
+            segment_name="TestSegment",
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            show_stimulus_collision_boundary=False,
+        )
+    )
+
+    populate_default_experiment_states(experiment_configuration=config, state_count=3)
+
+    assert "state_1" in config.experiment_states
+    assert "state_2" in config.experiment_states
+    assert "state_3" in config.experiment_states
+
+    state_1 = config.experiment_states["state_1"]
+    assert state_1.experiment_state_code == 1
+    assert state_1.state_duration_s == 60
+    assert state_1.supports_trials is True
+    assert state_1.reinforcing_initial_guided_trials == 3  # Has water reward trials
+    assert state_1.aversive_initial_guided_trials == 0  # No gas puff trials
+
+
+def test_populate_default_experiment_states_with_gas_puff():
+    """Verifies that populate_default_experiment_states adds states with gas puff guidance."""
+    config = _create_test_config_with_trial(
+        GasPuffTrial(
+            segment_name="TestSegment",
+            stimulus_trigger_zone_start_cm=180.0,
+            stimulus_trigger_zone_end_cm=200.0,
+            stimulus_location_cm=190.0,
+            show_stimulus_collision_boundary=False,
+        )
+    )
+
+    populate_default_experiment_states(experiment_configuration=config, state_count=2)
+
+    state_1 = config.experiment_states["state_1"]
+    assert state_1.reinforcing_initial_guided_trials == 0  # No water reward trials
+    assert state_1.aversive_initial_guided_trials == 3  # Has gas puff trials
+    assert state_1.aversive_recovery_failed_threshold == 9
+    assert state_1.aversive_recovery_guided_trials == 3
