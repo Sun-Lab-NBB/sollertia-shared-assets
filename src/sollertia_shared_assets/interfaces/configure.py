@@ -1,20 +1,16 @@
-"""Provides the Command-Line Interface (CLI) for configuring major components of the Sollertia platform data
-workflow.
-"""
+"""Provides the Command-Line Interface for configuring major components of the Sollertia platform data workflow."""
 
 from __future__ import annotations
 
-from pathlib import Path  # pragma: no cover
+from typing import Literal
+from pathlib import Path
 
-import click  # pragma: no cover
-from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists  # pragma: no cover
+import click
+from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
-from .mcp_server import run_server  # pragma: no cover
-from ..configuration import (  # pragma: no cover
-    GasPuffTrial,
+from .mcp_server import run_server
+from ..configuration import (
     TaskTemplate,
-    ExperimentState,
-    WaterRewardTrial,
     AcquisitionSystems,
     set_working_directory,
     set_google_credentials_path,
@@ -24,10 +20,11 @@ from ..configuration import (  # pragma: no cover
     create_experiment_configuration,
     create_server_configuration_file,
     create_system_configuration_file,
+    populate_default_experiment_states,
 )
 
-CONTEXT_SETTINGS = {"max_content_width": 120}  # pragma: no cover
-"""Ensures that displayed CLICK help messages are formatted according to the lab standard."""
+CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
+"""Ensures that displayed Click help messages are formatted according to the lab standard."""
 
 
 @click.group("configure", context_settings=CONTEXT_SETTINGS)
@@ -35,7 +32,7 @@ def configure() -> None:  # pragma: no cover
     """Configures major components of the Sollertia platform data workflow."""
 
 
-@configure.command("directory")
+@configure.command("directory", context_settings=CONTEXT_SETTINGS)
 @click.option(
     "-d",
     "--directory",
@@ -45,25 +42,22 @@ def configure() -> None:  # pragma: no cover
 )
 def configure_directory(directory: Path) -> None:  # pragma: no cover
     """Sets the input directory as the local Sollertia platform working directory."""
-    # Creates the directory if it does not exist
     ensure_directory_exists(directory)
-
-    # Sets the directory as the local working directory
     set_working_directory(path=directory)
 
 
-@configure.command("mcp")
+@configure.command("mcp", context_settings=CONTEXT_SETTINGS)
 @click.option(
     "-t",
     "--transport",
-    type=str,
+    type=click.Choice(["stdio", "sse", "streamable-http"], case_sensitive=False),
     default="stdio",
     show_default=True,
-    help="The MCP transport type to use ('stdio', 'sse', or 'streamable-http').",
+    help="The MCP transport type to use.",
 )
-def start_mcp_server(transport: str) -> None:  # pragma: no cover
+def start_mcp_server(transport: Literal["stdio", "sse", "streamable-http"]) -> None:  # pragma: no cover
     """Starts the MCP server for agentic configuration management."""
-    run_server(transport=transport)  # type: ignore[arg-type]
+    run_server(transport=transport)
 
 
 @configure.command("system", context_settings=CONTEXT_SETTINGS)
@@ -155,8 +149,8 @@ def configure_project(project: str) -> None:  # pragma: no cover
     "-sc",
     "--state-count",
     type=int,
-    required=True,
     default=1,
+    show_default=True,
     help="The number of runtime states supported by the experiment.",
 )
 @click.option(
@@ -205,17 +199,17 @@ def generate_experiment_configuration_file(
         message = (
             f"Unable to generate the {experiment} experiment's configuration file as the {acquisition_system.name} "
             f"data acquisition system is currently not configured to acquire data for the {project} project. Use the "
-            f"'sl-configure project' CLI command to create the project before creating new experiment configuration(s)."
+            f"'sl-configure project' CLI command to create the project before creating a new experiment configuration."
         )
         console.error(message=message, error=ValueError)
 
-    templates_dir = get_task_templates_directory()
-    template_path = templates_dir.joinpath(f"{template}.yaml")
+    templates_directory = get_task_templates_directory()
+    template_path = templates_directory.joinpath(f"{template}.yaml")
     if not template_path.exists():
-        available = sorted([f.stem for f in templates_dir.glob("*.yaml")])
+        available_templates = sorted([template_file.stem for template_file in templates_directory.glob("*.yaml")])
         message = (
-            f"Template '{template}' not found in {templates_dir}. "
-            f"Available templates: {', '.join(available) if available else 'none'}."
+            f"Template '{template}' not found in {templates_directory}. "
+            f"Available templates: {', '.join(available_templates) if available_templates else 'none'}."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -231,25 +225,10 @@ def generate_experiment_configuration_file(
         default_occupancy_duration_ms=occupancy_duration,
     )
 
-    water_reward_count = sum(
-        1 for t in experiment_configuration.trial_structures.values() if isinstance(t, WaterRewardTrial)
+    populate_default_experiment_states(
+        experiment_configuration=experiment_configuration,
+        state_count=state_count,
     )
-    gas_puff_count = sum(1 for t in experiment_configuration.trial_structures.values() if isinstance(t, GasPuffTrial))
-
-    for state_num in range(state_count):
-        state_name = f"state_{state_num + 1}"
-        experiment_configuration.experiment_states[state_name] = ExperimentState(
-            experiment_state_code=state_num + 1,
-            system_state_code=0,
-            state_duration_s=60,
-            supports_trials=True,
-            reinforcing_initial_guided_trials=3 if water_reward_count > 0 else 0,
-            reinforcing_recovery_failed_threshold=9 if water_reward_count > 0 else 0,
-            reinforcing_recovery_guided_trials=3 if water_reward_count > 0 else 0,
-            aversive_initial_guided_trials=3 if gas_puff_count > 0 else 0,
-            aversive_recovery_failed_threshold=9 if gas_puff_count > 0 else 0,
-            aversive_recovery_guided_trials=3 if gas_puff_count > 0 else 0,
-        )
 
     experiment_configuration.to_yaml(file_path=file_path)
     console.echo(

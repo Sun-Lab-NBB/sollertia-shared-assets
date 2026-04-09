@@ -23,6 +23,7 @@ from .configuration_utilities import (
     create_experiment_configuration,
     create_server_configuration_file,
     create_system_configuration_file,
+    populate_default_experiment_states,
 )
 from .mesoscope_configuration import (
     MesoscopeCameras,
@@ -69,6 +70,7 @@ __all__ = [
     "get_system_configuration_data",
     "get_task_templates_directory",
     "get_working_directory",
+    "populate_default_experiment_states",
     "set_google_credentials_path",
     "set_task_templates_directory",
     "set_working_directory",

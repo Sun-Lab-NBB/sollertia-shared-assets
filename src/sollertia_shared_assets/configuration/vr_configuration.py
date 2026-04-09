@@ -50,6 +50,10 @@ class Cue:
     """The unique uint8 code (0-255) that identifies the cue during MQTT communication and data analysis."""
     length_cm: float
     """The length of the cue in centimeters."""
+    texture: str = ""
+    """The texture filename (e.g., ``Cue 016 - 4x1.png``) located in the Unity project's
+    ``Assets/InfiniteCorridorTask/Textures/`` directory. Applied 1:1 to the cue wall panels during prefab generation.
+    Defaults to an empty string for backwards compatibility with templates that predate this field."""
 
     def __post_init__(self) -> None:
         """Validates cue definition parameters."""
