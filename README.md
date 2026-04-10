@@ -203,7 +203,7 @@ sl-configure mcp
 `generate_task_prefab_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `list_scenes_tool`, `list_unity_assets_tool`,
 `open_scene_tool`, `validate_prefab_against_template_tool`) require the Unity Editor to be running on the local machine
 with the McpBridge plugin from [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks) active.
-These tools relay commands to the Editor via HTTP at `localhost:8090`.
+These tools relay commands to the Editor via HTTP.
 
 #### Client Registration
 

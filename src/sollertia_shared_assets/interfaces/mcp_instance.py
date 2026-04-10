@@ -23,53 +23,24 @@ from ..data_classes import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from ..configuration import (
-    BaseTrial,
-    GasPuffTrial,
-    WaterRewardTrial,
-    get_system_configuration_data,
-)
+from ..configuration import get_system_configuration_data
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
-_SESSION_MARKER_FILENAME: str = "session_data.yaml"
+SESSION_MARKER_FILENAME: str = "session_data.yaml"
 """Marker filename used to identify session directories during recursive discovery walks."""
 
-_DATASET_MARKER_FILENAME: str = "dataset.yaml"
+DATASET_MARKER_FILENAME: str = "dataset.yaml"
 """Marker filename used to identify dataset directories during recursive discovery walks."""
 
-_INCOMPLETE_SESSION_MARKER: str = "nk.bin"
+INCOMPLETE_SESSION_MARKER: str = "nk.bin"
 """Marker file present in raw_data while a session is incomplete; removed when runtime initializes."""
 
-_RAW_DATA_DIR: str = "raw_data"
-"""Subdirectory under each session that holds the raw data and metadata files."""
-
-_PROCESSED_DATA_DIR: str = "processed_data"
-"""Subdirectory under each session that holds processed data on processing machines."""
-
-_CONFIGURATION_DIR: str = "configuration"
+CONFIGURATION_DIR: str = "configuration"
 """Subdirectory under each project that holds experiment configuration YAML files."""
 
-_HARDWARE_STATE_FILENAME: str = "hardware_state.yaml"
-"""Canonical filename for the per-session MesoscopeHardwareState YAML."""
-
-_ZABER_POSITIONS_FILENAME: str = "zaber_positions.yaml"
-"""Canonical filename for the per-session ZaberPositions YAML."""
-
-_MESOSCOPE_POSITIONS_FILENAME: str = "mesoscope_positions.yaml"
-"""Canonical filename for the per-session MesoscopePositions YAML."""
-
-_SESSION_SYSTEM_CONFIG_FILENAME: str = "system_configuration.yaml"
-"""Canonical filename for the per-session snapshot of MesoscopeSystemConfiguration."""
-
-_SESSION_EXPERIMENT_CONFIG_FILENAME: str = "experiment_configuration.yaml"
-"""Canonical filename for the per-session snapshot of MesoscopeExperimentConfiguration."""
-
-_SERVER_CONFIG_FILENAME: str = "server_configuration.yaml"
-"""Canonical filename for the ServerConfiguration YAML stored in the working directory."""
-
-_DESCRIPTOR_REGISTRY: dict[SessionTypes, tuple[str, type[YamlConfig]]] = {
+DESCRIPTOR_REGISTRY: dict[SessionTypes, tuple[str, type[YamlConfig]]] = {
     SessionTypes.LICK_TRAINING: ("lick_training_descriptor.yaml", LickTrainingDescriptor),
     SessionTypes.RUN_TRAINING: ("run_training_descriptor.yaml", RunTrainingDescriptor),
     SessionTypes.MESOSCOPE_EXPERIMENT: ("experiment_descriptor.yaml", MesoscopeExperimentDescriptor),
@@ -77,30 +48,21 @@ _DESCRIPTOR_REGISTRY: dict[SessionTypes, tuple[str, type[YamlConfig]]] = {
 }
 """Maps each session type to its canonical descriptor filename and dataclass."""
 
-_TRIAL_CLASSES: dict[str, type[BaseTrial]] = {
-    "WaterRewardTrial": WaterRewardTrial,
-    "GasPuffTrial": GasPuffTrial,
-}
-"""Maps trial class names to their dataclass implementations."""
-
-_UNITY_BRIDGE_URL: str = "http://localhost:8090/"
-"""URL of the McpBridge HTTP listener running inside the Unity Editor."""
-
 # Initializes the MCP server with JSON response mode for structured output.
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 
 
-def _ok(**payload: Any) -> dict[str, Any]:  # noqa: ANN401 - response builder accepts arbitrary serializable values.
+def ok_response(**payload: Any) -> dict[str, Any]:  # noqa: ANN401
     """Constructs a successful response dict with a ``success`` flag set to True."""
     return {"success": True, **payload}
 
 
-def _error(message: str) -> dict[str, Any]:
+def error_response(message: str) -> dict[str, Any]:
     """Constructs a failure response dict with a ``success`` flag set to False and the provided error message."""
     return {"success": False, "error": message}
 
 
-def _serialize(value: Any) -> Any:  # noqa: ANN401 - recursive helper accepts any serializable value.
+def serialize(value: Any) -> Any:  # noqa: ANN401 - recursive helper accepts any serializable value.
     """Recursively converts a dataclass, Path, Enum, mapping, or sequence into JSON-friendly Python.
 
     Args:
@@ -113,7 +75,7 @@ def _serialize(value: Any) -> Any:  # noqa: ANN401 - recursive helper accepts an
         return None
     if is_dataclass(value) and not isinstance(value, type):
         return {
-            field_definition.name: _serialize(value=getattr(value, field_definition.name))
+            field_definition.name: serialize(value=getattr(value, field_definition.name))
             for field_definition in fields(value)
         }
     if isinstance(value, Path):
@@ -121,9 +83,9 @@ def _serialize(value: Any) -> Any:  # noqa: ANN401 - recursive helper accepts an
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, dict):
-        return {str(key): _serialize(value=item) for key, item in value.items()}
+        return {str(key): serialize(value=item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set, frozenset)):
-        return [_serialize(value=item) for item in value]
+        return [serialize(value=item) for item in value]
     return value
 
 
@@ -136,7 +98,7 @@ def _describe_type(type_hint: Any) -> str:  # noqa: ANN401 - introspection helpe
     return str(type_hint).replace("typing.", "")
 
 
-def _describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
+def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
     """Returns a structured schema description of a dataclass type.
 
     The returned dict has shape ``{"class": <name>, "fields": {<field_name>: {"type", "default"|"required",
@@ -170,10 +132,10 @@ def _describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
             type_hint = hints.get(field_definition.name, field_definition.type)
             field_schema: dict[str, Any] = {"type": _describe_type(type_hint=type_hint)}
             if field_definition.default is not MISSING:
-                field_schema["default"] = _serialize(value=field_definition.default)
+                field_schema["default"] = serialize(value=field_definition.default)
             elif field_definition.default_factory is not MISSING:
                 try:
-                    field_schema["default"] = _serialize(value=field_definition.default_factory())
+                    field_schema["default"] = serialize(value=field_definition.default_factory())
                 except Exception:
                     field_schema["required"] = True
             else:
@@ -187,7 +149,7 @@ def _describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
     return _describe_inner(target=cls, seen=frozenset())
 
 
-def _write_yaml_validated(
+def write_yaml_validated(
     file_path: Path,
     payload: dict[str, Any],
     validator_cls: type[YamlConfig],
@@ -218,7 +180,7 @@ def _write_yaml_validated(
         A response dict with the file path and serialized data on success, or an error dict on failure.
     """
     if file_path.exists() and not overwrite:
-        return _error(message=f"File already exists: {file_path}. Pass overwrite=True to replace.")
+        return error_response(message=f"File already exists: {file_path}. Pass overwrite=True to replace.")
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
     # Keeps the temp file ending in .yaml because YamlConfig.from_yaml rejects non-.yaml paths.
@@ -232,7 +194,7 @@ def _write_yaml_validated(
     except Exception as exception:
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
-        return _error(message=f"Validation failed for {validator_cls.__name__}: {exception}")
+        return error_response(message=f"Validation failed for {validator_cls.__name__}: {exception}")
     finally:
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
@@ -243,12 +205,12 @@ def _write_yaml_validated(
         else:
             instance.to_yaml(file_path=file_path)
     except Exception as exception:
-        return _error(message=f"Failed to persist {validator_cls.__name__} to {file_path}: {exception}")
+        return error_response(message=f"Failed to persist {validator_cls.__name__} to {file_path}: {exception}")
 
-    return _ok(file_path=str(file_path), data=_serialize(value=instance))
+    return ok_response(file_path=str(file_path), data=serialize(value=instance))
 
 
-def _read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, Any]:
+def read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, Any]:
     """Loads a YAML file via ``validator_cls`` and returns its serialized form.
 
     Args:
@@ -260,15 +222,15 @@ def _read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, An
         on failure.
     """
     if not file_path.exists():
-        return _error(message=f"File not found: {file_path}")
+        return error_response(message=f"File not found: {file_path}")
     try:
         instance = validator_cls.from_yaml(file_path=file_path)
     except Exception as exception:
-        return _error(message=f"Failed to load {file_path} as {validator_cls.__name__}: {exception}")
-    return _ok(file_path=str(file_path), data=_serialize(value=instance))
+        return error_response(message=f"Failed to load {file_path} as {validator_cls.__name__}: {exception}")
+    return ok_response(file_path=str(file_path), data=serialize(value=instance))
 
 
-def _resolve_root_directory(root_directory: str | None) -> tuple[Path | None, dict[str, Any] | None]:
+def resolve_root_directory(root_directory: str | None) -> tuple[Path | None, dict[str, Any] | None]:
     """Resolves the root data directory, falling back to the configured system root.
 
     Args:
@@ -281,18 +243,18 @@ def _resolve_root_directory(root_directory: str | None) -> tuple[Path | None, di
     if root_directory is not None:
         path = Path(root_directory)
         if not path.exists():
-            return None, _error(message=f"Root directory does not exist: {path}")
+            return None, error_response(message=f"Root directory does not exist: {path}")
         if not path.is_dir():
-            return None, _error(message=f"Root directory is not a directory: {path}")
+            return None, error_response(message=f"Root directory is not a directory: {path}")
         return path, None
     try:
         system_configuration = get_system_configuration_data()
     except (FileNotFoundError, OSError, ValueError) as exception:
-        return None, _error(message=f"Unable to resolve root directory from system configuration: {exception}")
+        return None, error_response(message=f"Unable to resolve root directory from system configuration: {exception}")
     return system_configuration.filesystem.root_directory, None
 
 
-def _session_root_from_marker(marker: Path) -> Path:
+def session_root_from_marker(marker: Path) -> Path:
     """Returns the session root directory given a session_data.yaml marker file.
 
     The marker is expected at ``<session_root>/raw_data/session_data.yaml``, so the session root is two
@@ -307,7 +269,7 @@ def _session_root_from_marker(marker: Path) -> Path:
     return marker.parents[1]
 
 
-def _safe_iterdir(directory: Path) -> list[Path]:
+def safe_iterdir(directory: Path) -> list[Path]:
     """Returns immediate non-hidden children of a directory, ignoring permission errors.
 
     Args:
