@@ -169,6 +169,7 @@ def discover_sessions_tool(
     if error is not None:
         return error
 
+    # Validates the optional session_type filter against supported values.
     if session_type is not None:
         try:
             session_type_filter: SessionTypes | None = SessionTypes(session_type)
@@ -178,6 +179,7 @@ def discover_sessions_tool(
     else:
         session_type_filter = None
 
+    # Narrows the search root to a specific project and animal when provided.
     search_root = root
     if project is not None:
         search_root = root.joinpath(project)  # type: ignore[union-attr]
@@ -188,6 +190,7 @@ def discover_sessions_tool(
             if not search_root.is_dir():
                 return error_response(message=f"Animal '{animal_id}' not found at {search_root}")
 
+    # Recursively discovers session markers and applies the active filters to each summary.
     markers = sorted(search_root.rglob(SESSION_MARKER_FILENAME))  # type: ignore[union-attr]
     sessions: list[dict[str, Any]] = []
     for marker in markers:
@@ -224,6 +227,7 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
     if not raw_data_dir.is_dir():
         return error_response(message=f"raw_data directory not found at {raw_data_dir}")
 
+    # Maps canonical filenames to human-readable kind labels for classification.
     known_kinds = {
         SESSION_MARKER_FILENAME: "session_data",
         _SESSION_SYSTEM_CONFIG_FILENAME: "system_configuration_snapshot",
@@ -234,6 +238,7 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
     }
     descriptor_filenames = {filename for filename, _ in DESCRIPTOR_REGISTRY.values()}
 
+    # Classifies each YAML file in raw_data by matching against known filenames and the descriptor registry.
     files: list[dict[str, Any]] = []
     for candidate in sorted(raw_data_dir.glob("*.yaml")):
         if candidate.name in known_kinds:
@@ -306,6 +311,7 @@ def discover_subjects_tool(project: str | None = None) -> dict[str, Any]:
     else:
         project_paths = [child for child in safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
 
+    # Deduplicates subjects that appear across multiple projects, merging session counts.
     seen: dict[str, dict[str, Any]] = {}
     for project_path in project_paths:
         for animal_dir in safe_iterdir(directory=project_path):
@@ -639,6 +645,7 @@ def write_dataset_tool(
         A response dict with ``dataset_path``, ``dataset_data_path``, and ``data`` (the materialized DatasetData
         payload).
     """
+    # Validates enumeration arguments against supported platform values.
     try:
         session_type_enum = SessionTypes(session_type)
     except ValueError:
@@ -654,6 +661,7 @@ def write_dataset_tool(
     if not sessions:
         return error_response(message="The 'sessions' argument must contain at least one entry.")
 
+    # Converts raw session dicts into typed DatasetSession objects with basic structure validation.
     dataset_session_objects: list[DatasetSession] = []
     for entry in sessions:
         if not isinstance(entry, dict) or "session" not in entry or "animal" not in entry:
@@ -674,6 +682,7 @@ def write_dataset_tool(
         except (FileNotFoundError, OSError, ValueError) as exception:
             return error_response(message=f"Unable to resolve datasets root directory: {exception}")
 
+    # Materializes the dataset hierarchy on disk and writes the manifest YAML.
     try:
         instance = DatasetData.create(
             name=name,
@@ -902,6 +911,7 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
         session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
     )
 
+    # Verifies that the required descriptor and configuration snapshot files are present.
     descriptor_path, _ = _find_descriptor_for_session(
         session_root=session_root,  # type: ignore[arg-type]
         session_type=session_type,
@@ -985,6 +995,7 @@ def get_batch_session_status_overview_tool(root_directory: str | None = None) ->
     if error is not None:
         return error
 
+    # Iterates every session marker under the root, deriving lifecycle status for each.
     counts: dict[str, int] = {"incomplete": 0, "acquired": 0, "processed": 0, "error": 0}
     sessions: list[dict[str, Any]] = []
     for marker in sorted(root.rglob(SESSION_MARKER_FILENAME)):  # type: ignore[union-attr]
@@ -1222,6 +1233,7 @@ def _resolve_surgery_path(
     Returns:
         A tuple of the resolved Path and an error dict. Exactly one element is non-None.
     """
+    # Builds a prioritized list of candidate paths under the working and root directories.
     candidate_paths: list[Path] = []
     candidate_filenames = (f"{subject_id}.yaml", f"{subject_id}_surgery.yaml", "surgery_data.yaml")
 
@@ -1242,6 +1254,7 @@ def _resolve_surgery_path(
     except OSError, ValueError:
         pass
 
+    # Returns the first candidate path that exists on disk.
     for candidate in candidate_paths:
         if candidate.exists():
             return candidate, None

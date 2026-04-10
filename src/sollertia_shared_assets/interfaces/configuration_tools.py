@@ -94,6 +94,7 @@ def discover_experiments_tool(
     if error is not None:
         return error
 
+    # Restricts the search to a single project when specified, otherwise scans all project directories.
     project_paths: list[Path]
     if project is not None:
         project_path = root.joinpath(project)  # type: ignore[union-attr]
@@ -103,6 +104,7 @@ def discover_experiments_tool(
     else:
         project_paths = [child for child in safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
 
+    # Collects experiment summaries from each project's configuration directory.
     experiments: list[dict[str, Any]] = []
     for project_path in sorted(project_paths, key=lambda candidate: candidate.name):
         configuration_dir = project_path.joinpath(CONFIGURATION_DIR)
@@ -474,6 +476,7 @@ def create_experiment_config_tool(
     if file_path.exists() and not overwrite:
         return error_response(message=f"Experiment '{experiment}' already exists in project '{project}'.")
 
+    # Resolves the template file and verifies it exists in the templates directory.
     try:
         templates_directory = get_task_templates_directory()
     except FileNotFoundError as exception:
@@ -487,6 +490,7 @@ def create_experiment_config_tool(
             ),
         )
 
+    # Loads the template, generates the experiment configuration, and populates default runtime states.
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_path)
         system_configuration = get_system_configuration_data()
@@ -716,6 +720,7 @@ def validate_system_configuration_tool() -> dict[str, Any]:
     except (FileNotFoundError, OSError, ValueError) as exception:
         return ok_response(valid=False, issues=[str(exception)])
 
+    # Probes each configured filesystem path for existence and writability.
     filesystem = system_configuration.filesystem
     paths_report: dict[str, dict[str, Any]] = {
         "root_directory": _check_path(path=filesystem.root_directory),
@@ -725,6 +730,7 @@ def validate_system_configuration_tool() -> dict[str, Any]:
     if hasattr(filesystem, "mesoscope_directory"):
         paths_report["mesoscope_directory"] = _check_path(path=filesystem.mesoscope_directory)
 
+    # Aggregates issues from paths that are configured but not accessible.
     issues = [
         f"{name}: {report.get('error', 'not OK')}"
         for name, report in paths_report.items()
@@ -757,12 +763,14 @@ def get_project_overview_tool(project: str) -> dict[str, Any]:
     if not project_path.is_dir():
         return error_response(message=f"Project '{project}' not found at {project_path}")
 
+    # Enumerates animal subdirectories, excluding the configuration directory.
     animals = [
         child.name
         for child in safe_iterdir(directory=project_path)
         if child.is_dir() and child.name != CONFIGURATION_DIR
     ]
 
+    # Tallies sessions by type and counts incomplete sessions across the project tree.
     sessions_by_type: dict[str, int] = {member.value: 0 for member in SessionTypes}
     incomplete_count = 0
     for marker in project_path.rglob(SESSION_MARKER_FILENAME):
@@ -776,6 +784,7 @@ def get_project_overview_tool(project: str) -> dict[str, Any]:
         if instance.raw_data_path.joinpath(INCOMPLETE_SESSION_MARKER).exists():
             incomplete_count += 1
 
+    # Counts experiment configurations and datasets under the project.
     configuration_dir = project_path.joinpath(CONFIGURATION_DIR)
     experiment_count = len(list(configuration_dir.glob("*.yaml"))) if configuration_dir.is_dir() else 0
     dataset_count = len(list(project_path.rglob(DATASET_MARKER_FILENAME)))
@@ -806,6 +815,7 @@ def get_acquisition_environment_status_tool() -> dict[str, Any]:
     """
     report: dict[str, Any] = {}
 
+    # Checks each platform component in turn: working directory, templates, credentials, server, system.
     try:
         working_directory = get_working_directory()
         report["working_directory"] = {"configured": True, "path": str(working_directory), "ok": True}
@@ -978,11 +988,13 @@ def _check_path(path: Path) -> dict[str, Any]:
         A dict with ``path``, ``exists``, ``is_mount``, ``writable``, and ``ok`` keys describing the path status.
     """
     path_str = str(path)
+    # Treats empty or dot-relative paths as unconfigured and short-circuits.
     if not path or path_str in ("", "."):
         return {"path": path_str, "configured": False}
     if not path.exists():
         return {"path": path_str, "exists": False, "ok": False}
 
+    # Probes mount status and write access by creating and removing a temporary test file.
     is_mount = path.is_mount()
     writable = False
     error: str | None = None

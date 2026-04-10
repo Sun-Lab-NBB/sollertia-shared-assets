@@ -114,6 +114,7 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
     """
 
     def _describe_inner(target: type, seen: frozenset[type]) -> dict[str, Any]:
+        # Guards against infinite recursion from self-referential or cyclic dataclass hierarchies.
         if target in seen:
             return {"class": target.__name__, "recursive_reference": True}
         next_seen = seen | {target}
@@ -127,6 +128,7 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
             hints = {}
 
         schema: dict[str, Any] = {"class": target.__name__, "fields": {}}
+        # Builds the per-field schema with type, default or required status, and optional nested recursion.
         # noinspection PyDataclass
         for field_definition in fields(target):
             type_hint = hints.get(field_definition.name, field_definition.type)
@@ -183,6 +185,7 @@ def write_yaml_validated(
         return error_response(message=f"File already exists: {file_path}. Pass overwrite=True to replace.")
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
+    # Writes the payload to a temporary sibling file and validates by round-tripping through the dataclass.
     # Keeps the temp file ending in .yaml because YamlConfig.from_yaml rejects non-.yaml paths.
     temp_path = file_path.with_name(f".{file_path.stem}.{uuid.uuid4().hex[:8]}.tmp.yaml")
 
@@ -199,6 +202,7 @@ def write_yaml_validated(
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
 
+    # Persists the validated instance to the final destination using the canonical serialization method.
     try:
         if use_save_method and hasattr(instance, "save"):
             instance.save(path=file_path)

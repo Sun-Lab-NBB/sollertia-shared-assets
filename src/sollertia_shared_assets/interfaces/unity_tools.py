@@ -195,6 +195,7 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
     Returns:
         The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable.
     """
+    # Constructs the JSON-encoded HTTP POST request for the Unity bridge.
     payload = json.dumps({"tool": tool, "args": arguments or {}}).encode("utf-8")
     request = urllib.request.Request(  # noqa: S310 - hardcoded localhost URL for the Unity Editor bridge.
         url=_UNITY_BRIDGE_URL,
@@ -203,6 +204,7 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         method="POST",
     )
 
+    # Sends the request and parses the JSON response, handling connectivity and decode errors.
     try:
         with urllib.request.urlopen(url=request, timeout=30) as response:  # noqa: S310 - same localhost URL.
             return json.loads(response.read().decode("utf-8"))

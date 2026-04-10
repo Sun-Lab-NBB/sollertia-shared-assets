@@ -2030,7 +2030,7 @@ def test_set_task_templates_directory_raises_error_not_directory(
     file_path = tmp_path / "a_file.txt"
     file_path.write_text("content")
 
-    with pytest.raises(ValueError, match=r"does not point to a directory"):
+    with pytest.raises(ValueError, match=r"does not point to a\s+directory"):
         set_task_templates_directory(file_path)
 
 
