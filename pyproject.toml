@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "8.0.0"
+version = "8.0.0rc1"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
