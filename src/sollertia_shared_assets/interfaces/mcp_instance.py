@@ -156,25 +156,21 @@ def write_yaml_validated(
     validator_cls: type[YamlConfig],
     *,
     overwrite: bool = False,
-    use_save_method: bool = False,
 ) -> dict[str, Any]:
     """Writes a payload as YAML to ``file_path`` and validates it by loading through ``validator_cls``.
 
     Notes:
         Writes the payload to a temporary sibling file first, validates by instantiating ``validator_cls`` from
         that file (which triggers the dataclass ``__post_init__`` validation), and only on success re-serializes
-        through the canonical ``to_yaml`` (or ``save``) method to produce the final file. Re-runs
-        ``__post_init__`` after loading so that any ``init=False`` derived fields whose values may have been
-        overwritten by missing YAML keys are recomputed correctly.
+        through the canonical ``to_yaml`` method to produce the final file. Re-runs ``__post_init__`` after
+        loading so that any ``init=False`` derived fields whose values may have been overwritten by missing YAML
+        keys are recomputed correctly.
 
     Args:
         file_path: The destination file path.
         payload: The dict payload to serialize as YAML.
         validator_cls: The YamlConfig dataclass used to validate the payload.
         overwrite: Determines whether to overwrite an existing destination file.
-        use_save_method: Determines whether to use ``instance.save(path=...)`` instead of
-            ``instance.to_yaml(file_path=...)``. Required for ``MesoscopeSystemConfiguration`` whose ``save``
-            method handles valve calibration tuples.
 
     Returns:
         A response dict with the file path and serialized data on success, or an error dict on failure.
@@ -202,10 +198,7 @@ def write_yaml_validated(
 
     # Persists the validated instance to the final destination using the canonical serialization method.
     try:
-        if use_save_method and hasattr(instance, "save"):
-            instance.save(path=file_path)
-        else:
-            instance.to_yaml(file_path=file_path)
+        instance.to_yaml(file_path=file_path)
     except Exception as exception:
         return error_response(message=f"Failed to persist {validator_cls.__name__} to {file_path}: {exception}")
 

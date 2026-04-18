@@ -4,7 +4,6 @@ processing machines.
 
 from enum import StrEnum
 import shutil
-from typing import Any
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -89,7 +88,8 @@ class SessionData(YamlConfig):
         session_type: str | SessionTypes,
         python_version: str,
         sollertia_experiment_version: str,
-        acquisition_system: Any,
+        acquisition_system: str | AcquisitionSystems,
+        root_directory: Path,
         experiment_name: str | None = None,
     ) -> SessionData:
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
@@ -97,16 +97,20 @@ class SessionData(YamlConfig):
         Notes:
             To access the data of an already existing session, use the load() method.
 
+            This method does not persist the acquisition system's own configuration snapshot; the acquisition runtime
+            package (e.g., sl-experiment) owns that data and is responsible for writing it into the returned
+            session's raw_data directory after this method returns.
+
         Args:
             project_name: The name of the project for which the session is acquired.
             animal_id: The unique identifier of the animal participating in the session.
             session_type: The type of the session.
             python_version: The Python version used to acquire the session's data.
             sollertia_experiment_version: The sollertia-experiment library version used to acquire the session's data.
-            acquisition_system: The active acquisition system configuration instance for the local machine. Must expose
-                a ``name`` attribute, a ``filesystem.root_directory`` attribute resolving to a :class:`Path`, and a
-                ``save(path: Path)`` method that writes the configuration snapshot to disk. The acquisition runtime
-                package (e.g., sl-experiment) owns this object and passes it in here.
+            acquisition_system: The acquisition system that will run the session. Accepts an ``AcquisitionSystems``
+                enumeration member or its string value.
+            root_directory: The root directory of the acquisition system's project hierarchy on the local machine
+                (PC). The session is created under ``root_directory / project_name / animal_id / <session_name>``.
             experiment_name: The name of the experiment performed during the session or None, if the session is
                 not an experiment session.
 
@@ -114,7 +118,7 @@ class SessionData(YamlConfig):
             An initialized SessionData instance that stores the structure and the metadata of the created session.
 
         Raises:
-            ValueError: If the specified session_type is not a valid SessionTypes enumeration member.
+            ValueError: If the specified session_type or acquisition_system is not a valid enumeration member.
             FileNotFoundError: If the project does not exist on the local machine (PC).
         """
         if session_type not in SessionTypes:
@@ -124,14 +128,22 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
+        if acquisition_system not in AcquisitionSystems:
+            message = (
+                f"Unable to initialize a new data acquisition session. The acquisition_system must be one of the "
+                f"AcquisitionSystems enumeration members, but got '{acquisition_system}'."
+            )
+            console.error(message=message, error=ValueError)
+        acquisition_system = AcquisitionSystems(acquisition_system)
+
         # Acquires the UTC timestamp to use as the session name.
         session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
 
-        # Constructs the root session directory path from the caller-provided system configuration.
-        session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, session_name)
+        # Constructs the root session directory path from the caller-provided root directory.
+        session_path = root_directory.joinpath(project_name, animal_id, session_name)
 
         # Prevents creating new sessions for non-existent projects.
-        if not acquisition_system.filesystem.root_directory.joinpath(project_name).exists():
+        if not root_directory.joinpath(project_name).exists():
             message = (
                 f"Unable to initialize a new data acquisition session {session_name} for the animal '{animal_id}' and "
                 f"project '{project_name}'. The project does not exist on the local machine (PC). Use the "
@@ -153,7 +165,7 @@ class SessionData(YamlConfig):
             animal_id=animal_id,
             session_name=session_name,
             session_type=session_type,
-            acquisition_system=acquisition_system.name,
+            acquisition_system=acquisition_system,
             experiment_name=experiment_name,
             python_version=python_version,
             sollertia_experiment_version=sollertia_experiment_version,
@@ -164,12 +176,9 @@ class SessionData(YamlConfig):
         # preprocessing.
         instance.save()
 
-        # Dumps the acquisition system's configuration data to the session's directory.
-        acquisition_system.save(path=instance.raw_data_path.joinpath("system_configuration.yaml"))
-
         if experiment_name is not None:
             # Copies the experiment_configuration.yaml file to the session's directory.
-            experiment_configuration_path = acquisition_system.filesystem.root_directory.joinpath(
+            experiment_configuration_path = root_directory.joinpath(
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
             shutil.copy2(

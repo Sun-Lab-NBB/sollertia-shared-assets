@@ -1,11 +1,9 @@
 """Contains tests for classes and methods provided by the data_classes module."""
 
 from pathlib import Path
-from dataclasses import field, dataclass
 
 import pytest
 import platformdirs
-from ataraxis_data_structures import YamlConfig
 
 from sollertia_shared_assets.data_classes import (
     SessionData,
@@ -21,35 +19,6 @@ from sollertia_shared_assets.configuration import (
     MesoscopeExperimentConfiguration,
     set_working_directory,
 )
-
-
-@dataclass(slots=True)
-class _FakeFilesystem:
-    """Minimal filesystem stand-in exposing the ``root_directory`` attribute required by SessionData.create."""
-
-    root_directory: Path = Path()
-
-
-@dataclass
-class _FakeSystemConfiguration(YamlConfig):
-    """Minimal stand-in for an acquisition system configuration exposing the duck-typed interface required by
-    SessionData.create: a ``name`` attribute, a ``filesystem.root_directory`` attribute, and a ``save(path)``
-    method that writes a YAML snapshot to disk."""
-
-    name: str = "mesoscope"
-    filesystem: _FakeFilesystem = field(default_factory=_FakeFilesystem)
-
-    def save(self, path: Path) -> None:
-        self.to_yaml(file_path=path)
-
-
-@pytest.fixture
-def sample_mesoscope_config() -> _FakeSystemConfiguration:
-    """Creates a minimal acquisition-system stand-in for SessionData.create tests."""
-    return _FakeSystemConfiguration(
-        name="mesoscope",
-        filesystem=_FakeFilesystem(root_directory=Path("/data/projects")),
-    )
 
 
 @pytest.fixture
@@ -177,7 +146,6 @@ def test_session_data_default_path_fields() -> None:
 
 def test_session_data_create_requires_valid_session_type(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() raises error for invalid session types.
@@ -189,11 +157,6 @@ def test_session_data_create_requires_valid_session_type(
 
     set_working_directory(clean_working_directory)
 
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
     # Creates project directory
     (clean_working_directory / "test_project").mkdir()
 
@@ -204,13 +167,40 @@ def test_session_data_create_requires_valid_session_type(
             session_type="invalid_session_type",
             python_version="3.11.13",
             sollertia_experiment_version="3.0.0",
-        acquisition_system=sample_mesoscope_config,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            root_directory=clean_working_directory,
+        )
+
+
+def test_session_data_create_requires_valid_acquisition_system(
+    clean_working_directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that create() raises error for invalid acquisition systems.
+
+    This test ensures only valid acquisition systems are accepted.
+    """
+    app_dir = clean_working_directory.parent / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+
+    set_working_directory(clean_working_directory)
+
+    (clean_working_directory / "test_project").mkdir()
+
+    with pytest.raises(ValueError, match=r"must be one of the AcquisitionSystems"):
+        SessionData.create(
+            project_name="test_project",
+            animal_id="test_animal",
+            session_type=SessionTypes.LICK_TRAINING,
+            python_version="3.11.13",
+            sollertia_experiment_version="3.0.0",
+            acquisition_system="not_a_real_system",
+            root_directory=clean_working_directory,
         )
 
 
 def test_session_data_create_generates_session_directory(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() generates the session directory structure.
@@ -222,11 +212,6 @@ def test_session_data_create_generates_session_directory(
 
     set_working_directory(clean_working_directory)
 
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
     # Creates project directory
     (clean_working_directory / "test_project").mkdir()
 
@@ -236,8 +221,9 @@ def test_session_data_create_generates_session_directory(
         session_type=SessionTypes.LICK_TRAINING,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
-    acquisition_system=sample_mesoscope_config,
-        )
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        root_directory=clean_working_directory,
+    )
 
     # Verifies session directory exists
     session_path = session_data.raw_data_path.parent
@@ -247,7 +233,6 @@ def test_session_data_create_generates_session_directory(
 
 def test_session_data_create_saves_session_data_yaml(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() saves session_data.yaml file.
@@ -259,11 +244,6 @@ def test_session_data_create_saves_session_data_yaml(
 
     set_working_directory(clean_working_directory)
 
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
     # Creates project directory
     (clean_working_directory / "test_project").mkdir()
 
@@ -273,8 +253,9 @@ def test_session_data_create_saves_session_data_yaml(
         session_type=SessionTypes.RUN_TRAINING,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
-    acquisition_system=sample_mesoscope_config,
-        )
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        root_directory=clean_working_directory,
+    )
 
     # Verifies session_data.yaml exists
     session_data_yaml = session_data.raw_data_path.joinpath("session_data.yaml")
@@ -287,7 +268,6 @@ def test_session_data_create_saves_session_data_yaml(
 
 def test_session_data_create_marks_with_nk_file(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() creates the nk.bin marker file.
@@ -299,11 +279,6 @@ def test_session_data_create_marks_with_nk_file(
 
     set_working_directory(clean_working_directory)
 
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
     # Creates project directory
     (clean_working_directory / "test_project").mkdir()
 
@@ -313,8 +288,9 @@ def test_session_data_create_marks_with_nk_file(
         session_type=SessionTypes.LICK_TRAINING,
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
-    acquisition_system=sample_mesoscope_config,
-        )
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        root_directory=clean_working_directory,
+    )
 
     # Verifies nk.bin exists
     assert session_data.raw_data_path.joinpath("nk.bin").exists()
@@ -485,7 +461,6 @@ def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path
 
 def test_session_data_create_raises_error_if_project_does_not_exist(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() raises FileNotFoundError when the project doesn't exist.
@@ -497,11 +472,6 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
 
     set_working_directory(clean_working_directory)
 
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
     # Does NOT create the project directory
 
     with pytest.raises(FileNotFoundError) as exc_info:
@@ -511,7 +481,8 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
             session_type=SessionTypes.LICK_TRAINING,
             python_version="3.11.13",
             sollertia_experiment_version="3.0.0",
-        acquisition_system=sample_mesoscope_config,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            root_directory=clean_working_directory,
         )
 
     # Verifies the error message mentioning the project and CLI command
@@ -521,7 +492,6 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
 
 def test_session_data_create_copies_experiment_configuration(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     sample_experiment_config: MesoscopeExperimentConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -533,11 +503,6 @@ def test_session_data_create_copies_experiment_configuration(
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
-
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
 
     # Creates project directory and experiment configuration
     project_path = clean_working_directory / "test_project"
@@ -555,8 +520,9 @@ def test_session_data_create_copies_experiment_configuration(
         experiment_name="test_experiment",
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
-    acquisition_system=sample_mesoscope_config,
-        )
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        root_directory=clean_working_directory,
+    )
 
     # Verifies experiment configuration was copied
     session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
@@ -568,7 +534,6 @@ def test_session_data_create_copies_experiment_configuration(
 
 def test_session_data_create_without_experiment_name_skips_experiment_config(
     clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() without experiment_name does not copy experiment config.
@@ -580,11 +545,6 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
 
     set_working_directory(clean_working_directory)
 
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
     # Creates project directory
     (clean_working_directory / "test_project").mkdir()
 
@@ -595,52 +555,13 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(
         # No experiment_name provided
         python_version="3.11.13",
         sollertia_experiment_version="3.0.0",
-    acquisition_system=sample_mesoscope_config,
-        )
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        root_directory=clean_working_directory,
+    )
 
     # Verifies experiment configuration was NOT created
     session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
     assert not session_experiment_config.exists()
-
-
-def test_session_data_create_saves_system_configuration(
-    clean_working_directory: Path,
-    sample_mesoscope_config: _FakeSystemConfiguration,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verifies that create() saves system configuration to the session.
-
-    This test ensures system configuration is copied for reproducibility.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Updates config with the actual root directory
-    sample_mesoscope_config.filesystem.root_directory = clean_working_directory
-    config_path = clean_working_directory / "configuration" / "mesoscope_system_configuration.yaml"
-    sample_mesoscope_config.save(path=config_path)
-
-    # Creates project directory
-    (clean_working_directory / "test_project").mkdir()
-
-    session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
-    acquisition_system=sample_mesoscope_config,
-        )
-
-    # Verifies system configuration file exists
-    system_config_path = session_data.raw_data_path.joinpath("system_configuration.yaml")
-    assert system_config_path.exists()
-
-    # Verifies content can be loaded back via the same stand-in class
-    loaded_config = _FakeSystemConfiguration.from_yaml(file_path=system_config_path)
-    assert loaded_config.name == sample_mesoscope_config.name
 
 
 def test_session_data_post_init_coerces_string_session_type() -> None:
@@ -659,4 +580,3 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
     )
 
     assert session_data.session_type == SessionTypes.LICK_TRAINING
-
