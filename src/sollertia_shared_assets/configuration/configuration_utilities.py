@@ -9,7 +9,6 @@ import platformdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
 from .vr_configuration import TriggerType, TaskTemplate
-from .server_configuration import ServerConfiguration
 from .mesoscope_configuration import MesoscopeSystemConfiguration, MesoscopeExperimentConfiguration
 from .experiment_configuration import GasPuffTrial, ExperimentState, WaterRewardTrial
 
@@ -444,66 +443,6 @@ def get_task_templates_directory() -> Path:
         console.error(message=message, error=FileNotFoundError)
 
     return templates_directory
-
-
-def create_server_configuration_file(
-    username: str,
-    password: str,
-    host: str,
-) -> None:
-    """Creates the .YAML configuration file for the Sollertia platform compute server and configures the local machine
-    (PC) to use this file for all future server-related calls.
-
-    Args:
-        username: The username to use for server authentication.
-        password: The password to use for server authentication.
-        host: The hostname or IP address of the server to connect to.
-    """
-    output_directory = get_working_directory().joinpath("configuration")
-    ServerConfiguration(
-        username=username,
-        password=password,
-        host=host,
-    ).to_yaml(file_path=output_directory.joinpath("server_configuration.yaml"))
-    console.echo(message="Server configuration file: Created.", level=LogLevel.SUCCESS)
-
-
-def get_server_configuration() -> ServerConfiguration:
-    """Resolves and returns the Sollertia platform compute server's configuration data as a ServerConfiguration
-    instance.
-
-    Returns:
-        The loaded and validated server configuration data, stored in a ServerConfiguration instance.
-
-    Raises:
-        FileNotFoundError: If the 'server_configuration.yaml' file does not exist in the local Sollertia platform
-            working directory.
-        ValueError: If the loaded server configuration is unconfigured or contains placeholder access credentials.
-    """
-    configuration_directory = get_working_directory().joinpath("configuration")
-
-    config_path = configuration_directory.joinpath("server_configuration.yaml")
-
-    if not config_path.exists():
-        message = (
-            f"Unable to locate the 'server_configuration.yaml' file in the Sollertia platform working directory "
-            f"{config_path}. Call the 'sl-configure server' CLI command to create the server configuration file."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    configuration = ServerConfiguration.from_yaml(file_path=config_path)
-
-    if not all((configuration.username, configuration.password, configuration.host)):
-        message = (
-            "Unable to load the server configuration. The 'server_configuration.yaml' file appears to be unconfigured "
-            "or contains placeholder values for one or more required fields (username, password, host). Call the "
-            "'sl-configure server' CLI command to reconfigure the server access credentials."
-        )
-        console.error(message=message, error=ValueError)
-
-    message = f"Server configuration: Resolved. Using the {configuration.username} account."
-    console.echo(message=message, level=LogLevel.SUCCESS)
-    return configuration
 
 
 def _create_mesoscope_experiment_config(

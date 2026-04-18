@@ -9,12 +9,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from pathlib import Path
 
-from ataraxis_base_utilities import ensure_directory_exists
-
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    DATASET_MARKER_FILENAME,
     SESSION_MARKER_FILENAME,
     INCOMPLETE_SESSION_MARKER,
     mcp,
@@ -30,7 +27,6 @@ from .mcp_instance import (
 )
 from ..data_classes import (
     DrugData,
-    DatasetData,
     ImplantData,
     SessionData,
     SubjectData,
@@ -38,13 +34,11 @@ from ..data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
-    DatasetSession,
     ZaberPositions,
     MesoscopePositions,
     MesoscopeHardwareState,
 )
 from ..configuration import (
-    AcquisitionSystems,
     MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
     get_working_directory,
@@ -254,38 +248,6 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def discover_datasets_tool(
-    datasets_root: str | None = None,
-    project: str | None = None,
-) -> dict[str, Any]:
-    """Recursively discovers all dataset directories under the datasets root.
-
-    Walks the directory tree looking for ``dataset.yaml`` markers and returns a flat list of dataset summaries.
-
-    Args:
-        datasets_root: Override for the datasets root directory. When omitted, the active system configuration's
-            ``filesystem.root_directory`` is used (datasets often live alongside acquisition data).
-        project: When provided, only datasets belonging to this project are returned.
-
-    Returns:
-        A response dict with ``datasets`` (list of dataset summary dicts) and ``total_datasets``.
-    """
-    root, error = resolve_root_directory(root_directory=datasets_root)
-    if error is not None:
-        return error
-
-    markers = sorted(root.rglob(DATASET_MARKER_FILENAME))  # type: ignore[union-attr]
-    datasets: list[dict[str, Any]] = []
-    for marker in markers:
-        summary = _load_dataset_summary(marker=marker)
-        if project is not None and summary.get("project") != project:
-            continue
-        datasets.append(summary)
-
-    return ok_response(datasets=datasets, total_datasets=len(datasets), datasets_root=str(root))
-
-
-@mcp.tool()
 def discover_subjects_tool(project: str | None = None) -> dict[str, Any]:
     """Discovers subjects (animals) by scanning project directories on disk.
 
@@ -488,27 +450,6 @@ def read_session_experiment_configuration_tool(session_path: str) -> dict[str, A
 
 
 @mcp.tool()
-def read_dataset_tool(dataset_path: str) -> dict[str, Any]:
-    """Loads the DatasetData YAML for a dataset.
-
-    Args:
-        dataset_path: Path to the dataset root directory (containing ``dataset.yaml``).
-
-    Returns:
-        A response dict with ``data`` containing the full DatasetData payload, including the resolved session
-        list, and ``dataset_path``.
-    """
-    path = Path(dataset_path)
-    if not path.exists():
-        return error_response(message=f"Dataset path does not exist: {path}")
-    try:
-        instance = DatasetData.load(dataset_path=path)
-    except Exception as exception:
-        return error_response(message=f"Failed to load DatasetData: {exception}")
-    return ok_response(data=serialize(value=instance), dataset_path=str(path))
-
-
-@mcp.tool()
 def read_subject_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
     """Loads SubjectData for a subject from the cached SurgeryData YAML.
 
@@ -615,91 +556,6 @@ def read_subject_drugs_tool(subject_id: str, project: str | None = None) -> dict
     if drugs is None:
         return error_response(message=f"SurgeryData at {surgery_path} does not contain a drugs section")
     return ok_response(data=drugs, surgery_data_path=str(surgery_path))
-
-
-@mcp.tool()
-def write_dataset_tool(
-    name: str,
-    project: str,
-    session_type: str,
-    acquisition_system: str,
-    sessions: list[dict[str, str]],
-    datasets_root: str | None = None,
-) -> dict[str, Any]:
-    """Creates a new dataset by materializing the dataset hierarchy on disk.
-
-    Wraps ``DatasetData.create``: builds the dataset directory, creates animal and session subdirectories, and
-    writes the dataset.yaml manifest. Each entry in ``sessions`` must specify the ``session`` name and ``animal``
-    ID; the ``session_path`` field is resolved automatically.
-
-    Args:
-        name: The unique dataset name.
-        project: The source project name.
-        session_type: The SessionTypes value all sessions belong to.
-        acquisition_system: The AcquisitionSystems value all sessions were acquired on.
-        sessions: List of dicts each containing ``{"session": str, "animal": str}``.
-        datasets_root: Override for the datasets root directory. When omitted, the active system configuration's
-            ``filesystem.root_directory`` is used.
-
-    Returns:
-        A response dict with ``dataset_path``, ``dataset_data_path``, and ``data`` (the materialized DatasetData
-        payload).
-    """
-    # Validates enumeration arguments against supported platform values.
-    try:
-        session_type_enum = SessionTypes(session_type)
-    except ValueError:
-        valid = ", ".join(member.value for member in SessionTypes)
-        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
-
-    try:
-        acquisition_system_enum = AcquisitionSystems(acquisition_system)
-    except ValueError:
-        valid = ", ".join(member.value for member in AcquisitionSystems)
-        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
-
-    if not sessions:
-        return error_response(message="The 'sessions' argument must contain at least one entry.")
-
-    # Converts raw session dicts into typed DatasetSession objects with basic structure validation.
-    dataset_session_objects: list[DatasetSession] = []
-    for entry in sessions:
-        if not isinstance(entry, dict) or "session" not in entry or "animal" not in entry:
-            return error_response(
-                message=f"Invalid session entry {entry!r}. Each entry must be a dict with 'session' and 'animal' keys.",
-            )
-        dataset_session_objects.append(DatasetSession(session=entry["session"], animal=entry["animal"]))
-
-    # Creates the datasets root directory when an explicit override is provided and the directory does not exist.
-    root: Path
-    if datasets_root is not None:
-        root = Path(datasets_root)
-        ensure_directory_exists(path=root)
-    else:
-        try:
-            system_configuration = get_system_configuration_data()
-            root = system_configuration.filesystem.root_directory
-        except (FileNotFoundError, OSError, ValueError) as exception:
-            return error_response(message=f"Unable to resolve datasets root directory: {exception}")
-
-    # Materializes the dataset hierarchy on disk and writes the manifest YAML.
-    try:
-        instance = DatasetData.create(
-            name=name,
-            project=project,
-            session_type=session_type_enum,
-            acquisition_system=acquisition_system_enum,
-            sessions=tuple(dataset_session_objects),
-            datasets_root=root,
-        )
-    except Exception as exception:
-        return error_response(message=f"Failed to create dataset: {exception}")
-
-    return ok_response(
-        dataset_path=str(instance.dataset_data_path.parent),
-        dataset_data_path=str(instance.dataset_data_path),
-        data=serialize(value=instance),
-    )
 
 
 @mcp.tool()
@@ -832,48 +688,6 @@ def write_session_mesoscope_positions_tool(
         payload=positions_payload,
         validator_cls=MesoscopePositions,
         overwrite=overwrite,
-    )
-
-
-@mcp.tool()
-def validate_dataset_tool(dataset_path: str) -> dict[str, Any]:
-    """Loads and validates a dataset, verifying that all referenced session paths still exist.
-
-    Args:
-        dataset_path: Path to the dataset root directory.
-
-    Returns:
-        A response dict with ``valid``, ``issues``, ``missing_sessions`` (when invalid), and ``summary``.
-    """
-    path = Path(dataset_path)
-    if not path.exists():
-        return ok_response(valid=False, issues=[f"Dataset path does not exist: {path}"])
-    try:
-        dataset = DatasetData.load(dataset_path=path)
-    except Exception as exception:
-        return ok_response(valid=False, issues=[str(exception)])
-
-    missing: list[dict[str, str]] = [
-        {
-            "session": session.session,
-            "animal": session.animal,
-            "expected_path": str(session.session_path),
-        }
-        for session in dataset.sessions
-        if not session.session_path.exists()
-    ]
-
-    return ok_response(
-        valid=not missing,
-        issues=[f"Missing session: {entry['animal']}/{entry['session']}" for entry in missing],
-        missing_sessions=missing,
-        summary={
-            "name": dataset.name,
-            "project": dataset.project,
-            "session_type": serialize(value=dataset.session_type),
-            "session_count": len(dataset.sessions),
-            "animal_count": len(dataset.animals),
-        },
     )
 
 
@@ -1031,18 +845,6 @@ def get_batch_session_status_overview_tool(root_directory: str | None = None) ->
 
 
 @mcp.tool()
-def describe_dataset_schema_tool() -> dict[str, Any]:
-    """Returns the schema for DatasetData and its nested DatasetSession.
-
-    Returns:
-        A response dict with ``schema`` containing the dataset schema and ``nested_classes``.
-    """
-    schema = describe_dataclass(cls=DatasetData)
-    schema["nested_classes"] = {"DatasetSession": describe_dataclass(cls=DatasetSession)}
-    return ok_response(schema=schema)
-
-
-@mcp.tool()
 def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]:
     """Returns the schema for the descriptor associated with a given session type.
 
@@ -1137,37 +939,6 @@ def _load_session_summary(marker: Path) -> dict[str, Any]:
         "raw_data_path": str(instance.raw_data_path),
         "processed_data_path": str(instance.processed_data_path),
         "incomplete": incomplete,
-    }
-
-
-def _load_dataset_summary(marker: Path) -> dict[str, Any]:
-    """Loads a DatasetData YAML and returns a flat summary dict for use in discovery responses.
-
-    Args:
-        marker: The path to the ``dataset.yaml`` marker file.
-
-    Returns:
-        A flat dict with dataset identity metadata, session counts, and paths, or an error dict if the
-        dataset could not be loaded.
-    """
-    dataset_root = marker.parent
-    try:
-        instance: DatasetData = DatasetData.load(dataset_path=dataset_root)
-    except Exception as exception:
-        return {
-            "dataset_path": str(dataset_root),
-            "marker": str(marker),
-            "error": f"Failed to load dataset: {exception}",
-        }
-    return {
-        "name": instance.name,
-        "project": instance.project,
-        "session_type": serialize(value=instance.session_type),
-        "acquisition_system": serialize(value=instance.acquisition_system),
-        "session_count": len(instance.sessions),
-        "animal_count": len(instance.animals),
-        "dataset_path": str(dataset_root),
-        "dataset_data_path": str(instance.dataset_data_path),
     }
 
 

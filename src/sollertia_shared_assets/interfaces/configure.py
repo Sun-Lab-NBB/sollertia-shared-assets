@@ -18,7 +18,6 @@ from ..configuration import (
     set_task_templates_directory,
     get_system_configuration_data,
     create_experiment_configuration,
-    create_server_configuration_file,
     create_system_configuration_file,
     populate_default_experiment_states,
 )
@@ -232,38 +231,3 @@ def generate_experiment_configuration_file(
     )
 
 
-@configure.command("server", context_settings=CONTEXT_SETTINGS)
-@click.option(
-    "-u",
-    "--username",
-    type=str,
-    required=True,
-    help="The username to use for server authentication.",
-)
-@click.option(
-    "-p",
-    "--password",
-    type=str,
-    prompt=True,
-    hide_input=True,
-    confirmation_prompt=True,
-    help="The password to use for server authentication. Prompted interactively (with hidden input) if not provided.",
-)
-@click.option(
-    "-h",
-    "--host",
-    type=str,
-    required=True,
-    help="The host name or IP address of the server.",
-)
-def generate_server_configuration_file(
-    username: str,
-    password: str,
-    host: str,
-) -> None:  # pragma: no cover
-    """Creates the remote compute server configuration file."""
-    create_server_configuration_file(
-        username=username,
-        password=password,
-        host=host,
-    )

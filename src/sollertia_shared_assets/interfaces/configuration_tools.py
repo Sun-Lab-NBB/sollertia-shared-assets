@@ -1,8 +1,7 @@
 """Provides MCP tools for managing Sollertia platform configuration assets.
 
-Covers experiment configurations, task templates, system and server configuration, platform setup,
-schema introspection, and enumeration tools. All tools register on the shared ``mcp`` instance from
-``mcp_instance``.
+Covers experiment configurations, task templates, system configuration, platform setup, schema introspection,
+and enumeration tools. All tools register on the shared ``mcp`` instance from ``mcp_instance``.
 """
 
 from __future__ import annotations
@@ -45,7 +44,6 @@ from ..configuration import (
     WaterRewardTrial,
     AcquisitionSystems,
     MesoscopeFileSystem,
-    ServerConfiguration,
     MesoscopeGoogleSheets,
     MesoscopeExternalAssets,
     MesoscopeMicroControllers,
@@ -53,7 +51,6 @@ from ..configuration import (
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory as _set_working_directory,
-    get_server_configuration,
     get_google_credentials_path,
     set_google_credentials_path as _set_google_credentials_path,
     get_task_templates_directory,
@@ -62,9 +59,6 @@ from ..configuration import (
     create_experiment_configuration,
     populate_default_experiment_states,
 )
-
-_SERVER_CONFIG_FILENAME: str = "server_configuration.yaml"
-"""Canonical filename for the ServerConfiguration YAML stored in the working directory."""
 
 _TRIAL_CLASSES: dict[str, type[BaseTrial]] = {
     "WaterRewardTrial": WaterRewardTrial,
@@ -207,24 +201,6 @@ def read_system_configuration_tool() -> dict[str, Any]:
     except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(data=serialize(value=instance))
-
-
-@mcp.tool()
-def read_server_configuration_tool() -> dict[str, Any]:
-    """Loads the ServerConfiguration from the working directory with the password masked.
-
-    Returns:
-        A response dict with ``data`` containing the server configuration payload. The password field is
-        replaced with the literal string ``"<masked>"`` for security.
-    """
-    try:
-        instance = get_server_configuration()
-    except (FileNotFoundError, OSError, ValueError) as exception:
-        return error_response(message=str(exception))
-    serialized = serialize(value=instance)
-    if isinstance(serialized, dict) and "password" in serialized:
-        serialized["password"] = "<masked>"  # noqa: S105 - literal masking placeholder, not a real password.
-    return ok_response(data=serialized)
 
 
 @mcp.tool()
@@ -378,38 +354,6 @@ def write_system_configuration_tool(
         overwrite=overwrite,
         use_save_method=True,
     )
-
-
-@mcp.tool()
-def write_server_configuration_tool(
-    configuration_payload: dict[str, Any],
-    *,
-    overwrite: bool = False,
-) -> dict[str, Any]:
-    """Creates or replaces the ServerConfiguration YAML in the working directory.
-
-    Args:
-        configuration_payload: The complete ServerConfiguration payload (must include ``username``, ``password``,
-            and ``host``).
-        overwrite: Determines whether to overwrite an existing server configuration file.
-
-    Returns:
-        A response dict with ``file_path`` and ``data`` containing the validated payload with the password masked.
-    """
-    try:
-        working_directory = get_working_directory()
-    except FileNotFoundError as exception:
-        return error_response(message=str(exception))
-    file_path = working_directory.joinpath(CONFIGURATION_DIR, _SERVER_CONFIG_FILENAME)
-    response = write_yaml_validated(
-        file_path=file_path,
-        payload=configuration_payload,
-        validator_cls=ServerConfiguration,
-        overwrite=overwrite,
-    )
-    if response.get("success") and isinstance(response.get("data"), dict):
-        response["data"]["password"] = "<masked>"  # noqa: S105 - literal masking placeholder, not a real password.
-    return response
 
 
 @mcp.tool()
@@ -806,8 +750,8 @@ def get_project_overview_tool(project: str) -> dict[str, Any]:
 def get_acquisition_environment_status_tool() -> dict[str, Any]:
     """Returns a comprehensive health report for the local acquisition environment.
 
-    Combines working directory, templates directory, server configuration, Google credentials, and system
-    configuration mount checks into a single report.
+    Combines working directory, templates directory, Google credentials, and system configuration mount checks
+    into a single report.
 
     Returns:
         A response dict with ``overall_ok`` (the aggregate health flag) and ``components`` mapping each
@@ -837,17 +781,6 @@ def get_acquisition_environment_status_tool() -> dict[str, Any]:
         report["google_credentials"] = {"configured": True, "path": str(google_credentials), "ok": True}
     except FileNotFoundError as exception:
         report["google_credentials"] = {"configured": False, "error": str(exception), "ok": False}
-
-    try:
-        server_configuration = get_server_configuration()
-        report["server_configuration"] = {
-            "configured": True,
-            "host": server_configuration.host,
-            "username": server_configuration.username,
-            "ok": True,
-        }
-    except (FileNotFoundError, ValueError) as exception:
-        report["server_configuration"] = {"configured": False, "error": str(exception), "ok": False}
 
     try:
         system_configuration = get_system_configuration_data()

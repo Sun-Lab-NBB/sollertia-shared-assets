@@ -1,9 +1,5 @@
 """Provides assets for storing data acquired through the Sollertia platform."""
 
-from .dataset_data import (
-    DatasetData,
-    DatasetSession,
-)
 from .runtime_data import (
     ZaberPositions,
     MesoscopePositions,
@@ -27,8 +23,6 @@ from .surgery_data import (
 )
 
 __all__ = [
-    "DatasetData",
-    "DatasetSession",
     "DrugData",
     "ImplantData",
     "InjectionData",

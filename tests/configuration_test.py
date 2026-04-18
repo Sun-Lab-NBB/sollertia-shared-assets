@@ -19,7 +19,6 @@ from sollertia_shared_assets.configuration import (
     WaterRewardTrial,
     AcquisitionSystems,
     MesoscopeFileSystem,
-    ServerConfiguration,
     MesoscopeGoogleSheets,
     MesoscopeExternalAssets,
     MesoscopeMicroControllers,
@@ -27,14 +26,12 @@ from sollertia_shared_assets.configuration import (
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory,
-    get_server_configuration,
     get_google_credentials_path,
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
     get_system_configuration_data,
     create_experiment_configuration,
-    create_server_configuration_file,
     create_system_configuration_file,
     populate_default_experiment_states,
 )
@@ -1426,182 +1423,6 @@ def test_get_system_configuration_data_valve_calibration_tuple(
     assert all(isinstance(item, tuple) for item in loaded_config.microcontrollers.valve_calibration_data)
 
 
-# Tests for ServerConfiguration dataclass
-
-
-def test_server_configuration_default_initialization() -> None:
-    """Verifies default initialization of ServerConfiguration.
-
-    This test ensures the class initializes with expected default values.
-    """
-    config = ServerConfiguration()
-
-    assert config.username == ""
-    assert config.password == ""
-    assert config.host == ""
-
-
-def test_server_configuration_custom_initialization() -> None:
-    """Verifies custom initialization of ServerConfiguration.
-
-    This test ensures all fields accept custom values.
-    """
-    config = ServerConfiguration(
-        username="myuser",
-        password="mypass",
-        host="example.com",
-    )
-
-    assert config.username == "myuser"
-    assert config.password == "mypass"
-    assert config.host == "example.com"
-
-
-def test_server_configuration_yaml_round_trip(tmp_path: Path) -> None:
-    """Verifies that ServerConfiguration survives YAML serialization.
-
-    This test ensures YAML round-trip preserves all data.
-    """
-    yaml_path = tmp_path / "server_config.yaml"
-
-    original = ServerConfiguration(
-        username="testuser",
-        password="testpass",
-        host="server.example.com",
-    )
-
-    original.to_yaml(file_path=yaml_path)
-    loaded = ServerConfiguration.from_yaml(file_path=yaml_path)
-
-    assert loaded.username == original.username
-    assert loaded.password == original.password
-    assert loaded.host == original.host
-
-
-# Tests for the create_server_configuration_file function
-
-
-def test_create_server_configuration_file(clean_working_directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that create_server_configuration_file creates user config.
-
-    This test ensures the user server configuration is created correctly.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    create_server_configuration_file(
-        username="testuser",
-        password="testpass",
-        host="server.example.com",
-    )
-
-    config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
-    assert config_file.exists()
-
-    # Verify content
-    loaded = ServerConfiguration.from_yaml(file_path=config_file)
-    assert loaded.username == "testuser"
-    assert loaded.password == "testpass"
-
-
-def test_create_server_configuration_file_custom_parameters(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verifies that create_server_configuration_file accepts custom parameters.
-
-    This test ensures custom server parameters are preserved.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    create_server_configuration_file(
-        username="myuser",
-        password="mypass",
-        host="custom.server.com",
-    )
-
-    config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
-    loaded = ServerConfiguration.from_yaml(file_path=config_file)
-
-    assert loaded.username == "myuser"
-    assert loaded.password == "mypass"
-    assert loaded.host == "custom.server.com"
-
-
-# Tests for the get_server_configuration function
-
-
-def test_get_server_configuration_user(clean_working_directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that get_server_configuration loads user config.
-
-    This test ensures user configuration can be retrieved.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Create user config
-    create_server_configuration_file(
-        username="testuser",
-        password="testpass",
-        host="server.example.com",
-    )
-
-    # Load it
-    config = get_server_configuration()
-
-    assert config.username == "testuser"
-    assert config.password == "testpass"
-
-
-def test_get_server_configuration_raises_error_if_missing(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verifies that get_server_configuration raises error when config missing.
-
-    This test ensures proper error handling for missing configurations.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Don't create any config files
-
-    with pytest.raises(FileNotFoundError, match=r"server_configuration\.yaml") as exc_info:
-        get_server_configuration()
-
-    assert "server_configuration.yaml" in str(exc_info.value)
-
-
-def test_get_server_configuration_raises_error_if_unconfigured(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verifies that get_server_configuration raises an error for placeholder credentials.
-
-    This test ensures unconfigured files are detected.
-    """
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Create config with empty credentials (unconfigured)
-    config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
-    ServerConfiguration().to_yaml(file_path=config_file)
-
-    with pytest.raises(ValueError, match=r"(?i)unconfigured") as exc_info:
-        get_server_configuration()
-
-    assert "unconfigured" in str(exc_info.value).lower()
 
 
 # Tests for Cue validation
