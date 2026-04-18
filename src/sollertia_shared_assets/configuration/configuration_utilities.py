@@ -3,14 +3,13 @@
 from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
-from dataclasses import field, dataclass
 from collections.abc import Callable
 
 import platformdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
-from ataraxis_data_structures import YamlConfig
 
 from .vr_configuration import TriggerType, TaskTemplate
+from .server_configuration import ServerConfiguration
 from .mesoscope_configuration import MesoscopeSystemConfiguration, MesoscopeExperimentConfiguration
 from .experiment_configuration import GasPuffTrial, ExperimentState, WaterRewardTrial
 
@@ -21,40 +20,6 @@ class AcquisitionSystems(StrEnum):
     MESOSCOPE_VR = "mesoscope"
     """Uses the 2-Photon Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game
     engine to conduct experiments."""
-
-
-@dataclass
-class ServerConfiguration(YamlConfig):
-    """Defines the access credentials and the filesystem layout of the Sollertia platform remote compute server."""
-
-    username: str = ""
-    """The username to use for server authentication."""
-    password: str = ""
-    """The password to use for server authentication."""
-    host: str = ""
-    """The hostname or IP address of the server to connect to."""
-    storage_root: Path = field(default_factory=Path)
-    """The path to the server directory dedicated to general data storage. This is the primary location where all
-    Sollertia platform project data is kept on the server."""
-    working_root: Path = field(default_factory=Path)
-    """The path to the server directory dedicated to data processing operations."""
-    shared_directory_name: str = ""
-    """The name of the shared directory that stores Sollertia platform project data under both server roots."""
-    shared_storage_root: Path = field(init=False, default_factory=Path)
-    """The path to the root Sollertia platform shared directory under the server's storage root."""
-    shared_working_root: Path = field(init=False, default_factory=Path)
-    """The path to the root Sollertia platform shared directory under the server's working root."""
-    user_data_root: Path = field(init=False, default_factory=Path)
-    """The path to the user's directory under the server's storage root."""
-    user_working_root: Path = field(init=False, default_factory=Path)
-    """The path to the user's directory under the server's working root."""
-
-    def __post_init__(self) -> None:
-        """Resolves all server-side directory paths."""
-        self.shared_storage_root = self.storage_root.joinpath(self.shared_directory_name)
-        self.shared_working_root = self.working_root.joinpath(self.shared_directory_name)
-        self.user_data_root = self.storage_root.joinpath(self.username)
-        self.user_working_root = self.working_root.joinpath(self.username)
 
 
 type SystemConfiguration = MesoscopeSystemConfiguration
@@ -485,9 +450,6 @@ def create_server_configuration_file(
     username: str,
     password: str,
     host: str,
-    storage_root: Path,
-    working_root: Path,
-    shared_directory_name: str,
 ) -> None:
     """Creates the .YAML configuration file for the Sollertia platform compute server and configures the local machine
     (PC) to use this file for all future server-related calls.
@@ -496,19 +458,12 @@ def create_server_configuration_file(
         username: The username to use for server authentication.
         password: The password to use for server authentication.
         host: The hostname or IP address of the server to connect to.
-        storage_root: The path to the server directory dedicated to general data storage.
-        working_root: The path to the server directory dedicated to data processing operations.
-        shared_directory_name: The name of the shared directory that stores Sollertia platform project data under both
-            server roots.
     """
     output_directory = get_working_directory().joinpath("configuration")
     ServerConfiguration(
         username=username,
         password=password,
         host=host,
-        storage_root=storage_root,
-        working_root=working_root,
-        shared_directory_name=shared_directory_name,
     ).to_yaml(file_path=output_directory.joinpath("server_configuration.yaml"))
     console.echo(message="Server configuration file: Created.", level=LogLevel.SUCCESS)
 
@@ -538,19 +493,11 @@ def get_server_configuration() -> ServerConfiguration:
 
     configuration = ServerConfiguration.from_yaml(file_path=config_path)
 
-    sentinel_path = Path()
-    required_strings = (
-        configuration.username,
-        configuration.password,
-        configuration.host,
-        configuration.shared_directory_name,
-    )
-    if not all(required_strings) or sentinel_path in {configuration.storage_root, configuration.working_root}:
+    if not all((configuration.username, configuration.password, configuration.host)):
         message = (
             "Unable to load the server configuration. The 'server_configuration.yaml' file appears to be unconfigured "
-            "or contains placeholder values for one or more required fields (username, password, host, storage_root, "
-            "working_root, shared_directory_name). Call the 'sl-configure server' CLI command to reconfigure the "
-            "server access credentials and filesystem layout."
+            "or contains placeholder values for one or more required fields (username, password, host). Call the "
+            "'sl-configure server' CLI command to reconfigure the server access credentials."
         )
         console.error(message=message, error=ValueError)
 

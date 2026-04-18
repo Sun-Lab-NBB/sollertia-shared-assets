@@ -166,8 +166,7 @@ def write_yaml_validated(
         that file (which triggers the dataclass ``__post_init__`` validation), and only on success re-serializes
         through the canonical ``to_yaml`` (or ``save``) method to produce the final file. Re-runs
         ``__post_init__`` after loading so that any ``init=False`` derived fields whose values may have been
-        overwritten by missing YAML keys are recomputed correctly (for example,
-        ``ServerConfiguration.shared_storage_root``).
+        overwritten by missing YAML keys are recomputed correctly.
 
     Args:
         file_path: The destination file path.
