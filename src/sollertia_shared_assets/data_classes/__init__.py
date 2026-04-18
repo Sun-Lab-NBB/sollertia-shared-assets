@@ -1,8 +1,6 @@
 """Provides assets for storing data acquired through the Sollertia platform."""
 
 from .runtime_data import (
-    ZaberPositions,
-    MesoscopePositions,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
@@ -29,7 +27,6 @@ __all__ = [
     "LickTrainingDescriptor",
     "MesoscopeExperimentDescriptor",
     "MesoscopeHardwareState",
-    "MesoscopePositions",
     "ProcedureData",
     "RunTrainingDescriptor",
     "SessionData",
@@ -37,5 +34,4 @@ __all__ = [
     "SubjectData",
     "SurgeryData",
     "WindowCheckingDescriptor",
-    "ZaberPositions",
 ]

@@ -4,6 +4,7 @@ processing machines.
 
 from enum import StrEnum
 import shutil
+from typing import Any
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -11,7 +12,7 @@ from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from ..configuration import AcquisitionSystems, get_system_configuration_data
+from ..configuration import AcquisitionSystems
 
 
 class SessionTypes(StrEnum):
@@ -88,6 +89,7 @@ class SessionData(YamlConfig):
         session_type: str | SessionTypes,
         python_version: str,
         sollertia_experiment_version: str,
+        acquisition_system: Any,
         experiment_name: str | None = None,
     ) -> SessionData:
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
@@ -101,6 +103,10 @@ class SessionData(YamlConfig):
             session_type: The type of the session.
             python_version: The Python version used to acquire the session's data.
             sollertia_experiment_version: The sollertia-experiment library version used to acquire the session's data.
+            acquisition_system: The active acquisition system configuration instance for the local machine. Must expose
+                a ``name`` attribute, a ``filesystem.root_directory`` attribute resolving to a :class:`Path`, and a
+                ``save(path: Path)`` method that writes the configuration snapshot to disk. The acquisition runtime
+                package (e.g., sl-experiment) owns this object and passes it in here.
             experiment_name: The name of the experiment performed during the session or None, if the session is
                 not an experiment session.
 
@@ -121,11 +127,7 @@ class SessionData(YamlConfig):
         # Acquires the UTC timestamp to use as the session name.
         session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
 
-        # Resolves the acquisition system configuration. This queries the acquisition system configuration data used
-        # by the machine (PC) that calls this method.
-        acquisition_system = get_system_configuration_data()
-
-        # Constructs the root session directory path.
+        # Constructs the root session directory path from the caller-provided system configuration.
         session_path = acquisition_system.filesystem.root_directory.joinpath(project_name, animal_id, session_name)
 
         # Prevents creating new sessions for non-existent projects.

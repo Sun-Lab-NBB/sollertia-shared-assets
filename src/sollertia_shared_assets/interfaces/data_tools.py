@@ -34,15 +34,11 @@ from ..data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
-    ZaberPositions,
-    MesoscopePositions,
     MesoscopeHardwareState,
 )
 from ..configuration import (
-    MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
     get_working_directory,
-    get_system_configuration_data,
 )
 
 if TYPE_CHECKING:
@@ -57,14 +53,9 @@ _PROCESSED_DATA_DIR: str = "processed_data"
 _HARDWARE_STATE_FILENAME: str = "hardware_state.yaml"
 """Canonical filename for the per-session MesoscopeHardwareState YAML."""
 
-_ZABER_POSITIONS_FILENAME: str = "zaber_positions.yaml"
-"""Canonical filename for the per-session ZaberPositions YAML."""
-
-_MESOSCOPE_POSITIONS_FILENAME: str = "mesoscope_positions.yaml"
-"""Canonical filename for the per-session MesoscopePositions YAML."""
-
 _SESSION_SYSTEM_CONFIG_FILENAME: str = "system_configuration.yaml"
-"""Canonical filename for the per-session snapshot of MesoscopeSystemConfiguration."""
+"""Canonical filename for the per-session system configuration snapshot. The system configuration classes now live
+in the acquisition runtime package; this file is listed here only to exclude it from descriptor autodetection."""
 
 _SESSION_EXPERIMENT_CONFIG_FILENAME: str = "experiment_configuration.yaml"
 """Canonical filename for the per-session snapshot of MesoscopeExperimentConfiguration."""
@@ -227,8 +218,6 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
         _SESSION_SYSTEM_CONFIG_FILENAME: "system_configuration_snapshot",
         _SESSION_EXPERIMENT_CONFIG_FILENAME: "experiment_configuration_snapshot",
         _HARDWARE_STATE_FILENAME: "hardware_state",
-        _ZABER_POSITIONS_FILENAME: "zaber_positions",
-        _MESOSCOPE_POSITIONS_FILENAME: "mesoscope_positions",
     }
     descriptor_filenames = {filename for filename, _ in DESCRIPTOR_REGISTRY.values()}
 
@@ -248,19 +237,21 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def discover_subjects_tool(project: str | None = None) -> dict[str, Any]:
+def discover_subjects_tool(root_directory: str, project: str | None = None) -> dict[str, Any]:
     """Discovers subjects (animals) by scanning project directories on disk.
 
     For each subject found on disk, attempts to locate a cached SurgeryData YAML and reports whether one was
     found. This tool is the disk-side counterpart to a future Google Sheets-backed surgery lookup.
 
     Args:
+        root_directory: The absolute path to the root data directory to scan. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
         project: When provided, only subjects belonging to this project are returned.
 
     Returns:
         A response dict with ``subjects`` (list of subject summary dicts) and ``total_subjects``.
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
 
@@ -291,7 +282,11 @@ def discover_subjects_tool(project: str | None = None) -> dict[str, Any]:
             if project_path.name not in entry["projects"]:
                 entry["projects"].append(project_path.name)
             entry["session_count"] += len(list(animal_dir.glob(f"*/{_RAW_DATA_DIR}/{SESSION_MARKER_FILENAME}")))
-            surgery_path, _ = _resolve_surgery_path(subject_id=animal_dir.name, project=project_path.name)
+            surgery_path, _ = _resolve_surgery_path(
+                subject_id=animal_dir.name,
+                project=project_path.name,
+                root_directory=root_directory,
+            )
             if surgery_path is not None:
                 entry["has_cached_surgery_data"] = True
                 entry["surgery_data_path"] = str(surgery_path)
@@ -377,57 +372,6 @@ def read_session_hardware_state_tool(session_path: str) -> dict[str, Any]:
         return error
     file_path = session_root.joinpath(_RAW_DATA_DIR, _HARDWARE_STATE_FILENAME)  # type: ignore[union-attr]
     return read_yaml(file_path=file_path, validator_cls=MesoscopeHardwareState)
-
-
-@mcp.tool()
-def read_session_zaber_positions_tool(session_path: str) -> dict[str, Any]:
-    """Loads the ZaberPositions YAML for a session.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``data`` containing the Zaber positions payload.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _ZABER_POSITIONS_FILENAME)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=ZaberPositions)
-
-
-@mcp.tool()
-def read_session_mesoscope_positions_tool(session_path: str) -> dict[str, Any]:
-    """Loads the MesoscopePositions YAML for a session.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``data`` containing the Mesoscope positions payload.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _MESOSCOPE_POSITIONS_FILENAME)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=MesoscopePositions)
-
-
-@mcp.tool()
-def read_session_system_configuration_tool(session_path: str) -> dict[str, Any]:
-    """Loads the per-session snapshot of MesoscopeSystemConfiguration.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``data`` containing the system configuration snapshot payload.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _SESSION_SYSTEM_CONFIG_FILENAME)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=MesoscopeSystemConfiguration)
 
 
 @mcp.tool()
@@ -629,64 +573,6 @@ def write_session_hardware_state_tool(
         file_path=file_path,
         payload=hardware_state_payload,
         validator_cls=MesoscopeHardwareState,
-        overwrite=overwrite,
-    )
-
-
-@mcp.tool()
-def write_session_zaber_positions_tool(
-    session_path: str,
-    positions_payload: dict[str, Any],
-    *,
-    overwrite: bool = True,
-) -> dict[str, Any]:
-    """Creates or replaces the ZaberPositions YAML for a session.
-
-    Args:
-        session_path: Path to the session root directory.
-        positions_payload: The complete ZaberPositions payload.
-        overwrite: Determines whether to overwrite an existing positions file.
-
-    Returns:
-        A response dict with ``file_path`` and ``data`` (the validated payload).
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _ZABER_POSITIONS_FILENAME)  # type: ignore[union-attr]
-    return write_yaml_validated(
-        file_path=file_path,
-        payload=positions_payload,
-        validator_cls=ZaberPositions,
-        overwrite=overwrite,
-    )
-
-
-@mcp.tool()
-def write_session_mesoscope_positions_tool(
-    session_path: str,
-    positions_payload: dict[str, Any],
-    *,
-    overwrite: bool = True,
-) -> dict[str, Any]:
-    """Creates or replaces the MesoscopePositions YAML for a session.
-
-    Args:
-        session_path: Path to the session root directory.
-        positions_payload: The complete MesoscopePositions payload.
-        overwrite: Determines whether to overwrite an existing positions file.
-
-    Returns:
-        A response dict with ``file_path`` and ``data`` (the validated payload).
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _MESOSCOPE_POSITIONS_FILENAME)  # type: ignore[union-attr]
-    return write_yaml_validated(
-        file_path=file_path,
-        payload=positions_payload,
-        validator_cls=MesoscopePositions,
         overwrite=overwrite,
     )
 
@@ -973,8 +859,6 @@ def _find_descriptor_for_session(
                 _SESSION_SYSTEM_CONFIG_FILENAME,
                 _SESSION_EXPERIMENT_CONFIG_FILENAME,
                 _HARDWARE_STATE_FILENAME,
-                _ZABER_POSITIONS_FILENAME,
-                _MESOSCOPE_POSITIONS_FILENAME,
             }:
                 continue
             try:
@@ -989,17 +873,21 @@ def _find_descriptor_for_session(
 def _resolve_surgery_path(
     subject_id: str,
     project: str | None = None,
+    root_directory: str | None = None,
 ) -> tuple[Path | None, dict[str, Any] | None]:
     """Locates a cached SurgeryData YAML on disk for the given subject.
 
     Notes:
         This is a best-effort filesystem search. The library does not currently mandate a single canonical
         location for cached surgery data; this helper looks under the configured working directory and the
-        configured root data directory for ``surgery_data/<subject_id>.yaml`` and similar conventional paths.
+        caller-provided data root directory for ``surgery_data/<subject_id>.yaml`` and similar conventional
+        paths. The previous fallback that read the system configuration's root directory was removed when the
+        system configuration moved to the acquisition runtime package.
 
     Args:
         subject_id: The unique identifier of the subject whose surgery data to locate.
         project: Optional project hint that scopes the lookup to a specific project subtree.
+        root_directory: Optional absolute path to the root data directory to scan.
 
     Returns:
         A tuple of the resolved Path and an error dict. Exactly one element is non-None.
@@ -1012,18 +900,15 @@ def _resolve_surgery_path(
         working_directory = get_working_directory()
         candidate_paths.extend(working_directory.joinpath("surgery_data", filename) for filename in candidate_filenames)
         candidate_paths.extend(working_directory.joinpath(filename) for filename in candidate_filenames)
-    except OSError, ValueError:
+    except (OSError, ValueError):
         pass
 
-    try:
-        system_configuration = get_system_configuration_data()
-        root = system_configuration.filesystem.root_directory
+    if root_directory is not None:
+        root = Path(root_directory)
         if project is not None:
             candidate_paths.extend(root.joinpath(project, "surgery_data", filename) for filename in candidate_filenames)
             candidate_paths.extend(root.joinpath(project, subject_id, filename) for filename in candidate_filenames)
         candidate_paths.extend(root.joinpath("surgery_data", filename) for filename in candidate_filenames)
-    except OSError, ValueError:
-        pass
 
     # Returns the first candidate path that exists on disk.
     for candidate in candidate_paths:
@@ -1033,7 +918,7 @@ def _resolve_surgery_path(
     return None, error_response(
         message=(
             f"Could not locate a cached SurgeryData file for subject '{subject_id}'. Searched under the working "
-            f"directory and the system root directory using conventional paths "
+            f"directory and the provided root directory using conventional paths "
             f"({', '.join(candidate_filenames)})."
         ),
     )

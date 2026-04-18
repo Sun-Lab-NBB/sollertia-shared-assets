@@ -40,14 +40,8 @@ from ..configuration import (
     VREnvironment,
     TrialStructure,
     ExperimentState,
-    MesoscopeCameras,
     WaterRewardTrial,
     AcquisitionSystems,
-    MesoscopeFileSystem,
-    MesoscopeGoogleSheets,
-    MesoscopeExternalAssets,
-    MesoscopeMicroControllers,
-    MesoscopeSystemConfiguration,
     MesoscopeExperimentConfiguration,
     get_working_directory,
     set_working_directory as _set_working_directory,
@@ -55,7 +49,6 @@ from ..configuration import (
     set_google_credentials_path as _set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory as _set_task_templates_directory,
-    get_system_configuration_data,
     create_experiment_configuration,
     populate_default_experiment_states,
 )
@@ -154,17 +147,19 @@ def discover_templates_tool() -> dict[str, Any]:
 
 
 @mcp.tool()
-def read_experiment_configuration_tool(project: str, experiment: str) -> dict[str, Any]:
+def read_experiment_configuration_tool(project: str, experiment: str, root_directory: str) -> dict[str, Any]:
     """Loads a MesoscopeExperimentConfiguration YAML for a project's experiment.
 
     Args:
         project: The name of the project containing the experiment.
         experiment: The name of the experiment configuration (without the ``.yaml`` extension).
+        root_directory: The absolute path to the root data directory that contains the project. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
 
     Returns:
         A response dict with ``data`` containing the full experiment configuration payload.
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
     configuration_path = root.joinpath(project, CONFIGURATION_DIR, f"{experiment}.yaml")  # type: ignore[union-attr]
@@ -187,20 +182,6 @@ def read_template_tool(template_name: str) -> dict[str, Any]:
         return error_response(message=str(exception))
     template_path = templates_directory.joinpath(f"{template_name}.yaml")
     return read_yaml(file_path=template_path, validator_cls=TaskTemplate)
-
-
-@mcp.tool()
-def read_system_configuration_tool() -> dict[str, Any]:
-    """Loads the active MesoscopeSystemConfiguration from the working directory.
-
-    Returns:
-        A response dict with ``data`` containing the full system configuration payload.
-    """
-    try:
-        instance = get_system_configuration_data()
-    except (FileNotFoundError, OSError, ValueError) as exception:
-        return error_response(message=str(exception))
-    return ok_response(data=serialize(value=instance))
 
 
 @mcp.tool()
@@ -284,6 +265,7 @@ def write_experiment_configuration_tool(
     project: str,
     experiment: str,
     configuration_payload: dict[str, Any],
+    root_directory: str,
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
@@ -296,12 +278,14 @@ def write_experiment_configuration_tool(
         project: The name of the project that owns the experiment.
         experiment: The destination filename (without the ``.yaml`` extension).
         configuration_payload: The complete experiment configuration payload.
+        root_directory: The absolute path to the root data directory that contains the project. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
         A response dict with ``file_path`` and ``data`` (the validated configuration payload).
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
     project_path = root.joinpath(project)  # type: ignore[union-attr]
@@ -319,55 +303,18 @@ def write_experiment_configuration_tool(
 
 
 @mcp.tool()
-def write_system_configuration_tool(
-    system: str,
-    configuration_payload: dict[str, Any],
-    *,
-    overwrite: bool = False,
-) -> dict[str, Any]:
-    """Creates or replaces a system configuration YAML in the working directory.
-
-    Args:
-        system: The acquisition system name (e.g., ``"mesoscope"``). Determines the destination filename.
-        configuration_payload: The complete system configuration payload.
-        overwrite: Determines whether to overwrite an existing system configuration file.
-
-    Returns:
-        A response dict with ``file_path`` and ``data`` (the validated configuration payload).
-    """
-    try:
-        AcquisitionSystems(system)
-    except ValueError:
-        valid = ", ".join(member.value for member in AcquisitionSystems)
-        return error_response(message=f"Invalid acquisition system '{system}'. Valid values: {valid}")
-
-    try:
-        working_directory = get_working_directory()
-    except FileNotFoundError as exception:
-        return error_response(message=str(exception))
-
-    file_path = working_directory.joinpath(CONFIGURATION_DIR, f"{system}_system_configuration.yaml")
-    return write_yaml_validated(
-        file_path=file_path,
-        payload=configuration_payload,
-        validator_cls=MesoscopeSystemConfiguration,
-        overwrite=overwrite,
-        use_save_method=True,
-    )
-
-
-@mcp.tool()
-def create_project_tool(project: str) -> dict[str, Any]:
-    """Creates a new project directory and its ``configuration`` subdirectory under the system root.
+def create_project_tool(project: str, root_directory: str) -> dict[str, Any]:
+    """Creates a new project directory and its ``configuration`` subdirectory under the root data directory.
 
     Args:
         project: The name of the project to create.
+        root_directory: The absolute path to the root data directory under which to create the project.
 
     Returns:
         A response dict with ``project``, ``project_path``, and ``already_exists`` (True when the project
         directory was already present and no changes were made).
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
     project_path = root.joinpath(project)  # type: ignore[union-attr]
@@ -386,6 +333,7 @@ def create_experiment_config_tool(
     project: str,
     experiment: str,
     template: str,
+    root_directory: str,
     state_count: int = 1,
     *,
     overwrite: bool = False,
@@ -400,6 +348,8 @@ def create_experiment_config_tool(
         project: The name of the project for which to create the experiment.
         experiment: The destination experiment name (without the ``.yaml`` extension).
         template: The name of the task template to use (without the ``.yaml`` extension).
+        root_directory: The absolute path to the root data directory that contains the project. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
         state_count: Number of default-valued runtime states to generate.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
@@ -407,7 +357,7 @@ def create_experiment_config_tool(
         A response dict with ``project``, ``experiment``, ``template``, ``file_path``, and ``data`` (the
         generated experiment configuration payload).
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
     project_path = root.joinpath(project)  # type: ignore[union-attr]
@@ -437,10 +387,9 @@ def create_experiment_config_tool(
     # Loads the template, generates the experiment configuration, and populates default runtime states.
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_path)
-        system_configuration = get_system_configuration_data()
         experiment_configuration = create_experiment_configuration(
             template=task_template,
-            system=system_configuration.name,
+            system=AcquisitionSystems.MESOSCOPE_VR,
             unity_scene_name=template,
         )
         populate_default_experiment_states(
@@ -563,33 +512,6 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
 
 
 @mcp.tool()
-def describe_system_configuration_schema_tool(acquisition_system: str = "mesoscope") -> dict[str, Any]:
-    """Returns the schema for the system configuration of a given acquisition system.
-
-    Args:
-        acquisition_system: The AcquisitionSystems value to describe. Defaults to ``"mesoscope"``.
-
-    Returns:
-        A response dict with ``schema`` containing the system configuration schema and ``nested_classes``
-        mapping each nested dataclass name to its individual schema.
-    """
-    try:
-        AcquisitionSystems(acquisition_system)
-    except ValueError:
-        valid = ", ".join(member.value for member in AcquisitionSystems)
-        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
-    schema = describe_dataclass(cls=MesoscopeSystemConfiguration)
-    schema["nested_classes"] = {
-        "MesoscopeFileSystem": describe_dataclass(cls=MesoscopeFileSystem),
-        "MesoscopeGoogleSheets": describe_dataclass(cls=MesoscopeGoogleSheets),
-        "MesoscopeCameras": describe_dataclass(cls=MesoscopeCameras),
-        "MesoscopeMicroControllers": describe_dataclass(cls=MesoscopeMicroControllers),
-        "MesoscopeExternalAssets": describe_dataclass(cls=MesoscopeExternalAssets),
-    }
-    return ok_response(schema=schema)
-
-
-@mcp.tool()
 def validate_template_tool(template_name: str) -> dict[str, Any]:
     """Loads and validates a TaskTemplate against its schema and cross-reference constraints.
 
@@ -621,17 +543,19 @@ def validate_template_tool(template_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def validate_experiment_configuration_tool(project: str, experiment: str) -> dict[str, Any]:
+def validate_experiment_configuration_tool(project: str, experiment: str, root_directory: str) -> dict[str, Any]:
     """Loads and validates an experiment configuration YAML for a project.
 
     Args:
         project: The name of the project containing the experiment.
         experiment: The name of the experiment configuration (without the ``.yaml`` extension).
+        root_directory: The absolute path to the root data directory that contains the project. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
 
     Returns:
         A response dict with ``valid`` and either ``summary`` or ``issues``.
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
     configuration_path = root.joinpath(project, CONFIGURATION_DIR, f"{experiment}.yaml")  # type: ignore[union-attr]
@@ -652,54 +576,19 @@ def validate_experiment_configuration_tool(project: str, experiment: str) -> dic
 
 
 @mcp.tool()
-def validate_system_configuration_tool() -> dict[str, Any]:
-    """Loads and validates the active system configuration plus all configured filesystem paths.
-
-    Returns:
-        A response dict with ``valid``, ``issues``, ``system_name``, and ``paths`` (the per-path mount
-        status report).
-    """
-    try:
-        system_configuration = get_system_configuration_data()
-    except (FileNotFoundError, OSError, ValueError) as exception:
-        return ok_response(valid=False, issues=[str(exception)])
-
-    # Probes each configured filesystem path for existence and writability.
-    filesystem = system_configuration.filesystem
-    paths_report: dict[str, dict[str, Any]] = {
-        "root_directory": _check_path(path=filesystem.root_directory),
-        "server_directory": _check_path(path=filesystem.server_directory),
-        "nas_directory": _check_path(path=filesystem.nas_directory),
-    }
-    if hasattr(filesystem, "mesoscope_directory"):
-        paths_report["mesoscope_directory"] = _check_path(path=filesystem.mesoscope_directory)
-
-    # Aggregates issues from paths that are configured but not accessible.
-    issues = [
-        f"{name}: {report.get('error', 'not OK')}"
-        for name, report in paths_report.items()
-        if report.get("configured", True) and not report.get("ok", False)
-    ]
-    return ok_response(
-        valid=not issues,
-        issues=issues,
-        system_name=system_configuration.name,
-        paths=paths_report,
-    )
-
-
-@mcp.tool()
-def get_project_overview_tool(project: str) -> dict[str, Any]:
+def get_project_overview_tool(project: str, root_directory: str) -> dict[str, Any]:
     """Returns aggregate counts (animals, sessions by type, experiments, datasets) for a project.
 
     Args:
         project: The name of the project.
+        root_directory: The absolute path to the root data directory that contains the project. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
 
     Returns:
         A response dict with ``project``, ``project_path``, ``animal_count``, ``animals``, ``sessions_by_type``,
         ``total_sessions``, ``incomplete_sessions``, ``experiment_count``, and ``dataset_count``.
     """
-    root, error = resolve_root_directory(root_directory=None)
+    root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
 
@@ -748,10 +637,11 @@ def get_project_overview_tool(project: str) -> dict[str, Any]:
 
 @mcp.tool()
 def get_acquisition_environment_status_tool() -> dict[str, Any]:
-    """Returns a comprehensive health report for the local acquisition environment.
+    """Returns a health report for the Sollertia platform configuration components owned by this package.
 
-    Combines working directory, templates directory, Google credentials, and system configuration mount checks
-    into a single report.
+    Combines working directory, templates directory, and Google credentials status into a single report. System
+    configuration mount checks are not included here — those live with the acquisition runtime package
+    (sl-experiment).
 
     Returns:
         A response dict with ``overall_ok`` (the aggregate health flag) and ``components`` mapping each
@@ -759,7 +649,6 @@ def get_acquisition_environment_status_tool() -> dict[str, Any]:
     """
     report: dict[str, Any] = {}
 
-    # Checks each platform component in turn: working directory, templates, credentials, server, system.
     try:
         working_directory = get_working_directory()
         report["working_directory"] = {"configured": True, "path": str(working_directory), "ok": True}
@@ -782,25 +671,6 @@ def get_acquisition_environment_status_tool() -> dict[str, Any]:
     except FileNotFoundError as exception:
         report["google_credentials"] = {"configured": False, "error": str(exception), "ok": False}
 
-    try:
-        system_configuration = get_system_configuration_data()
-        filesystem = system_configuration.filesystem
-        paths_report: dict[str, dict[str, Any]] = {
-            "root_directory": _check_path(path=filesystem.root_directory),
-            "server_directory": _check_path(path=filesystem.server_directory),
-            "nas_directory": _check_path(path=filesystem.nas_directory),
-        }
-        if hasattr(filesystem, "mesoscope_directory"):
-            paths_report["mesoscope_directory"] = _check_path(path=filesystem.mesoscope_directory)
-        report["system_configuration"] = {
-            "configured": True,
-            "system_name": system_configuration.name,
-            "paths": paths_report,
-            "ok": all(path.get("ok", False) for path in paths_report.values()),
-        }
-    except (FileNotFoundError, OSError, ValueError) as exception:
-        report["system_configuration"] = {"configured": False, "error": str(exception), "ok": False}
-
     overall_ok = all(component.get("ok", False) for component in report.values())
     return ok_response(overall_ok=overall_ok, components=report)
 
@@ -817,39 +687,6 @@ def check_mount_accessibility_tool(path: str) -> dict[str, Any]:
         ``error``.
     """
     return ok_response(**_check_path(path=Path(path)))
-
-
-@mcp.tool()
-def check_system_mounts_tool() -> dict[str, Any]:
-    """Verifies all filesystem paths in the active system configuration.
-
-    Returns:
-        A response dict with ``system_name``, ``paths`` (the per-path status report), and ``summary`` (counts
-        of OK, failed, and not-configured paths).
-    """
-    try:
-        system_configuration = get_system_configuration_data()
-    except (FileNotFoundError, OSError, ValueError) as exception:
-        return error_response(message=str(exception))
-
-    filesystem = system_configuration.filesystem
-    paths: dict[str, dict[str, Any]] = {
-        "root_directory": _check_path(path=filesystem.root_directory),
-        "server_directory": _check_path(path=filesystem.server_directory),
-        "nas_directory": _check_path(path=filesystem.nas_directory),
-    }
-    if hasattr(filesystem, "mesoscope_directory"):
-        paths["mesoscope_directory"] = _check_path(path=filesystem.mesoscope_directory)
-
-    ok_count = sum(1 for entry in paths.values() if entry.get("ok"))
-    fail_count = sum(1 for entry in paths.values() if entry.get("configured", True) and not entry.get("ok"))
-    not_configured_count = sum(1 for entry in paths.values() if not entry.get("configured", True))
-
-    return ok_response(
-        system_name=system_configuration.name,
-        paths=paths,
-        summary={"ok": ok_count, "fail": fail_count, "not_configured": not_configured_count},
-    )
 
 
 @mcp.tool()
