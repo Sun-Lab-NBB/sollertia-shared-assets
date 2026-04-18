@@ -390,7 +390,7 @@ def write_server_configuration_tool(
 
     Args:
         configuration_payload: The complete ServerConfiguration payload (must include ``username``, ``password``,
-            ``host``, ``storage_root``, ``working_root``, and ``shared_directory_name``).
+            and ``host``).
         overwrite: Determines whether to overwrite an existing server configuration file.
 
     Returns:

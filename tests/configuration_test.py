@@ -1439,27 +1439,6 @@ def test_server_configuration_default_initialization() -> None:
     assert config.username == ""
     assert config.password == ""
     assert config.host == ""
-    assert config.storage_root == Path()
-    assert config.working_root == Path()
-    assert config.shared_directory_name == ""
-
-
-def test_server_configuration_post_init_resolves_paths() -> None:
-    """Verifies that __post_init__ correctly resolves derived paths.
-
-    This test ensures all paths are properly constructed.
-    """
-    config = ServerConfiguration(
-        username="testuser",
-        storage_root=Path("/mnt/storage"),
-        working_root=Path("/mnt/work"),
-        shared_directory_name="shared",
-    )
-
-    assert config.shared_storage_root == Path("/mnt/storage/shared")
-    assert config.shared_working_root == Path("/mnt/work/shared")
-    assert config.user_data_root == Path("/mnt/storage/testuser")
-    assert config.user_working_root == Path("/mnt/work/testuser")
 
 
 def test_server_configuration_custom_initialization() -> None:
@@ -1471,17 +1450,11 @@ def test_server_configuration_custom_initialization() -> None:
         username="myuser",
         password="mypass",
         host="example.com",
-        storage_root=Path("/data"),
-        working_root=Path("/work"),
-        shared_directory_name="lab_data",
     )
 
     assert config.username == "myuser"
     assert config.password == "mypass"
     assert config.host == "example.com"
-    assert config.storage_root == Path("/data")
-    assert config.working_root == Path("/work")
-    assert config.shared_directory_name == "lab_data"
 
 
 def test_server_configuration_yaml_round_trip(tmp_path: Path) -> None:
@@ -1503,7 +1476,6 @@ def test_server_configuration_yaml_round_trip(tmp_path: Path) -> None:
     assert loaded.username == original.username
     assert loaded.password == original.password
     assert loaded.host == original.host
-    assert loaded.shared_storage_root == original.shared_storage_root
 
 
 # Tests for the create_server_configuration_file function
@@ -1523,9 +1495,6 @@ def test_create_server_configuration_file(clean_working_directory: Path, monkeyp
         username="testuser",
         password="testpass",
         host="server.example.com",
-        storage_root=Path("/srv/storage"),
-        working_root=Path("/srv/work"),
-        shared_directory_name="shared",
     )
 
     config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
@@ -1554,18 +1523,14 @@ def test_create_server_configuration_file_custom_parameters(
         username="myuser",
         password="mypass",
         host="custom.server.com",
-        storage_root=Path("/custom/storage"),
-        working_root=Path("/custom/work"),
-        shared_directory_name="custom_shared",
     )
 
     config_file = clean_working_directory / "configuration" / "server_configuration.yaml"
     loaded = ServerConfiguration.from_yaml(file_path=config_file)
 
+    assert loaded.username == "myuser"
+    assert loaded.password == "mypass"
     assert loaded.host == "custom.server.com"
-    assert loaded.storage_root == Path("/custom/storage")
-    assert loaded.working_root == Path("/custom/work")
-    assert loaded.shared_directory_name == "custom_shared"
 
 
 # Tests for the get_server_configuration function
@@ -1586,9 +1551,6 @@ def test_get_server_configuration_user(clean_working_directory: Path, monkeypatc
         username="testuser",
         password="testpass",
         host="server.example.com",
-        storage_root=Path("/srv/storage"),
-        working_root=Path("/srv/work"),
-        shared_directory_name="shared",
     )
 
     # Load it

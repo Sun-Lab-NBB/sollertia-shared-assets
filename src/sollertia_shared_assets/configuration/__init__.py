@@ -8,9 +8,9 @@ from .vr_configuration import (
     VREnvironment,
     TrialStructure,
 )
+from .server_configuration import ServerConfiguration
 from .configuration_utilities import (
     AcquisitionSystems,
-    ServerConfiguration,
     SystemConfiguration,
     get_working_directory,
     set_working_directory,

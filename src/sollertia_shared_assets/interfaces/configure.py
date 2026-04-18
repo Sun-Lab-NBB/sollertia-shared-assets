@@ -256,41 +256,14 @@ def generate_experiment_configuration_file(
     required=True,
     help="The host name or IP address of the server.",
 )
-@click.option(
-    "-sr",
-    "--storage-root",
-    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the server directory dedicated to general data storage.",
-)
-@click.option(
-    "-wr",
-    "--working-root",
-    type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the server directory dedicated to data processing operations.",
-)
-@click.option(
-    "-sd",
-    "--shared-directory",
-    type=str,
-    required=True,
-    help="The name of the shared directory used to store all Sollertia platform projects under the server's roots.",
-)
 def generate_server_configuration_file(
     username: str,
     password: str,
     host: str,
-    storage_root: Path,
-    working_root: Path,
-    shared_directory: str,
 ) -> None:  # pragma: no cover
     """Creates the remote compute server configuration file."""
     create_server_configuration_file(
         username=username,
         password=password,
         host=host,
-        storage_root=storage_root,
-        working_root=working_root,
-        shared_directory_name=shared_directory,
     )
