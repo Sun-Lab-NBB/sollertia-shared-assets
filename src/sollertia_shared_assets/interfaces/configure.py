@@ -16,10 +16,7 @@ from ..configuration import (
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
-    get_system_configuration_data,
     create_experiment_configuration,
-    create_server_configuration_file,
-    create_system_configuration_file,
     populate_default_experiment_states,
 )
 
@@ -60,21 +57,6 @@ def start_mcp_server(transport: Literal["stdio", "sse", "streamable-http"]) -> N
     run_server(transport=transport)
 
 
-@configure.command("system", context_settings=CONTEXT_SETTINGS)
-@click.option(
-    "-s",
-    "--system",
-    type=click.Choice(AcquisitionSystems, case_sensitive=False),
-    show_default=True,
-    required=True,
-    default=AcquisitionSystems.MESOSCOPE_VR,
-    help="The type (name) of the data acquisition system for which to create the configuration file.",
-)
-def generate_system_configuration_file(system: AcquisitionSystems) -> None:  # pragma: no cover
-    """Creates the specified data acquisition system's configuration file."""
-    create_system_configuration_file(system=system)
-
-
 @configure.command("google", context_settings=CONTEXT_SETTINGS)
 @click.option(
     "-c",
@@ -109,11 +91,16 @@ def configure_task_templates_directory(directory: Path) -> None:  # pragma: no c
     required=True,
     help="The name of the project to be created.",
 )
-def configure_project(project: str) -> None:  # pragma: no cover
-    """Configures the local data acquisition system to acquire data for the specified project."""
-    system_configuration = get_system_configuration_data()
-    project_path = system_configuration.filesystem.root_directory.joinpath(project, "configuration")
-
+@click.option(
+    "-r",
+    "--root-directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the root data directory under which to create the project.",
+)
+def configure_project(project: str, root_directory: Path) -> None:  # pragma: no cover
+    """Creates the data structure for a new project under the provided root data directory."""
+    project_path = root_directory.joinpath(project, "configuration")
     ensure_directory_exists(path=project_path)
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
 
@@ -139,6 +126,13 @@ def configure_project(project: str) -> None:  # pragma: no cover
     type=str,
     required=True,
     help="The name of the task template to use (filename without .yaml extension).",
+)
+@click.option(
+    "-r",
+    "--root-directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
+    required=True,
+    help="The absolute path to the root data directory that contains the project.",
 )
 @click.option(
     "-sc",
@@ -180,23 +174,23 @@ def generate_experiment_configuration_file(
     project: str,
     experiment: str,
     template: str,
+    root_directory: Path,
     state_count: int,
     reward_size: float,
     reward_tone_duration: int,
     puff_duration: int,
     occupancy_duration: int,
 ) -> None:  # pragma: no cover
-    """Creates an experiment configuration from a task template."""
-    acquisition_system = get_system_configuration_data()
-    file_path = acquisition_system.filesystem.root_directory.joinpath(project, "configuration", f"{experiment}.yaml")
-
-    if not acquisition_system.filesystem.root_directory.joinpath(project).exists():
+    """Creates an experiment configuration from a task template under the provided root data directory."""
+    project_path = root_directory.joinpath(project)
+    if not project_path.exists():
         message = (
-            f"Unable to generate the {experiment} experiment's configuration file as the {acquisition_system.name} "
-            f"data acquisition system is currently not configured to acquire data for the {project} project. Use the "
-            f"'sl-configure project' CLI command to create the project before creating a new experiment configuration."
+            f"Unable to generate the {experiment} experiment's configuration file: the project '{project}' does not "
+            f"exist under the provided root directory {root_directory}. Use 'sl-configure project' first."
         )
         console.error(message=message, error=ValueError)
+
+    file_path = project_path.joinpath("configuration", f"{experiment}.yaml")
 
     templates_directory = get_task_templates_directory()
     template_path = templates_directory.joinpath(f"{template}.yaml")
@@ -212,7 +206,7 @@ def generate_experiment_configuration_file(
 
     experiment_configuration = create_experiment_configuration(
         template=task_template,
-        system=acquisition_system.name,
+        system=AcquisitionSystems.MESOSCOPE_VR,
         unity_scene_name=template,
         default_reward_size_ul=reward_size,
         default_reward_tone_duration_ms=reward_tone_duration,
@@ -229,41 +223,4 @@ def generate_experiment_configuration_file(
     console.echo(
         message=f"{experiment} experiment's configuration file: created from template '{template}'.",
         level=LogLevel.SUCCESS,
-    )
-
-
-@configure.command("server", context_settings=CONTEXT_SETTINGS)
-@click.option(
-    "-u",
-    "--username",
-    type=str,
-    required=True,
-    help="The username to use for server authentication.",
-)
-@click.option(
-    "-p",
-    "--password",
-    type=str,
-    prompt=True,
-    hide_input=True,
-    confirmation_prompt=True,
-    help="The password to use for server authentication. Prompted interactively (with hidden input) if not provided.",
-)
-@click.option(
-    "-h",
-    "--host",
-    type=str,
-    required=True,
-    help="The host name or IP address of the server.",
-)
-def generate_server_configuration_file(
-    username: str,
-    password: str,
-    host: str,
-) -> None:  # pragma: no cover
-    """Creates the remote compute server configuration file."""
-    create_server_configuration_file(
-        username=username,
-        password=password,
-        host=host,
     )

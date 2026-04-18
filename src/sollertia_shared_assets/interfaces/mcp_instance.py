@@ -23,7 +23,6 @@ from ..data_classes import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from ..configuration import get_system_configuration_data
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
@@ -234,27 +233,30 @@ def read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, Any
 
 
 def resolve_root_directory(root_directory: str | None) -> tuple[Path | None, dict[str, Any] | None]:
-    """Resolves the root data directory, falling back to the configured system root.
+    """Resolves the root data directory from an explicit override.
 
     Args:
-        root_directory: An explicit override for the root data directory, or None to fall back to the active
-            system configuration.
+        root_directory: An explicit path to the root data directory. Required; the previous fallback to the
+            active system configuration's root directory was removed when the system configuration moved out of
+            this package and into the acquisition runtime package (sl-experiment).
 
     Returns:
         A tuple of the resolved Path and an error dict. Exactly one element is non-None.
     """
-    if root_directory is not None:
-        path = Path(root_directory)
-        if not path.exists():
-            return None, error_response(message=f"Root directory does not exist: {path}")
-        if not path.is_dir():
-            return None, error_response(message=f"Root directory is not a directory: {path}")
-        return path, None
-    try:
-        system_configuration = get_system_configuration_data()
-    except (FileNotFoundError, OSError, ValueError) as exception:
-        return None, error_response(message=f"Unable to resolve root directory from system configuration: {exception}")
-    return system_configuration.filesystem.root_directory, None
+    if root_directory is None:
+        return None, error_response(
+            message=(
+                "Unable to resolve the root data directory. The 'root_directory' argument is now required — the "
+                "active system configuration no longer lives in this package, so it cannot be auto-resolved here. "
+                "Pass the root directory explicitly, or query it from the acquisition runtime's own MCP/CLI."
+            ),
+        )
+    path = Path(root_directory)
+    if not path.exists():
+        return None, error_response(message=f"Root directory does not exist: {path}")
+    if not path.is_dir():
+        return None, error_response(message=f"Root directory is not a directory: {path}")
+    return path, None
 
 
 def session_root_from_marker(marker: Path) -> Path:

@@ -9,37 +9,27 @@ import platformdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
 from .vr_configuration import TriggerType, TaskTemplate
-from .server_configuration import ServerConfiguration
-from .mesoscope_configuration import MesoscopeSystemConfiguration, MesoscopeExperimentConfiguration
+from .mesoscope_configuration import MesoscopeExperimentConfiguration
 from .experiment_configuration import GasPuffTrial, ExperimentState, WaterRewardTrial
 
 
 class AcquisitionSystems(StrEnum):
-    """Defines the data acquisition systems currently supported by the Sollertia platform."""
+    """Defines the data acquisition systems currently supported by the Sollertia platform.
+
+    Each acquisition runtime package owns its own system configuration classes; this enum remains the shared
+    vocabulary that identifies which runtime a session or dataset was acquired on.
+    """
 
     MESOSCOPE_VR = "mesoscope"
     """Uses the 2-Photon Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game
     engine to conduct experiments."""
 
 
-type SystemConfiguration = MesoscopeSystemConfiguration
-"""Type alias for system configuration classes. Extend this union when adding new acquisition systems."""
-
 type ExperimentConfigFactory = Callable[
     [TaskTemplate, str, dict[str, WaterRewardTrial | GasPuffTrial], float],
     MesoscopeExperimentConfiguration,
 ]
 """Type alias for experiment configuration factory functions."""
-
-_SYSTEM_CONFIG_CLASSES: dict[str, type[SystemConfiguration]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeSystemConfiguration,
-}
-"""Maps acquisition system names to their system configuration classes."""
-
-_CONFIG_FILE_TO_CLASS: dict[str, type[SystemConfiguration]] = {
-    f"{system}_system_configuration.yaml": config_class for system, config_class in _SYSTEM_CONFIG_CLASSES.items()
-}
-"""Maps configuration file names to their configuration classes."""
 
 _EXPERIMENT_CONFIG_FACTORIES: dict[str, ExperimentConfigFactory] = {}
 """Maps acquisition system names to their experiment configuration factory functions."""
@@ -113,88 +103,6 @@ def get_working_directory() -> Path:
         console.error(message=message, error=FileNotFoundError)
 
     return working_directory
-
-
-def create_system_configuration_file(system: AcquisitionSystems | str) -> None:
-    """Creates the .YAML configuration file for the requested Sollertia platform data acquisition system and configures
-    the local machine (PC) to use this file for all future acquisition-system-related calls.
-
-    Args:
-        system: The name (type) of the data acquisition system for which to create the configuration file.
-
-    Raises:
-        ValueError: If the requested acquisition system is not supported by the Sollertia platform.
-    """
-    system_str = str(system)
-    if system_str not in _SYSTEM_CONFIG_CLASSES:
-        supported_systems = list(_SYSTEM_CONFIG_CLASSES.keys())
-        message = (
-            f"Unable to generate the system configuration file for the acquisition system '{system}'. The specified "
-            f"acquisition system is not supported (not recognized). Currently, only the following acquisition systems "
-            f"are supported: {', '.join(supported_systems)}."
-        )
-        console.error(message=message, error=ValueError)
-
-    directory = get_working_directory().joinpath("configuration")
-
-    existing_configs = tuple(directory.glob("*_system_configuration.yaml"))
-    for config_file in existing_configs:
-        console.echo(message=f"Removing the existing configuration file {config_file.name}...", level=LogLevel.INFO)
-        config_file.unlink()
-
-    config_class = _SYSTEM_CONFIG_CLASSES[system_str]
-    configuration = config_class()
-    configuration_path = directory.joinpath(f"{system}_system_configuration.yaml")
-    configuration.save(path=configuration_path)
-
-    message = (
-        f"{system} data acquisition system configuration file: Saved to {configuration_path}. Edit the default "
-        f"parameters inside the configuration file to finish configuring the system."
-    )
-    console.echo(message=message, level=LogLevel.SUCCESS)
-    input("Enter anything to continue...")
-
-
-def get_system_configuration_data() -> SystemConfiguration:
-    """Resolves the path to the local data acquisition system configuration file and loads the configuration data as
-    a SystemConfiguration instance.
-
-    Returns:
-        The initialized SystemConfiguration class instance that stores the loaded configuration parameters.
-
-    Raises:
-        FileNotFoundError: If the local Sollertia platform working directory does not contain exactly one data
-            acquisition system configuration file.
-        ValueError: If the discovered configuration file name does not match any supported acquisition system.
-    """
-    directory = get_working_directory().joinpath("configuration")
-
-    config_files = tuple(directory.glob("*_system_configuration.yaml"))
-
-    if len(config_files) != 1:
-        file_names = [config_file.name for config_file in config_files]
-        message = (
-            f"Unable to load the data acquisition system configuration. Expected a single data acquisition system "
-            f"configuration file inside the local Sollertia platform working directory ({directory}), but found "
-            f"{len(config_files)} files ({', '.join(file_names)}). Call the 'sl-configure system' CLI command to "
-            f"reconfigure the host-machine to only contain a single data acquisition system configuration file."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    configuration_file = config_files[0]
-    file_name = configuration_file.name
-
-    if file_name not in _CONFIG_FILE_TO_CLASS:
-        message = (
-            f"Unable to load the data acquisition system configuration file '{file_name}' stored in the local "
-            f"Sollertia platform working directory, as the file name does not match any supported acquisition system. "
-            f"Call the 'sl-configure system' CLI command to reconfigure the host-machine to use a supported "
-            f"configuration file."
-        )
-        console.error(message=message, error=ValueError)
-
-    configuration_class = _CONFIG_FILE_TO_CLASS[file_name]
-    return configuration_class.from_yaml(file_path=configuration_file)
 
 
 def create_experiment_configuration(
@@ -444,66 +352,6 @@ def get_task_templates_directory() -> Path:
         console.error(message=message, error=FileNotFoundError)
 
     return templates_directory
-
-
-def create_server_configuration_file(
-    username: str,
-    password: str,
-    host: str,
-) -> None:
-    """Creates the .YAML configuration file for the Sollertia platform compute server and configures the local machine
-    (PC) to use this file for all future server-related calls.
-
-    Args:
-        username: The username to use for server authentication.
-        password: The password to use for server authentication.
-        host: The hostname or IP address of the server to connect to.
-    """
-    output_directory = get_working_directory().joinpath("configuration")
-    ServerConfiguration(
-        username=username,
-        password=password,
-        host=host,
-    ).to_yaml(file_path=output_directory.joinpath("server_configuration.yaml"))
-    console.echo(message="Server configuration file: Created.", level=LogLevel.SUCCESS)
-
-
-def get_server_configuration() -> ServerConfiguration:
-    """Resolves and returns the Sollertia platform compute server's configuration data as a ServerConfiguration
-    instance.
-
-    Returns:
-        The loaded and validated server configuration data, stored in a ServerConfiguration instance.
-
-    Raises:
-        FileNotFoundError: If the 'server_configuration.yaml' file does not exist in the local Sollertia platform
-            working directory.
-        ValueError: If the loaded server configuration is unconfigured or contains placeholder access credentials.
-    """
-    configuration_directory = get_working_directory().joinpath("configuration")
-
-    config_path = configuration_directory.joinpath("server_configuration.yaml")
-
-    if not config_path.exists():
-        message = (
-            f"Unable to locate the 'server_configuration.yaml' file in the Sollertia platform working directory "
-            f"{config_path}. Call the 'sl-configure server' CLI command to create the server configuration file."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    configuration = ServerConfiguration.from_yaml(file_path=config_path)
-
-    if not all((configuration.username, configuration.password, configuration.host)):
-        message = (
-            "Unable to load the server configuration. The 'server_configuration.yaml' file appears to be unconfigured "
-            "or contains placeholder values for one or more required fields (username, password, host). Call the "
-            "'sl-configure server' CLI command to reconfigure the server access credentials."
-        )
-        console.error(message=message, error=ValueError)
-
-    message = f"Server configuration: Resolved. Using the {configuration.username} account."
-    console.echo(message=message, level=LogLevel.SUCCESS)
-    return configuration
 
 
 def _create_mesoscope_experiment_config(
