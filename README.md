@@ -123,7 +123,6 @@ slsa mcp
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `check_mount_accessibility_tool`                | Verifies that a filesystem path is accessible and writable                                     |
 | `create_experiment_config_tool`                 | Creates an experiment configuration from a task template using sensible defaults               |
 | `create_project_tool`                           | Creates a new project directory and its configuration subdirectory                             |
 | `create_scene_tool`                             | Creates a new Unity scene by copying ExperimentTemplate and optionally adding a task prefab    |
@@ -142,7 +141,7 @@ slsa mcp
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
 | `generate_task_prefab_tool`                     | Generates a Task prefab in Unity from a YAML task template                                     |
-| `get_acquisition_environment_status_tool`       | Reports the status of the working directory, templates directory, and Google credentials       |
+| `get_platform_environment_status_tool`          | Reports the status of the working directory, templates directory, and Google credentials       |
 | `get_batch_session_status_overview_tool`        | Aggregates session lifecycle status across every session under the data root                   |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
 | `get_project_overview_tool`                     | Returns aggregate counts for animals, sessions, experiments, and datasets                      |

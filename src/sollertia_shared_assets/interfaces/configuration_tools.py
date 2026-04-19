@@ -6,7 +6,6 @@ and enumeration tools. All tools register on the shared ``mcp`` instance from ``
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 from pathlib import Path
 
@@ -636,7 +635,7 @@ def get_project_overview_tool(project: str, root_directory: str) -> dict[str, An
 
 
 @mcp.tool()
-def get_acquisition_environment_status_tool() -> dict[str, Any]:
+def get_platform_environment_status_tool() -> dict[str, Any]:
     """Returns a health report for the Sollertia platform configuration components owned by this package.
 
     Combines working directory, templates directory, and Google credentials status into a single report. System
@@ -673,20 +672,6 @@ def get_acquisition_environment_status_tool() -> dict[str, Any]:
 
     overall_ok = all(component.get("ok", False) for component in report.values())
     return ok_response(overall_ok=overall_ok, components=report)
-
-
-@mcp.tool()
-def check_mount_accessibility_tool(path: str) -> dict[str, Any]:
-    """Verifies that a filesystem path is accessible and writable.
-
-    Args:
-        path: The filesystem path to verify.
-
-    Returns:
-        A response dict with ``path``, ``exists``, ``is_mount``, ``writable``, ``ok``, and (when relevant)
-        ``error``.
-    """
-    return ok_response(**_check_path(path=Path(path)))
 
 
 @mcp.tool()
@@ -747,44 +732,3 @@ def list_supported_trigger_types_tool() -> dict[str, Any]:
     entries = [{"value": member.value, "name": member.name} for member in TriggerType]
     return ok_response(trigger_types=entries)
 
-
-def _check_path(path: Path) -> dict[str, Any]:
-    """Returns a status dict for a single filesystem path covering existence, mount status, and writability.
-
-    Args:
-        path: The filesystem path to check.
-
-    Returns:
-        A dict with ``path``, ``exists``, ``is_mount``, ``writable``, and ``ok`` keys describing the path status.
-    """
-    path_str = str(path)
-    # Treats empty or dot-relative paths as unconfigured and short-circuits.
-    if path_str in ("", "."):
-        return {"path": path_str, "configured": False}
-    if not path.exists():
-        return {"path": path_str, "exists": False, "ok": False}
-
-    # Probes mount status and write access by creating and removing a temporary test file.
-    is_mount = path.is_mount()
-    writable = False
-    error: str | None = None
-    try:
-        test_file = path.joinpath(f".mount_test_{uuid.uuid4().hex[:8]}")
-        test_file.write_text("test")
-        test_file.unlink()
-        writable = True
-    except PermissionError:
-        error = "Permission denied"
-    except OSError as os_error:
-        error = str(os_error)
-
-    result: dict[str, Any] = {
-        "path": path_str,
-        "exists": True,
-        "is_mount": is_mount,
-        "writable": writable,
-        "ok": writable,
-    }
-    if error is not None:
-        result["error"] = error
-    return result
