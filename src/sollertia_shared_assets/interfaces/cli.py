@@ -1,4 +1,4 @@
-"""Provides the Command-Line Interface for configuring major components of the Sollertia platform data workflow."""
+"""Provides the Command-Line Interface installed into the Python environment together with the library."""
 
 from __future__ import annotations
 
@@ -24,12 +24,33 @@ _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 """Ensures that displayed Click help messages are formatted according to the lab standard."""
 
 
-@click.group("configure", context_settings=_CONTEXT_SETTINGS)
-def configure() -> None:  # pragma: no cover
+@click.group("slsa", context_settings=_CONTEXT_SETTINGS)
+def slsa_cli() -> None:  # pragma: no cover
+    """Serves as the entry-point for interfacing with all interactive components of the sollertia-shared-assets
+    (SLSA) library.
+    """
+
+
+@slsa_cli.command("mcp", context_settings=_CONTEXT_SETTINGS)
+@click.option(
+    "-t",
+    "--transport",
+    type=click.Choice(["stdio", "sse", "streamable-http"], case_sensitive=False),
+    default="stdio",
+    show_default=True,
+    help="The MCP transport type to use.",
+)
+def run_mcp_server(transport: Literal["stdio", "sse", "streamable-http"]) -> None:  # pragma: no cover
+    """Starts the MCP server for agentic configuration management."""
+    run_server(transport=transport)
+
+
+@slsa_cli.group("configure", context_settings=_CONTEXT_SETTINGS)
+def configure_group() -> None:  # pragma: no cover
     """Configures major components of the Sollertia platform data workflow."""
 
 
-@configure.command("directory", context_settings=_CONTEXT_SETTINGS)
+@configure_group.command("directory", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-d",
     "--directory",
@@ -43,21 +64,7 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     set_working_directory(path=directory)
 
 
-@configure.command("mcp", context_settings=_CONTEXT_SETTINGS)
-@click.option(
-    "-t",
-    "--transport",
-    type=click.Choice(["stdio", "sse", "streamable-http"], case_sensitive=False),
-    default="stdio",
-    show_default=True,
-    help="The MCP transport type to use.",
-)
-def start_mcp_server(transport: Literal["stdio", "sse", "streamable-http"]) -> None:  # pragma: no cover
-    """Starts the MCP server for agentic configuration management."""
-    run_server(transport=transport)
-
-
-@configure.command("google", context_settings=_CONTEXT_SETTINGS)
+@configure_group.command("google", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-c",
     "--credentials",
@@ -70,7 +77,7 @@ def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
     set_google_credentials_path(path=credentials)
 
 
-@configure.command("templates", context_settings=_CONTEXT_SETTINGS)
+@configure_group.command("templates", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-d",
     "--directory",
@@ -83,7 +90,7 @@ def configure_task_templates_directory(directory: Path) -> None:  # pragma: no c
     set_task_templates_directory(path=directory)
 
 
-@configure.command("project", context_settings=_CONTEXT_SETTINGS)
+@configure_group.command("project", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-p",
     "--project",
@@ -105,7 +112,7 @@ def configure_project(project: str, root_directory: Path) -> None:  # pragma: no
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
 
 
-@configure.command("experiment", context_settings=_CONTEXT_SETTINGS)
+@configure_group.command("experiment", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-p",
     "--project",
@@ -186,7 +193,7 @@ def generate_experiment_configuration_file(
     if not project_path.exists():
         message = (
             f"Unable to generate the {experiment} experiment's configuration file: the project '{project}' does not "
-            f"exist under the provided root directory {root_directory}. Use 'sl-configure project' first."
+            f"exist under the provided root directory {root_directory}. Use 'slsa configure project' first."
         )
         console.error(message=message, error=ValueError)
 

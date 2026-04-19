@@ -61,10 +61,9 @@ dependencies = [
 Homepage = "https://github.com/Sun-Lab-NBB/sollertia-shared-assets"
 Documentation = "https://sollertia-shared-assets-api-docs.netlify.app/"
 
-# Exports the CLI for configuring various components of the Sollertia platform data workflow on
-# the host-machine.
+# Exports the CLI for interacting with all interactive components of the sollertia-shared-assets library.
 [project.scripts]
-sl-configure = "sollertia_shared_assets.interfaces.configure:configure"
+slsa = "sollertia_shared_assets.interfaces.cli:slsa_cli"
 
 # Development dependencies (PEP 735). Not published to PyPI.
 [dependency-groups]

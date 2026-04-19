@@ -22,12 +22,12 @@ acquisition ([sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-exp
 ([sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)) independent of each other by providing the
 shared assets both depend on.
 
-The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, datasets, subjects,
-hardware state) and configure data acquisition and processing runtimes. It also provides a CLI (`sl-configure`) for
-platform configuration and an MCP server with tools for agentic configuration management, session and dataset
-operations, and Unity Editor integration. A subset of the MCP tools relay commands to a running Unity Editor instance
-via the McpBridge plugin from [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), enabling
-agents to generate task prefabs, manage scenes, and control Play Mode.
+The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, subjects, hardware
+state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
+configuration and an MCP server with tools for agentic configuration management, session operations, and Unity Editor
+integration. A subset of the MCP tools relay commands to a running Unity Editor instance via the McpBridge plugin from
+[sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), enabling agents to generate task prefabs,
+manage scenes, and control Play Mode.
 
 ___
 
@@ -92,20 +92,18 @@ platform libraries.
 
 ### CLI Commands
 
-This library provides the `sl-configure` CLI that exposes the following commands:
+This library provides the `slsa` CLI that exposes the following commands and command groups:
 
-| Command      | Description                                                          |
-|--------------|----------------------------------------------------------------------|
-| `directory`  | Sets the local Sollertia platform working directory                  |
-| `mcp`        | Starts the MCP server for agentic configuration management           |
-| `system`     | Creates the data acquisition system configuration file               |
-| `google`     | Sets the path to the Google service account credentials file         |
-| `templates`  | Sets the path to the sollertia-unity-tasks task templates directory  |
-| `project`    | Creates a project directory structure for data acquisition           |
-| `experiment` | Creates an experiment configuration from a task template             |
-| `server`     | Creates the remote compute server configuration file                 |
+| Command                 | Description                                                          |
+|-------------------------|----------------------------------------------------------------------|
+| `mcp`                   | Starts the MCP server for agentic configuration management           |
+| `configure directory`   | Sets the local Sollertia platform working directory                  |
+| `configure google`      | Sets the path to the Google service account credentials file         |
+| `configure templates`   | Sets the path to the sollertia-unity-tasks task templates directory  |
+| `configure project`     | Creates a project directory structure for data acquisition           |
+| `configure experiment`  | Creates an experiment configuration from a task template             |
 
-Use `sl-configure --help` or `sl-configure COMMAND --help` for detailed usage information.
+Use `slsa --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage information.
 
 ### MCP Server
 
@@ -118,7 +116,7 @@ workflow components.
 Start the MCP server using the CLI:
 
 ```bash
-sl-configure mcp
+slsa mcp
 ```
 
 #### Available Tools
@@ -126,28 +124,25 @@ sl-configure mcp
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
 | `check_mount_accessibility_tool`                | Verifies that a filesystem path is accessible and writable                                     |
-| `check_system_mounts_tool`                      | Verifies all filesystem paths in the active system configuration                               |
 | `create_experiment_config_tool`                 | Creates an experiment configuration from a task template using sensible defaults               |
 | `create_project_tool`                           | Creates a new project directory and its configuration subdirectory                             |
 | `create_scene_tool`                             | Creates a new Unity scene by copying ExperimentTemplate and optionally adding a task prefab    |
-| `describe_dataset_schema_tool`                  | Returns the schema for DatasetData and its nested DatasetSession                               |
 | `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system              |
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
+| `describe_session_hardware_state_schema_tool`   | Returns the schema for MesoscopeHardwareState                                                  |
 | `describe_surgery_schema_tool`                  | Returns the schema for SurgeryData and its nested subclasses                                   |
-| `describe_system_configuration_schema_tool`     | Returns the schema for the system configuration of a given acquisition system                  |
 | `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, Segment, TrialStructure, and VREnvironment |
 | `discover_animals_tool`                         | Lists animal subdirectories within a project                                                   |
-| `discover_datasets_tool`                        | Recursively discovers all dataset directories under the datasets root                          |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
 | `discover_projects_tool`                        | Lists all projects accessible to the data acquisition system                                   |
-| `discover_session_descriptors_tool`             | Returns the inventory of descriptor, hardware state, and position files in a session           |
+| `discover_session_descriptors_tool`             | Returns the inventory of descriptor, hardware state, and configuration snapshot files          |
 | `discover_sessions_tool`                        | Recursively discovers all sessions under the data root                                         |
 | `discover_subjects_tool`                        | Discovers subjects by scanning project directories on disk                                     |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
 | `generate_task_prefab_tool`                     | Generates a Task prefab in Unity from a YAML task template                                     |
-| `get_acquisition_environment_status_tool`       | Returns a comprehensive health report for the local acquisition environment                    |
+| `get_acquisition_environment_status_tool`       | Reports the status of the working directory, templates directory, and Google credentials       |
 | `get_batch_session_status_overview_tool`        | Aggregates session lifecycle status across every session under the data root                   |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
 | `get_project_overview_tool`                     | Returns aggregate counts for animals, sessions, experiments, and datasets                      |
@@ -160,43 +155,31 @@ sl-configure mcp
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
 | `list_unity_assets_tool`                        | Lists Unity assets of a given type within a search path                                        |
 | `open_scene_tool`                               | Opens a Unity scene in the Editor                                                              |
-| `read_dataset_tool`                             | Loads the DatasetData YAML for a dataset                                                       |
 | `read_experiment_configuration_tool`            | Loads the experiment configuration YAML for a project                                          |
 | `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                     |
-| `read_server_configuration_tool`                | Loads the ServerConfiguration from the working directory with the password masked              |
 | `read_session_data_tool`                        | Loads the SessionData YAML for a session                                                       |
 | `read_session_descriptor_tool`                  | Detects the appropriate descriptor class and loads the descriptor YAML                         |
 | `read_session_experiment_configuration_tool`    | Loads the per-session snapshot of the experiment configuration                                 |
 | `read_session_hardware_state_tool`              | Loads the MesoscopeHardwareState YAML for a session                                            |
-| `read_session_mesoscope_positions_tool`         | Loads the MesoscopePositions YAML for a session                                                |
-| `read_session_system_configuration_tool`        | Loads the per-session snapshot of the system configuration                                     |
-| `read_session_zaber_positions_tool`             | Loads the ZaberPositions YAML for a session                                                    |
 | `read_subject_drugs_tool`                       | Loads the DrugData payload for a subject from the cached SurgeryData YAML                      |
 | `read_subject_implants_tool`                    | Loads the list of ImplantData for a subject from the cached SurgeryData YAML                   |
 | `read_subject_injections_tool`                  | Loads the list of InjectionData for a subject from the cached SurgeryData YAML                 |
+| `read_subject_procedure_tool`                   | Loads the ProcedureData payload for a subject from the cached SurgeryData YAML                 |
 | `read_subject_surgery_tool`                     | Loads the full SurgeryData payload for a subject                                               |
 | `read_subject_tool`                             | Loads SubjectData for a subject from the cached SurgeryData YAML                               |
-| `read_system_configuration_tool`                | Loads the active system configuration from the working directory                               |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                      |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
 | `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                   |
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                  |
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                            |
-| `validate_dataset_tool`                         | Validates a dataset and verifies that all referenced session paths exist                       |
 | `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                       |
 | `validate_prefab_against_template_tool`         | Validates that Unity prefab zone positions match the template configuration                    |
 | `validate_session_tool`                         | Validates that a session has the expected files for its session type                           |
-| `validate_system_configuration_tool`            | Validates the active system configuration and all configured filesystem paths                  |
 | `validate_template_tool`                        | Validates a TaskTemplate against its schema and cross-reference constraints                    |
-| `write_dataset_tool`                            | Creates a new dataset by materializing the dataset hierarchy on disk                           |
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                             |
-| `write_server_configuration_tool`               | Creates or replaces the ServerConfiguration YAML in the working directory                      |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
 | `write_session_hardware_state_tool`             | Creates or replaces the MesoscopeHardwareState YAML for a session                              |
-| `write_session_mesoscope_positions_tool`        | Creates or replaces the MesoscopePositions YAML for a session                                  |
-| `write_session_zaber_positions_tool`            | Creates or replaces the ZaberPositions YAML for a session                                      |
-| `write_system_configuration_tool`               | Creates or replaces a system configuration YAML in the working directory                       |
 | `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                  |
 
 ***Note,*** tools that interact with Unity (`create_scene_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`,
@@ -219,7 +202,7 @@ ___
 See the [API documentation](https://sollertia-shared-assets-api-docs.netlify.app/) for the detailed description of the
 methods and classes exposed by components of this library.
 
-***Note,*** the API documentation includes additional details about the `sl-configure` CLI commands and their
+***Note,*** the API documentation includes additional details about the `slsa` CLI commands and their
 parameters beyond what is covered in the [CLI Commands](#cli-commands) section above.
 
 ___
@@ -283,12 +266,15 @@ in parallel.
 
 ### Adding New Acquisition Systems
 
-The library uses registry patterns to support multiple data acquisition systems. Each system requires configuration
-dataclasses. The following steps outline how to add support for a new acquisition system.
+This library owns the shared vocabulary that identifies acquisition systems (the `AcquisitionSystems` enum) and the
+experiment configuration factory registry used to build per-system experiment configuration dataclasses from a
+`TaskTemplate`. System-level hardware and software configuration classes live in the acquisition runtime package
+(sollertia-experiment), not in this library. The following steps outline how to add support for a new acquisition
+system.
 
 **Step 1: Add the system to the AcquisitionSystems enum**
 
-In `configuration_utilities.py`, add a new entry to the `AcquisitionSystems` enum:
+In `configuration/configuration_utilities.py`, add a new entry to the `AcquisitionSystems` enum:
 
 ```python
 from enum import StrEnum
@@ -297,26 +283,25 @@ class AcquisitionSystems(StrEnum):
     NEW_SYSTEM = "new_system"  # Add new system here
 ```
 
-**Step 2: Create the system configuration module**
+**Step 2: Create the experiment configuration module**
 
-Create a new file (e.g., `new_system_configuration.py`) containing:
+Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing an experiment configuration
+dataclass inheriting from `YamlConfig` that captures the runtime experiment parameters for the new system. Use
+`MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as a reference.
 
-- A system configuration dataclass inheriting from `YamlConfig` with hardware and software settings
-- An experiment configuration dataclass for runtime experiment parameters
-- A `save()` method if custom serialization logic is needed
+**Step 3: Update the factory registry**
 
-**Step 3: Update type aliases and registries**
+In `configuration/configuration_utilities.py`:
 
-In `configuration_utilities.py`:
-
-1. Extend the `SystemConfiguration` type alias to include the new configuration class
-2. Extend the `ExperimentConfigFactory` type alias to include the new experiment configuration class in the return type
-3. Add an entry to `_SYSTEM_CONFIG_CLASSES` mapping the system name to its configuration class
-4. Create an experiment factory function and register it in `_EXPERIMENT_CONFIG_FACTORIES`
+1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class
+2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) that builds the new experiment
+   configuration dataclass from a `TaskTemplate` and the converted trial structures dictionary
+3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key
 
 **Step 4: Update downstream libraries**
 
-Coordinate changes with sollertia-experiment (data acquisition) and sollertia-forgery (data processing) as needed.
+Coordinate changes with sollertia-experiment (which owns the system-level hardware/software configuration classes and
+the acquisition runtime) and sollertia-forgery (data processing) as needed.
 
 ### AI-Assisted Development
 
@@ -325,7 +310,7 @@ Claude Code skills and AI development assets for this project are distributed th
 - [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace: Provides MCP server registration,
   configuration-specific skills for working directory management, system and experiment configuration, session data,
   subject metadata, dataset management, task templates, and MCP environment setup via the **configuration** plugin.
-  Install this plugin to register the `sl-configure mcp` server with compatible MCP clients and make all configuration
+  Install this plugin to register the `slsa mcp` server with compatible MCP clients and make all configuration
   workflow skills available.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace: Provides shared development skills that enforce
   Sun Lab coding conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and

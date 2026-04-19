@@ -89,7 +89,7 @@ def get_working_directory() -> Path:
     if not path_file.exists():
         message = (
             "Unable to resolve the path to the local Sollertia platform working directory, as it has not been set. "
-            "Set the local working directory by using the 'sl-configure directory' CLI command."
+            "Set the local working directory by using the 'slsa configure directory' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -99,7 +99,7 @@ def get_working_directory() -> Path:
     if not working_directory.exists():
         message = (
             "Unable to resolve the path to the local Sollertia platform working directory, as the currently configured "
-            "directory does not exist at the expected path. Set a new working directory by using the 'sl-configure "
+            "directory does not exist at the expected path. Set a new working directory by using the 'slsa configure "
             "directory' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
@@ -271,7 +271,7 @@ def get_google_credentials_path() -> Path:
     if not path_file.exists():
         message = (
             "Unable to resolve the path to the Google account credentials file, as it has not been set. "
-            "Set the Google service account credentials path by using the 'sl-configure google' CLI command."
+            "Set the Google service account credentials path by using the 'slsa configure google' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -282,7 +282,7 @@ def get_google_credentials_path() -> Path:
         message = (
             f"Unable to resolve the path to the Google account credentials file, as the previously configured "
             f"credentials file does not exist at the expected path ({credentials_path}). Set a new credentials path "
-            f"by using the 'sl-configure google' CLI command."
+            f"by using the 'slsa configure google' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -341,7 +341,7 @@ def get_task_templates_directory() -> Path:
     if not path_file.exists():
         message = (
             "Unable to resolve the path to the task templates directory, as it has not been set. "
-            "Set the task templates directory path by using the 'sl-configure templates' CLI command."
+            "Set the task templates directory path by using the 'slsa configure templates' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 
@@ -352,7 +352,7 @@ def get_task_templates_directory() -> Path:
         message = (
             f"Unable to resolve the path to the task templates directory, as the previously configured "
             f"directory does not exist at the expected path ({templates_directory}). Set a new directory path "
-            f"by using the 'sl-configure templates' CLI command."
+            f"by using the 'slsa configure templates' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 

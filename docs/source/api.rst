@@ -17,6 +17,6 @@ Data Storage Assets
 
 Command Line Interfaces
 =======================
-.. click:: sollertia_shared_assets.interfaces.configure:configure
-   :prog: sl-configure
+.. click:: sollertia_shared_assets.interfaces.cli:slsa_cli
+   :prog: slsa
    :nested: full
