@@ -1,5 +1,7 @@
 """Provides assets for storing animal surgery data extracted from the Sollertia platform surgery log."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from ataraxis_data_structures import YamlConfig

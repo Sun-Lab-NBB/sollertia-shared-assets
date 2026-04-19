@@ -1,5 +1,7 @@
 """Provides assets for storing runtime data acquired by data acquisition systems."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from ataraxis_data_structures import YamlConfig
@@ -80,8 +82,8 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
     pause_dispensed_water_volume_ml: float = 0.0
     """The total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_given_water_volume_ml: float = 0.0
-    """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
-    """
+    """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
+    session."""
     preferred_session_water_volume_ml: float = 0.0
     """The volume of water, in milliliters, the animal should be receiving during the session runtime if its
     performance matches experimenter-specified threshold."""
@@ -139,8 +141,8 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
     pause_dispensed_water_volume_ml: float = 0.0
     """The total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_given_water_volume_ml: float = 0.0
-    """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
-    """
+    """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
+    session."""
     preferred_session_water_volume_ml: float = 0.0
     """The volume of water, in milliliters, the animal should be receiving during the session runtime if its
     performance matches experimenter-specified threshold."""
@@ -168,8 +170,8 @@ class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
     pause_dispensed_water_volume_ml: float = 0.0
     """The total water volume, in milliliters, dispensed during the paused (idle) state."""
     experimenter_given_water_volume_ml: float = 0.0
-    """The additional volume of water, in milliliters, administered by the experimenter to the animal after the session.
-    """
+    """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
+    session."""
     preferred_session_water_volume_ml: float = 0.0
     """The volume of water, in milliliters, the animal should be receiving during the session runtime if its
     performance matches experimenter-specified threshold."""

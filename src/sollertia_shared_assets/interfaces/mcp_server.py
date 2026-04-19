@@ -4,22 +4,22 @@ Exposes the canonical MCP tool surface that all sibling Sollertia libraries (sol
 sollertia-unity-tasks, sollertia-forgery, and downstream agents) use to discover, read, write, validate, and
 introspect the configuration and runtime data files defined in this library.
 
-Importing this module triggers tool registration in all tool sub-modules.
+Importing this module triggers tool registration in all tool submodules.
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
+# noinspection PyUnusedImports
 from . import (
-    data_tools,
-    unity_tools,
-    configuration_tools,
+    data_tools,  # noqa: F401 - imported to trigger MCP tool registration.
+    unity_tools,  # noqa: F401 - imported to trigger MCP tool registration.
+    configuration_tools,  # noqa: F401 - imported to trigger MCP tool registration.
 )
 from .mcp_instance import mcp
 
-# References to suppress F811/F401 on the trigger imports above.
-__all__ = ["configuration_tools", "data_tools", "unity_tools"]
+__all__ = ["run_server"]
 
 
 def run_server(transport: Literal["stdio", "sse", "streamable-http"] = "stdio") -> None:

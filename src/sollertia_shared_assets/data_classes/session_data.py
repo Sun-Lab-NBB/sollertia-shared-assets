@@ -2,6 +2,8 @@
 processing machines.
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
 import shutil
 from pathlib import Path
@@ -24,13 +26,11 @@ class SessionTypes(StrEnum):
     RUN_TRAINING = "run training"
     """Teaches animals to run on the treadmill while being head-fixed on the Mesoscope-VR system."""
     MESOSCOPE_EXPERIMENT = "mesoscope experiment"
-    """Runs virtual reality tasks using Unity game engine and collects brain activity data using the 2-Photon Random
-    Access Mesoscope (2P-RAM).
-    """
+    """Runs virtual reality tasks using Unity game engine and collects brain activity data using the 2-Photon
+    Random Access Mesoscope (2P-RAM)."""
     WINDOW_CHECKING = "window checking"
     """Evaluates the quality of the cranial window implantation procedure and the suitability of the animal for
-    experiment sessions using the Mesoscope.
-    """
+    experiment sessions using the Mesoscope."""
 
 
 @dataclass
@@ -60,9 +60,8 @@ class SessionData(YamlConfig):
     acquisition_system: str | AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR
     """The name of the data acquisition system used to acquire the session's data."""
     experiment_name: str | None = None
-    """The name of the experiment performed during the session or Null (None), if the session is not an experiment
-    session.
-    """
+    """The name of the experiment performed during the session or Null (None), if the session is not an
+    experiment session."""
     python_version: str = "3.14.4"
     """The Python version used to acquire session's data."""
     sollertia_experiment_version: str = "5.0.0"

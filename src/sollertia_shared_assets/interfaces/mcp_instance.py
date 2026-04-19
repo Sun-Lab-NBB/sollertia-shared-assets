@@ -47,8 +47,8 @@ DESCRIPTOR_REGISTRY: dict[SessionTypes, tuple[str, type[YamlConfig]]] = {
 }
 """Maps each session type to its canonical descriptor filename and dataclass."""
 
-# Initializes the MCP server with JSON response mode for structured output.
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
+"""The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
 
 
 def ok_response(**payload: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -180,7 +180,7 @@ def write_yaml_validated(
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
     # Writes the payload to a temporary sibling file and validates by round-tripping through the dataclass.
-    # Keeps the temp file ending in .yaml because YamlConfig.from_yaml rejects non-.yaml paths.
+    # Keeps the temp file ending in .yaml because YamlConfig.from_yaml() rejects non-.yaml paths.
     temp_path = file_path.with_name(f".{file_path.stem}.{uuid.uuid4().hex[:8]}.tmp.yaml")
 
     try:

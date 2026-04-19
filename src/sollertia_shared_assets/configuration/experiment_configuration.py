@@ -5,6 +5,8 @@ the specific data acquisition system. These classes serve as the foundation for 
 configurations.
 """
 
+from __future__ import annotations
+
 from dataclasses import field, dataclass
 
 from ataraxis_base_utilities import console

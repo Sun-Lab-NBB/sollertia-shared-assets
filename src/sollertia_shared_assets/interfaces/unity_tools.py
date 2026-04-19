@@ -210,8 +210,10 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.URLError:
         return error_response(
-            message="Unity Editor is not reachable. Ensure the Editor is open with the McpBridge plugin loaded "
-            f"and listening on {_UNITY_BRIDGE_URL}."
+            message=(
+                f"Unity Editor is not reachable. Ensure the Editor is open with the McpBridge plugin loaded "
+                f"and listening on {_UNITY_BRIDGE_URL}."
+            ),
         )
     except json.JSONDecodeError:
         return error_response(message="Unity bridge returned invalid JSON.")

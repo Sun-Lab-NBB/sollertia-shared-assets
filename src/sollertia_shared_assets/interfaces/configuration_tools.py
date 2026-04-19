@@ -71,7 +71,7 @@ def discover_experiments_tool(
     experiment summaries.
 
     Args:
-        root_directory: Override for the root data directory.
+        root_directory: The absolute path to the root data directory to scan.
         project: When provided, restricts the search to a single project.
 
     Returns:
@@ -450,7 +450,7 @@ def set_task_templates_directory_tool(directory: str) -> dict[str, Any]:
     """Sets the path to the sollertia-unity-tasks task templates directory.
 
     Args:
-        directory: The absolute path to the templates' directory.
+        directory: The absolute path to the templates directory.
 
     Returns:
         A response dict with ``task_templates_directory`` containing the configured path.
@@ -759,7 +759,7 @@ def _check_path(path: Path) -> dict[str, Any]:
     """
     path_str = str(path)
     # Treats empty or dot-relative paths as unconfigured and short-circuits.
-    if not path or path_str in ("", "."):
+    if path_str in ("", "."):
         return {"path": path_str, "configured": False}
     if not path.exists():
         return {"path": path_str, "exists": False, "ok": False}

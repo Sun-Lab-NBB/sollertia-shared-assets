@@ -508,7 +508,6 @@ def test_experiment_config_derives_trial_fields() -> None:
     assert config.trial_structures["trial1"].trial_length_cm == 175.0
 
 
-
 # Tests for MesoscopeExperimentConfiguration
 
 
@@ -820,7 +819,6 @@ def test_get_google_credentials_path_raises_error_if_file_missing(
 
     with pytest.raises(FileNotFoundError, match=r"previously configured"):
         get_google_credentials_path()
-
 
 
 # Tests for Cue validation

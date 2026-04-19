@@ -69,8 +69,8 @@ def discover_projects_tool(root_directory: str | None = None) -> dict[str, Any]:
     aggregate counts (animals and experiment configurations).
 
     Args:
-        root_directory: Override for the root data directory. When omitted, the active system configuration's
-            ``filesystem.root_directory`` is used.
+        root_directory: The absolute path to the root data directory to scan. Required — the
+            system-configuration-based fallback has moved to the acquisition runtime package.
 
     Returns:
         A response dict with ``projects`` (list of project summary dicts) and ``total_projects``.
@@ -106,7 +106,7 @@ def discover_animals_tool(project: str, root_directory: str | None = None) -> di
 
     Args:
         project: The name of the project to enumerate animals for.
-        root_directory: Override for the root data directory.
+        root_directory: The absolute path to the root data directory to scan.
 
     Returns:
         A response dict with ``animals`` (list of animal summary dicts), ``total_animals``, and ``project``.
@@ -142,7 +142,7 @@ def discover_sessions_tool(
     summaries. The optional ``project``, ``animal_id``, and ``session_type`` filters narrow the search.
 
     Args:
-        root_directory: Override for the root data directory.
+        root_directory: The absolute path to the root data directory to scan.
         project: When provided, only sessions belonging to this project are returned.
         animal_id: When provided, only sessions belonging to this animal are returned.
         session_type: When provided, only sessions of this type are returned. Must be a valid SessionTypes value.
@@ -196,7 +196,8 @@ def discover_sessions_tool(
 
 @mcp.tool()
 def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
-    """Returns the inventory of descriptor, hardware state, and position files present in a session's raw_data.
+    """Returns the inventory of descriptor, hardware state, and configuration snapshot files present in a
+    session's raw_data directory.
 
     Args:
         session_path: Path to the session root directory (containing the ``raw_data`` subdirectory).
@@ -503,6 +504,29 @@ def read_subject_drugs_tool(subject_id: str, project: str | None = None) -> dict
 
 
 @mcp.tool()
+def read_subject_procedure_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
+    """Loads the ProcedureData payload for a subject from the cached SurgeryData YAML.
+
+    Args:
+        subject_id: The unique identifier of the subject.
+        project: Optional project hint to scope the surgery cache lookup.
+
+    Returns:
+        A response dict with ``data`` containing the ProcedureData payload and ``surgery_data_path``.
+    """
+    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
+    if error is not None:
+        return error
+    response = read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
+    if not response.get("success"):
+        return response
+    procedure = response.get("data", {}).get("procedure") if isinstance(response.get("data"), dict) else None
+    if procedure is None:
+        return error_response(message=f"SurgeryData at {surgery_path} does not contain a procedure section")
+    return ok_response(data=procedure, surgery_data_path=str(surgery_path))
+
+
+@mcp.tool()
 def write_session_descriptor_tool(
     session_path: str,
     descriptor_payload: dict[str, Any],
@@ -685,7 +709,7 @@ def get_batch_session_status_overview_tool(root_directory: str | None = None) ->
     """Aggregates session lifecycle status across every session under the data root.
 
     Args:
-        root_directory: Override for the root data directory.
+        root_directory: The absolute path to the root data directory to scan.
 
     Returns:
         A response dict with ``counts`` (per-status counts), ``sessions`` (per-session status entries),
@@ -750,6 +774,20 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
         session_type=session_type_enum.value,
         descriptor_filename=canonical_filename,
         schema=describe_dataclass(cls=descriptor_class),
+    )
+
+
+@mcp.tool()
+def describe_session_hardware_state_schema_tool() -> dict[str, Any]:
+    """Returns the schema for MesoscopeHardwareState.
+
+    Returns:
+        A response dict with ``hardware_state_filename`` and ``schema`` (the MesoscopeHardwareState dataclass
+        schema describing every hardware parameter field and its default).
+    """
+    return ok_response(
+        hardware_state_filename=_HARDWARE_STATE_FILENAME,
+        schema=describe_dataclass(cls=MesoscopeHardwareState),
     )
 
 
@@ -900,7 +938,7 @@ def _resolve_surgery_path(
         working_directory = get_working_directory()
         candidate_paths.extend(working_directory.joinpath("surgery_data", filename) for filename in candidate_filenames)
         candidate_paths.extend(working_directory.joinpath(filename) for filename in candidate_filenames)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         pass
 
     if root_directory is not None:

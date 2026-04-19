@@ -6,13 +6,15 @@ its nested dataclasses) have been moved to the ``sl-experiment`` package since t
 consumer.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
-from .vr_configuration import Cue, Segment, VREnvironment  # noqa: TC001 (used in dataclass fields)
-from .experiment_configuration import (  # noqa: TC001 (used in dataclass fields)
+from .vr_configuration import Cue, Segment, VREnvironment  # noqa: TC001 - YamlConfig resolves these at runtime.
+from .experiment_configuration import (  # noqa: TC001 - YamlConfig resolves these at runtime.
     GasPuffTrial,
     ExperimentState,
     WaterRewardTrial,

@@ -5,6 +5,8 @@ System-agnostic and system-specific configuration classes in this library inheri
 experiment-specific parameters.
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
 from dataclasses import dataclass
 

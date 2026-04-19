@@ -20,16 +20,16 @@ from ..configuration import (
     populate_default_experiment_states,
 )
 
-CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
+_CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 """Ensures that displayed Click help messages are formatted according to the lab standard."""
 
 
-@click.group("configure", context_settings=CONTEXT_SETTINGS)
+@click.group("configure", context_settings=_CONTEXT_SETTINGS)
 def configure() -> None:  # pragma: no cover
     """Configures major components of the Sollertia platform data workflow."""
 
 
-@configure.command("directory", context_settings=CONTEXT_SETTINGS)
+@configure.command("directory", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-d",
     "--directory",
@@ -43,7 +43,7 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     set_working_directory(path=directory)
 
 
-@configure.command("mcp", context_settings=CONTEXT_SETTINGS)
+@configure.command("mcp", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-t",
     "--transport",
@@ -57,7 +57,7 @@ def start_mcp_server(transport: Literal["stdio", "sse", "streamable-http"]) -> N
     run_server(transport=transport)
 
 
-@configure.command("google", context_settings=CONTEXT_SETTINGS)
+@configure.command("google", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-c",
     "--credentials",
@@ -70,7 +70,7 @@ def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
     set_google_credentials_path(path=credentials)
 
 
-@configure.command("templates", context_settings=CONTEXT_SETTINGS)
+@configure.command("templates", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-d",
     "--directory",
@@ -83,7 +83,7 @@ def configure_task_templates_directory(directory: Path) -> None:  # pragma: no c
     set_task_templates_directory(path=directory)
 
 
-@configure.command("project", context_settings=CONTEXT_SETTINGS)
+@configure.command("project", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-p",
     "--project",
@@ -105,7 +105,7 @@ def configure_project(project: str, root_directory: Path) -> None:  # pragma: no
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
 
 
-@configure.command("experiment", context_settings=CONTEXT_SETTINGS)
+@configure.command("experiment", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-p",
     "--project",
