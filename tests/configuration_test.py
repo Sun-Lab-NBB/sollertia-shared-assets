@@ -1,10 +1,15 @@
 """Contains tests for classes and methods provided by the configuration module."""
 
+from __future__ import annotations
+
 import shutil
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import platformdirs
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from sollertia_shared_assets.configuration import (
     Cue,
@@ -29,160 +34,12 @@ from sollertia_shared_assets.configuration import (
 )
 
 
-@pytest.fixture
-def sample_experiment_config() -> MesoscopeExperimentConfiguration:
-    """Creates a sample MesoscopeExperimentConfiguration for testing."""
-    state = ExperimentState(
-        experiment_state_code=1,
-        system_state_code=0,
-        state_duration_s=600.0,
-        supports_trials=True,
-        reinforcing_initial_guided_trials=10,
-        reinforcing_recovery_failed_threshold=5,
-        reinforcing_recovery_guided_trials=3,
-    )
-
-    # Cues: A->50, B->75, C->50 = 175 total for Segment_abc
-    cues = [
-        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
-        Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
-        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
-    ]
-
-    segments = [
-        Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None),
-    ]
-
-    # Trial references the segment - cue_sequence and trial_length_cm are derived
-    trial = WaterRewardTrial(
-        segment_name="Segment_abc",
-        stimulus_trigger_zone_start_cm=150.0,
-        stimulus_trigger_zone_end_cm=175.0,
-        stimulus_location_cm=160.0,
-        show_stimulus_collision_boundary=False,
-    )
-
-    return MesoscopeExperimentConfiguration(
-        cues=cues,
-        segments=segments,
-        trial_structures={"trial1": trial},
-        experiment_states={"state1": state},
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-        ),
-        unity_scene_name="TestScene",
-        cue_offset_cm=10.0,
-    )
-
-
-@pytest.fixture
-def clean_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Sets up a clean temporary working directory for testing."""
-    # Patches platformdirs to use temporary directory
-    app_dir = tmp_path / "app_data"
-    app_dir.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    working_dir = tmp_path / "working_directory"
-    working_dir.mkdir()
-
-    return working_dir
-
-
-# Tests for AcquisitionSystems enumeration
-
-
-def test_acquisition_systems_mesoscope_vr() -> None:
-    """Verifies the MESOSCOPE_VR acquisition system enumeration value.
-
-    This test ensures the enumeration contains the expected string value.
-    """
-    assert AcquisitionSystems.MESOSCOPE_VR == "mesoscope"
-    assert str(AcquisitionSystems.MESOSCOPE_VR) == "mesoscope"
-
-
-def test_acquisition_systems_is_string_enum() -> None:
-    """Verifies that AcquisitionSystems inherits from StrEnum.
-
-    This test ensures the enumeration members behave as strings.
-    """
-    assert isinstance(AcquisitionSystems.MESOSCOPE_VR, str)
-
-
-# Tests for ExperimentState dataclass
-
-
-def test_mesoscope_experiment_state_initialization() -> None:
-    """Verifies basic initialization of ExperimentState.
-
-    This test ensures all fields are properly assigned during initialization.
-    """
-    state = ExperimentState(
-        experiment_state_code=1,
-        system_state_code=0,
-        state_duration_s=600.0,
-        supports_trials=True,
-        reinforcing_initial_guided_trials=10,
-        reinforcing_recovery_failed_threshold=5,
-        reinforcing_recovery_guided_trials=3,
-        aversive_initial_guided_trials=5,
-        aversive_recovery_failed_threshold=3,
-        aversive_recovery_guided_trials=2,
-    )
-
-    assert state.experiment_state_code == 1
-    assert state.system_state_code == 0
-    assert state.state_duration_s == 600.0
-    assert state.supports_trials is True
-    assert state.reinforcing_initial_guided_trials == 10
-    assert state.reinforcing_recovery_failed_threshold == 5
-    assert state.reinforcing_recovery_guided_trials == 3
-    assert state.aversive_initial_guided_trials == 5
-    assert state.aversive_recovery_failed_threshold == 3
-    assert state.aversive_recovery_guided_trials == 2
-
-
-def test_mesoscope_experiment_state_types() -> None:
-    """Verifies the data types of ExperimentState fields.
-
-    This test ensures each field has the expected type.
-    """
-    state = ExperimentState(
-        experiment_state_code=1,
-        system_state_code=0,
-        state_duration_s=600.0,
-        supports_trials=True,
-        reinforcing_initial_guided_trials=10,
-        reinforcing_recovery_failed_threshold=5,
-        reinforcing_recovery_guided_trials=3,
-    )
-
-    assert isinstance(state.experiment_state_code, int)
-    assert isinstance(state.system_state_code, int)
-    assert isinstance(state.state_duration_s, float)
-    assert isinstance(state.supports_trials, bool)
-    assert isinstance(state.reinforcing_initial_guided_trials, int)
-    assert isinstance(state.reinforcing_recovery_failed_threshold, int)
-    assert isinstance(state.reinforcing_recovery_guided_trials, int)
-    assert isinstance(state.aversive_initial_guided_trials, int)
-    assert isinstance(state.aversive_recovery_failed_threshold, int)
-    assert isinstance(state.aversive_recovery_guided_trials, int)
-
-
-# Tests for Trial dataclasses (WaterRewardTrial, GasPuffTrial)
-#
-# Note: Trials now use segment_name to reference a segment, and cue_sequence/trial_length_cm
-# are derived fields populated by MesoscopeExperimentConfiguration.__post_init__.
-# Zone validation requires trial_length_cm > 0, so zone tests must go through the full config.
-
-
 def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> MesoscopeExperimentConfiguration:
-    """Helper to create a MesoscopeExperimentConfiguration for testing a trial.
+    """Builds a MesoscopeExperimentConfiguration wrapping a single trial with a 200 cm "TestSegment".
 
-    The segment "TestSegment" has cues that sum to 200.0 cm.
+    Trials reference a segment through segment_name; cue_sequence and trial_length_cm are derived fields populated
+    by MesoscopeExperimentConfiguration.__post_init__. Zone validation requires trial_length_cm > 0, so tests that
+    exercise zone validation must go through the full configuration.
     """
     cues = [
         Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
@@ -212,11 +69,108 @@ def _create_test_config_with_trial(trial: WaterRewardTrial | GasPuffTrial) -> Me
     )
 
 
-def test_water_reward_trial_initialization() -> None:
-    """Verifies basic initialization of WaterRewardTrial.
+def _create_base_task_template(
+    cues: list[Cue] | None = None,
+    segments: list[Segment] | None = None,
+    trial_structures: dict[str, TrialStructure] | None = None,
+) -> TaskTemplate:
+    """Builds a TaskTemplate populated with defaults suitable for tests."""
+    if cues is None:
+        cues = [
+            Cue(name="A", code=1, length_cm=50.0),
+            Cue(name="B", code=2, length_cm=50.0),
+        ]
+    if segments is None:
+        segments = [Segment(name="Seg_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
+    if trial_structures is None:
+        trial_structures = {
+            "trial1": TrialStructure(
+                segment_name="Seg_ab",
+                stimulus_trigger_zone_start_cm=80.0,
+                stimulus_trigger_zone_end_cm=100.0,
+                stimulus_location_cm=90.0,
+                show_stimulus_collision_boundary=False,
+                trigger_type=TriggerType.LICK,
+            ),
+        }
+    return TaskTemplate(
+        cues=cues,
+        segments=segments,
+        trial_structures=trial_structures,
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+        ),
+        cue_offset_cm=0.0,
+    )
 
-    This test ensures all fields are properly assigned during initialization.
-    """
+
+def test_acquisition_systems_mesoscope_vr() -> None:
+    """Verifies the MESOSCOPE_VR acquisition system enumeration value."""
+    assert AcquisitionSystems.MESOSCOPE_VR == "mesoscope"
+    assert str(AcquisitionSystems.MESOSCOPE_VR) == "mesoscope"
+
+
+def test_acquisition_systems_is_string_enum() -> None:
+    """Verifies that AcquisitionSystems inherits from StrEnum."""
+    assert isinstance(AcquisitionSystems.MESOSCOPE_VR, str)
+
+
+def test_mesoscope_experiment_state_initialization() -> None:
+    """Verifies basic initialization of ExperimentState."""
+    state = ExperimentState(
+        experiment_state_code=1,
+        system_state_code=0,
+        state_duration_s=600.0,
+        supports_trials=True,
+        reinforcing_initial_guided_trials=10,
+        reinforcing_recovery_failed_threshold=5,
+        reinforcing_recovery_guided_trials=3,
+        aversive_initial_guided_trials=5,
+        aversive_recovery_failed_threshold=3,
+        aversive_recovery_guided_trials=2,
+    )
+
+    assert state.experiment_state_code == 1
+    assert state.system_state_code == 0
+    assert state.state_duration_s == 600.0
+    assert state.supports_trials is True
+    assert state.reinforcing_initial_guided_trials == 10
+    assert state.reinforcing_recovery_failed_threshold == 5
+    assert state.reinforcing_recovery_guided_trials == 3
+    assert state.aversive_initial_guided_trials == 5
+    assert state.aversive_recovery_failed_threshold == 3
+    assert state.aversive_recovery_guided_trials == 2
+
+
+def test_mesoscope_experiment_state_types() -> None:
+    """Verifies the data types of ExperimentState fields."""
+    state = ExperimentState(
+        experiment_state_code=1,
+        system_state_code=0,
+        state_duration_s=600.0,
+        supports_trials=True,
+        reinforcing_initial_guided_trials=10,
+        reinforcing_recovery_failed_threshold=5,
+        reinforcing_recovery_guided_trials=3,
+    )
+
+    assert isinstance(state.experiment_state_code, int)
+    assert isinstance(state.system_state_code, int)
+    assert isinstance(state.state_duration_s, float)
+    assert isinstance(state.supports_trials, bool)
+    assert isinstance(state.reinforcing_initial_guided_trials, int)
+    assert isinstance(state.reinforcing_recovery_failed_threshold, int)
+    assert isinstance(state.reinforcing_recovery_guided_trials, int)
+    assert isinstance(state.aversive_initial_guided_trials, int)
+    assert isinstance(state.aversive_recovery_failed_threshold, int)
+    assert isinstance(state.aversive_recovery_guided_trials, int)
+
+
+def test_water_reward_trial_initialization() -> None:
+    """Verifies basic initialization of WaterRewardTrial."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
@@ -225,13 +179,13 @@ def test_water_reward_trial_initialization() -> None:
         show_stimulus_collision_boundary=False,
     )
 
-    # Creates config to populate derived fields
+    # Builds the configuration so that derived fields are populated.
     config = _create_test_config_with_trial(trial)
     populated_trial = config.trial_structures["test_trial"]
 
     assert populated_trial.segment_name == "TestSegment"
-    assert populated_trial.cue_sequence == [1, 2, 3, 4]  # Derived from segment
-    assert populated_trial.trial_length_cm == 200.0  # Derived from segment (4 * 50.0)
+    assert populated_trial.cue_sequence == [1, 2, 3, 4]
+    assert populated_trial.trial_length_cm == 200.0
     assert populated_trial.stimulus_trigger_zone_start_cm == 180.0
     assert populated_trial.stimulus_trigger_zone_end_cm == 200.0
     assert populated_trial.stimulus_location_cm == 190.0
@@ -241,10 +195,7 @@ def test_water_reward_trial_initialization() -> None:
 
 
 def test_gas_puff_trial_initialization() -> None:
-    """Verifies basic initialization of GasPuffTrial.
-
-    This test ensures all fields are properly assigned during initialization.
-    """
+    """Verifies basic initialization of GasPuffTrial."""
     trial = GasPuffTrial(
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
@@ -253,13 +204,13 @@ def test_gas_puff_trial_initialization() -> None:
         show_stimulus_collision_boundary=False,
     )
 
-    # Creates config to populate derived fields
+    # Builds the configuration so that derived fields are populated.
     config = _create_test_config_with_trial(trial)
     populated_trial = config.trial_structures["test_trial"]
 
     assert populated_trial.segment_name == "TestSegment"
-    assert populated_trial.cue_sequence == [1, 2, 3, 4]  # Derived from segment
-    assert populated_trial.trial_length_cm == 200.0  # Derived from segment (4 * 50.0)
+    assert populated_trial.cue_sequence == [1, 2, 3, 4]
+    assert populated_trial.trial_length_cm == 200.0
     assert populated_trial.stimulus_trigger_zone_start_cm == 180.0
     assert populated_trial.stimulus_trigger_zone_end_cm == 200.0
     assert populated_trial.stimulus_location_cm == 190.0
@@ -269,10 +220,7 @@ def test_gas_puff_trial_initialization() -> None:
 
 
 def test_trial_types() -> None:
-    """Verifies the data types of trial fields.
-
-    This test ensures each field has the expected type for both trial classes.
-    """
+    """Verifies the data types of trial fields for both water and gas puff trials."""
     water_trial = WaterRewardTrial(
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
@@ -281,7 +229,6 @@ def test_trial_types() -> None:
         show_stimulus_collision_boundary=False,
     )
 
-    # Creates config to populate derived fields
     config = _create_test_config_with_trial(water_trial)
     water_trial = config.trial_structures["test_trial"]
 
@@ -304,7 +251,6 @@ def test_trial_types() -> None:
         show_stimulus_collision_boundary=False,
     )
 
-    # Creates config to populate derived fields
     config = _create_test_config_with_trial(gas_trial)
     gas_trial = config.trial_structures["test_trial"]
 
@@ -313,15 +259,12 @@ def test_trial_types() -> None:
     assert isinstance(gas_trial.show_stimulus_collision_boundary, bool)
 
 
-# Tests for Trial validation
-
-
 def test_trial_zone_end_less_than_start() -> None:
     """Verifies that zone_end < zone_start raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=170.0,  # Less than start
+        stimulus_trigger_zone_end_cm=170.0,
         stimulus_location_cm=175.0,
         show_stimulus_collision_boundary=False,
     )
@@ -333,7 +276,7 @@ def test_trial_zone_start_outside_trial_length() -> None:
     """Verifies that zone_start outside trial length raises ValueError during config validation."""
     trial = WaterRewardTrial(
         segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=250.0,  # Outside trial length (200)
+        stimulus_trigger_zone_start_cm=250.0,
         stimulus_trigger_zone_end_cm=260.0,
         stimulus_location_cm=255.0,
         show_stimulus_collision_boundary=False,
@@ -347,7 +290,7 @@ def test_trial_zone_end_outside_trial_length() -> None:
     trial = WaterRewardTrial(
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=250.0,  # Outside trial length (200)
+        stimulus_trigger_zone_end_cm=250.0,
         stimulus_location_cm=190.0,
         show_stimulus_collision_boundary=False,
     )
@@ -361,7 +304,7 @@ def test_trial_stimulus_location_outside_trial_length() -> None:
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=250.0,  # Outside trial length (200)
+        stimulus_location_cm=250.0,
         show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match=r"stimulus_location_cm.*must be within"):
@@ -374,14 +317,11 @@ def test_trial_stimulus_location_precedes_trigger_zone() -> None:
         segment_name="TestSegment",
         stimulus_trigger_zone_start_cm=180.0,
         stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=170.0,  # Before trigger zone start (180)
+        stimulus_location_cm=170.0,
         show_stimulus_collision_boundary=False,
     )
     with pytest.raises(ValueError, match=r"(?s)stimulus_location_cm.*must not precede"):
         _create_test_config_with_trial(trial)
-
-
-# Tests for MesoscopeExperimentConfiguration validation
 
 
 def test_experiment_config_invalid_segment_reference() -> None:
@@ -400,7 +340,7 @@ def test_experiment_config_invalid_segment_reference() -> None:
     segments = [Segment(name="Segment_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
 
     trial = WaterRewardTrial(
-        segment_name="NonexistentSegment",  # Does not exist
+        segment_name="NonexistentSegment",
         stimulus_trigger_zone_start_cm=100.0,
         stimulus_trigger_zone_end_cm=125.0,
         stimulus_location_cm=110.0,
@@ -436,7 +376,7 @@ def test_experiment_config_invalid_cue_in_segment() -> None:
         Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
         Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
     ]
-    # Segment references cue "C" which doesn't exist
+    # Segment references cue "C", which is not defined in the cue list.
     segments = [Segment(name="Segment_abc", cue_sequence=["A", "B", "C"], transition_probabilities=None)]
 
     trial = WaterRewardTrial(
@@ -464,7 +404,7 @@ def test_experiment_config_invalid_cue_in_segment() -> None:
 
 
 def test_experiment_config_derives_trial_fields() -> None:
-    """Verifies that trial cue_sequence and trial_length_cm are derived from segment."""
+    """Verifies that trial cue_sequence and trial_length_cm are derived from the referenced segment."""
     state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
@@ -472,7 +412,7 @@ def test_experiment_config_derives_trial_fields() -> None:
         supports_trials=True,
     )
 
-    # Cues: A->50, B->75, C->50 = 175 total
+    # Defines cues that sum to 175 cm for Segment_abc (50 + 75 + 50).
     cues = [
         Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
         Cue(name="B", code=2, length_cm=75.0, texture="Cue 001 - 4x1.png"),
@@ -503,21 +443,14 @@ def test_experiment_config_derives_trial_fields() -> None:
         cue_offset_cm=10.0,
     )
 
-    # Verify derived fields
     assert config.trial_structures["trial1"].cue_sequence == [1, 2, 3]
     assert config.trial_structures["trial1"].trial_length_cm == 175.0
-
-
-# Tests for MesoscopeExperimentConfiguration
 
 
 def test_mesoscope_experiment_configuration_initialization(
     sample_experiment_config: MesoscopeExperimentConfiguration,
 ) -> None:
-    """Verifies basic initialization of MesoscopeExperimentConfiguration.
-
-    This test ensures all fields are properly assigned during initialization.
-    """
+    """Verifies basic initialization of MesoscopeExperimentConfiguration."""
     assert len(sample_experiment_config.cues) == 3
     assert len(sample_experiment_config.segments) == 1
     assert sample_experiment_config.cue_offset_cm == 10.0
@@ -529,27 +462,21 @@ def test_mesoscope_experiment_configuration_initialization(
 def test_mesoscope_experiment_configuration_nested_structures(
     sample_experiment_config: MesoscopeExperimentConfiguration,
 ) -> None:
-    """Verifies nested dataclass structures in MesoscopeExperimentConfiguration.
-
-    This test ensures nested experiment states and trials are properly initialized.
-    """
+    """Verifies nested dataclass structures in MesoscopeExperimentConfiguration."""
     state = sample_experiment_config.experiment_states["state1"]
     assert isinstance(state, ExperimentState)
     assert state.experiment_state_code == 1
 
     trial = sample_experiment_config.trial_structures["trial1"]
     assert isinstance(trial, WaterRewardTrial)
-    assert trial.cue_sequence == [1, 2, 3]  # Derived from Segment_abc
+    assert trial.cue_sequence == [1, 2, 3]
 
 
 def test_mesoscope_experiment_configuration_yaml_serialization(
     tmp_path: Path,
     sample_experiment_config: MesoscopeExperimentConfiguration,
 ) -> None:
-    """Verifies that MesoscopeExperimentConfiguration can be saved as YAML.
-
-    This test ensures the experiment configuration is properly serialized to YAML.
-    """
+    """Verifies that MesoscopeExperimentConfiguration can be saved as YAML."""
     yaml_path = tmp_path / "experiment_config.yaml"
     sample_experiment_config.to_yaml(file_path=yaml_path)
 
@@ -565,10 +492,7 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(
     tmp_path: Path,
     sample_experiment_config: MesoscopeExperimentConfiguration,
 ) -> None:
-    """Verifies that MesoscopeExperimentConfiguration can be loaded from YAML.
-
-    This test ensures the experiment configuration is properly deserialized from YAML.
-    """
+    """Verifies that MesoscopeExperimentConfiguration can be loaded from YAML."""
     yaml_path = tmp_path / "experiment_config.yaml"
     sample_experiment_config.to_yaml(file_path=yaml_path)
 
@@ -579,21 +503,15 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(
     assert loaded_config.cue_offset_cm == sample_experiment_config.cue_offset_cm
 
 
-# Tests for set_working_directory function
-
-
 def test_set_working_directory_creates_directory(
     clean_working_directory: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that set_working_directory creates the directory if it does not exist.
-
-    This test ensures the function creates missing directories.
-    """
+    """Verifies that set_working_directory creates the directory if it does not exist."""
     new_dir = clean_working_directory.parent / "new_working_dir"
     assert not new_dir.exists()
 
-    # Patches platformdirs to use our test directory
+    # Redirects platformdirs to the isolated test application-data directory.
     app_dir = clean_working_directory.parent / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -603,10 +521,7 @@ def test_set_working_directory_creates_directory(
 
 
 def test_set_working_directory_writes_path_file(clean_working_directory: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that set_working_directory writes the path to the cache file.
-
-    This test ensures the working directory path is cached correctly.
-    """
+    """Verifies that set_working_directory writes the path to the cache file."""
     app_dir = clean_working_directory.parent / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -618,10 +533,7 @@ def test_set_working_directory_writes_path_file(clean_working_directory: Path, m
 
 
 def test_set_working_directory_creates_app_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that set_working_directory creates the app data directory.
-
-    This test ensures the application data directory is created if missing.
-    """
+    """Verifies that set_working_directory creates the application data directory."""
     app_dir = tmp_path / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -637,19 +549,16 @@ def test_set_working_directory_overwrites_existing(
     clean_working_directory: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that set_working_directory overwrites an existing cached path.
-
-    This test ensures the function can update an existing working directory path.
-    """
+    """Verifies that set_working_directory overwrites an existing cached path."""
     app_dir = clean_working_directory.parent / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
-    # Sets first directory
+    # Sets the initial working directory.
     first_dir = clean_working_directory / "first"
     first_dir.mkdir()
     set_working_directory(first_dir)
 
-    # Sets a second directory
+    # Replaces the cached path with a second directory.
     second_dir = clean_working_directory / "second"
     second_dir.mkdir()
     set_working_directory(second_dir)
@@ -658,17 +567,11 @@ def test_set_working_directory_overwrites_existing(
     assert path_file.read_text() == str(second_dir)
 
 
-# Tests for get_working_directory function
-
-
 def test_get_working_directory_returns_cached_path(
     clean_working_directory: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that get_working_directory returns the cached directory path.
-
-    This test ensures the function retrieves the correct cached path.
-    """
+    """Verifies that get_working_directory returns the cached directory path."""
     app_dir = clean_working_directory.parent / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -679,10 +582,7 @@ def test_get_working_directory_returns_cached_path(
 
 
 def test_get_working_directory_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that get_working_directory raises FileNotFoundError if not configured.
-
-    This test ensures the function raises an appropriate error when unconfigured.
-    """
+    """Verifies that get_working_directory raises FileNotFoundError if not configured."""
     app_dir = tmp_path / "empty_app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -694,30 +594,21 @@ def test_get_working_directory_raises_error_if_directory_missing(
     clean_working_directory: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that get_working_directory raises error if cached directory does not exist.
-
-    This test ensures the function detects when the cached path no longer exists.
-    """
+    """Verifies that get_working_directory raises error if the cached directory does not exist."""
     app_dir = clean_working_directory.parent / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
     set_working_directory(clean_working_directory)
 
-    # Deletes the working directory
+    # Removes the cached working directory to simulate an out-of-date cache.
     shutil.rmtree(clean_working_directory)
 
     with pytest.raises(FileNotFoundError, match=r"currently configured"):
         get_working_directory()
 
 
-# Tests for set_google_credentials_path function
-
-
 def test_set_google_credentials_path_creates_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that set_google_credentials_path creates the credentials' cache file.
-
-    This test ensures the credentials' path is properly cached.
-    """
+    """Verifies that set_google_credentials_path creates the credentials cache file."""
     app_dir = tmp_path / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -735,10 +626,7 @@ def test_set_google_credentials_path_raises_error_file_not_exists(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that set_google_credentials_path raises error for non-existent files.
-
-    This test ensures the function validates file existence.
-    """
+    """Verifies that set_google_credentials_path raises error for non-existent files."""
     app_dir = tmp_path / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -752,10 +640,7 @@ def test_set_google_credentials_path_raises_error_wrong_extension(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that set_google_credentials_path raises error for non-JSON files.
-
-    This test ensures the function validates the file extension.
-    """
+    """Verifies that set_google_credentials_path raises error for non-JSON files."""
     app_dir = tmp_path / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -766,14 +651,8 @@ def test_set_google_credentials_path_raises_error_wrong_extension(
         set_google_credentials_path(wrong_extension)
 
 
-# Tests for get_google_credentials_path function
-
-
 def test_get_google_credentials_path_returns_cached_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that get_google_credentials_path returns the cached credentials path.
-
-    This test ensures the function retrieves the correct cached credentials path.
-    """
+    """Verifies that get_google_credentials_path returns the cached credentials path."""
     app_dir = tmp_path / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -787,10 +666,7 @@ def test_get_google_credentials_path_returns_cached_path(tmp_path: Path, monkeyp
 
 
 def test_get_google_credentials_path_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that get_google_credentials_path raises an error if not configured.
-
-    This test ensures the function raises an error when the credentials' path is not set.
-    """
+    """Verifies that get_google_credentials_path raises an error if not configured."""
     app_dir = tmp_path / "empty_app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -802,10 +678,7 @@ def test_get_google_credentials_path_raises_error_if_file_missing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that get_google_credentials_path raises an error if the cached file no longer exists.
-
-    This test ensures the function detects when the cached credentials file is missing.
-    """
+    """Verifies that get_google_credentials_path raises an error if the cached file no longer exists."""
     app_dir = tmp_path / "app_data"
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
 
@@ -814,14 +687,11 @@ def test_get_google_credentials_path_raises_error_if_file_missing(
 
     set_google_credentials_path(credentials_file)
 
-    # Deletes the credentials' file
+    # Removes the cached credentials file to simulate an out-of-date cache.
     credentials_file.unlink()
 
     with pytest.raises(FileNotFoundError, match=r"previously configured"):
         get_google_credentials_path()
-
-
-# Tests for Cue validation
 
 
 def test_cue_code_above_uint8_raises_error() -> None:
@@ -848,9 +718,6 @@ def test_cue_length_negative_raises_error() -> None:
         Cue(name="X", code=1, length_cm=-10.0)
 
 
-# Tests for Segment validation
-
-
 def test_segment_empty_cue_sequence_raises_error() -> None:
     """Verifies that a Segment with an empty cue_sequence raises ValueError."""
     with pytest.raises(ValueError, match=r"must contain at least one cue"):
@@ -875,47 +742,6 @@ def test_segment_none_probabilities() -> None:
     assert segment.transition_probabilities is None
 
 
-# Tests for TaskTemplate validation
-
-
-def _create_base_task_template(
-    cues: list[Cue] | None = None,
-    segments: list[Segment] | None = None,
-    trial_structures: dict[str, TrialStructure] | None = None,
-) -> TaskTemplate:
-    """Helper to create a TaskTemplate with sensible defaults."""
-    if cues is None:
-        cues = [
-            Cue(name="A", code=1, length_cm=50.0),
-            Cue(name="B", code=2, length_cm=50.0),
-        ]
-    if segments is None:
-        segments = [Segment(name="Seg_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
-    if trial_structures is None:
-        trial_structures = {
-            "trial1": TrialStructure(
-                segment_name="Seg_ab",
-                stimulus_trigger_zone_start_cm=80.0,
-                stimulus_trigger_zone_end_cm=100.0,
-                stimulus_location_cm=90.0,
-                show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.LICK,
-            ),
-        }
-    return TaskTemplate(
-        cues=cues,
-        segments=segments,
-        trial_structures=trial_structures,
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-        ),
-        cue_offset_cm=0.0,
-    )
-
-
 def test_task_template_valid_initialization() -> None:
     """Verifies that a valid TaskTemplate initializes without errors."""
     template = _create_base_task_template()
@@ -928,7 +754,7 @@ def test_task_template_duplicate_cue_codes_raises_error() -> None:
     """Verifies that duplicate cue codes raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=1, length_cm=50.0),  # Duplicate code
+        Cue(name="B", code=1, length_cm=50.0),
     ]
     with pytest.raises(ValueError, match=r"duplicate codes"):
         _create_base_task_template(cues=cues)
@@ -938,7 +764,7 @@ def test_task_template_duplicate_cue_names_raises_error() -> None:
     """Verifies that duplicate cue names raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="A", code=2, length_cm=50.0),  # Duplicate name
+        Cue(name="A", code=2, length_cm=50.0),
     ]
     with pytest.raises(ValueError, match=r"duplicate names"):
         _create_base_task_template(cues=cues)
@@ -997,7 +823,7 @@ def test_task_template_zone_end_less_than_start_raises_error() -> None:
         "trial1": TrialStructure(
             segment_name="Seg_ab",
             stimulus_trigger_zone_start_cm=90.0,
-            stimulus_trigger_zone_end_cm=80.0,  # Less than start
+            stimulus_trigger_zone_end_cm=80.0,
             stimulus_location_cm=85.0,
             show_stimulus_collision_boundary=False,
             trigger_type=TriggerType.LICK,
@@ -1012,7 +838,7 @@ def test_task_template_zone_start_outside_segment_raises_error() -> None:
     trial_structures = {
         "trial1": TrialStructure(
             segment_name="Seg_ab",
-            stimulus_trigger_zone_start_cm=150.0,  # Outside segment (100 cm)
+            stimulus_trigger_zone_start_cm=150.0,
             stimulus_trigger_zone_end_cm=160.0,
             stimulus_location_cm=155.0,
             show_stimulus_collision_boundary=False,
@@ -1029,7 +855,7 @@ def test_task_template_zone_end_outside_segment_raises_error() -> None:
         "trial1": TrialStructure(
             segment_name="Seg_ab",
             stimulus_trigger_zone_start_cm=80.0,
-            stimulus_trigger_zone_end_cm=150.0,  # Outside segment (100 cm)
+            stimulus_trigger_zone_end_cm=150.0,
             stimulus_location_cm=90.0,
             show_stimulus_collision_boundary=False,
             trigger_type=TriggerType.LICK,
@@ -1046,7 +872,7 @@ def test_task_template_location_outside_segment_raises_error() -> None:
             segment_name="Seg_ab",
             stimulus_trigger_zone_start_cm=80.0,
             stimulus_trigger_zone_end_cm=100.0,
-            stimulus_location_cm=150.0,  # Outside segment (100 cm)
+            stimulus_location_cm=150.0,
             show_stimulus_collision_boundary=False,
             trigger_type=TriggerType.LICK,
         ),
@@ -1062,7 +888,7 @@ def test_task_template_location_precedes_start_raises_error() -> None:
             segment_name="Seg_ab",
             stimulus_trigger_zone_start_cm=80.0,
             stimulus_trigger_zone_end_cm=100.0,
-            stimulus_location_cm=70.0,  # Before zone start
+            stimulus_location_cm=70.0,
             show_stimulus_collision_boundary=False,
             trigger_type=TriggerType.LICK,
         ),
@@ -1075,26 +901,24 @@ def test_task_template_properties() -> None:
     """Verifies the internal properties of TaskTemplate."""
     template = _create_base_task_template()
 
-    cue_map = template._cue_by_name
+    # Asserts directly on private members to lock in the derived-data contract exercised by __post_init__.
+    cue_map = template._cue_by_name  # noqa: SLF001
     assert "A" in cue_map
     assert "B" in cue_map
     assert cue_map["A"].code == 1
 
-    segment_map = template._segment_by_name
+    segment_map = template._segment_by_name  # noqa: SLF001
     assert "Seg_ab" in segment_map
 
-    length = template._get_segment_length_cm("Seg_ab")
-    assert length == 100.0  # 50 + 50
-
-
-# Tests for MesoscopeExperimentConfiguration duplicate validation
+    length = template._get_segment_length_cm(segment_name="Seg_ab")  # noqa: SLF001
+    assert length == 100.0
 
 
 def test_experiment_config_duplicate_cue_codes_raises_error() -> None:
     """Verifies that duplicate cue codes in MesoscopeExperimentConfiguration raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=1, length_cm=50.0),  # Duplicate code
+        Cue(name="B", code=1, length_cm=50.0),
     ]
     segments = [Segment(name="Seg", cue_sequence=["A", "B"], transition_probabilities=None)]
     trial = WaterRewardTrial(
@@ -1125,7 +949,7 @@ def test_experiment_config_duplicate_cue_names_raises_error() -> None:
     """Verifies that duplicate cue names in MesoscopeExperimentConfiguration raise ValueError."""
     cues = [
         Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="A", code=2, length_cm=50.0),  # Duplicate name
+        Cue(name="A", code=2, length_cm=50.0),
     ]
     segments = [Segment(name="Seg", cue_sequence=["A"], transition_probabilities=None)]
     trial = WaterRewardTrial(
@@ -1152,11 +976,9 @@ def test_experiment_config_duplicate_cue_names_raises_error() -> None:
         )
 
 
-# Tests for BaseTrial.validate_zones trial_length_cm validation
-
-
 def test_trial_validate_zones_zero_length_raises_error() -> None:
     """Verifies that validate_zones raises ValueError when trial_length_cm is zero."""
+    # trial_length_cm defaults to 0.0 until the enclosing configuration's __post_init__ populates it.
     trial = WaterRewardTrial(
         segment_name="Seg",
         stimulus_trigger_zone_start_cm=10.0,
@@ -1164,12 +986,8 @@ def test_trial_validate_zones_zero_length_raises_error() -> None:
         stimulus_location_cm=15.0,
         show_stimulus_collision_boundary=False,
     )
-    # trial_length_cm defaults to 0.0 when not populated by config __post_init__
     with pytest.raises(ValueError, match=r"trial_length_cm must be populated"):
         trial.validate_zones()
-
-
-# Tests for set_task_templates_directory and get_task_templates_directory
 
 
 def test_set_task_templates_directory_creates_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1254,9 +1072,6 @@ def test_get_task_templates_directory_raises_error_if_directory_missing(
         get_task_templates_directory()
 
 
-# Tests for create_experiment_configuration
-
-
 def test_create_experiment_configuration_mesoscope_vr() -> None:
     """Verifies that create_experiment_configuration creates a valid MesoscopeExperimentConfiguration."""
     template = _create_base_task_template()
@@ -1334,9 +1149,6 @@ def test_create_experiment_configuration_invalid_system_raises_error() -> None:
         )
 
 
-# Tests for populate_default_experiment_states
-
-
 def test_populate_default_experiment_states_with_water_reward() -> None:
     """Verifies that populate_default_experiment_states adds states with water reward guidance."""
     config = _create_test_config_with_trial(
@@ -1359,8 +1171,8 @@ def test_populate_default_experiment_states_with_water_reward() -> None:
     assert state_1.experiment_state_code == 1
     assert state_1.state_duration_s == 60
     assert state_1.supports_trials is True
-    assert state_1.reinforcing_initial_guided_trials == 3  # Has water reward trials
-    assert state_1.aversive_initial_guided_trials == 0  # No gas puff trials
+    assert state_1.reinforcing_initial_guided_trials == 3
+    assert state_1.aversive_initial_guided_trials == 0
 
 
 def test_populate_default_experiment_states_with_gas_puff() -> None:
@@ -1378,7 +1190,7 @@ def test_populate_default_experiment_states_with_gas_puff() -> None:
     populate_default_experiment_states(experiment_configuration=config, state_count=2)
 
     state_1 = config.experiment_states["state_1"]
-    assert state_1.reinforcing_initial_guided_trials == 0  # No water reward trials
-    assert state_1.aversive_initial_guided_trials == 3  # Has gas puff trials
+    assert state_1.reinforcing_initial_guided_trials == 0
+    assert state_1.aversive_initial_guided_trials == 3
     assert state_1.aversive_recovery_failed_threshold == 9
     assert state_1.aversive_recovery_guided_trials == 3
