@@ -1,9 +1,5 @@
 """Provides the experiment configuration dataclass used by both the acquisition runtime (sollertia-experiment) and the
 processing pipeline (sollertia-forgery) for the Mesoscope-VR data acquisition system.
-
-The hardware and software system-level configuration classes for Mesoscope-VR (``MesoscopeSystemConfiguration`` and
-its nested dataclasses) have been moved to the ``sl-experiment`` package since the acquisition runtime is their only
-consumer.
 """
 
 from __future__ import annotations

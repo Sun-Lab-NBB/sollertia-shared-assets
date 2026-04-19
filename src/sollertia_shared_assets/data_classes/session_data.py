@@ -96,10 +96,6 @@ class SessionData(YamlConfig):
         Notes:
             To access the data of an already existing session, use the load() method.
 
-            This method does not persist the acquisition system's own configuration snapshot; the acquisition runtime
-            package (e.g., sl-experiment) owns that data and is responsible for writing it into the returned
-            session's raw_data directory after this method returns.
-
         Args:
             project_name: The name of the project for which the session is acquired.
             animal_id: The unique identifier of the animal participating in the session.
