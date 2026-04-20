@@ -731,4 +731,3 @@ def list_supported_trigger_types_tool() -> dict[str, Any]:
     """
     entries = [{"value": member.value, "name": member.name} for member in TriggerType]
     return ok_response(trigger_types=entries)
-
