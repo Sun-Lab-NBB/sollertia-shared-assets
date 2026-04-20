@@ -57,7 +57,7 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
 
     experimenter: str
     """The ID of the experimenter running the session."""
-    mouse_weight_g: float
+    animal_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
     minimum_reward_delay_s: int = 6
     """The minimum delay, in seconds, that can separate the delivery of two consecutive water rewards."""
@@ -99,7 +99,7 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
 
     experimenter: str
     """The ID of the experimenter running the session."""
-    mouse_weight_g: float
+    animal_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
     final_run_speed_threshold_cm_s: float = 1.5
     """The running speed threshold, in centimeters per second, at the end of training."""
@@ -158,7 +158,7 @@ class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
 
     experimenter: str
     """The ID of the experimenter running the session."""
-    mouse_weight_g: float
+    animal_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
     maximum_unconsumed_rewards: int = 1
     """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If
