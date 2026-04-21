@@ -27,9 +27,6 @@ from ..data_classes import (
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
-SESSION_MARKER_FILENAME: str = "session_data.yaml"
-"""Marker filename used to identify session directories during recursive discovery walks."""
-
 DATASET_MARKER_FILENAME: str = "dataset.yaml"
 """Marker filename used to identify dataset directories during recursive discovery walks."""
 

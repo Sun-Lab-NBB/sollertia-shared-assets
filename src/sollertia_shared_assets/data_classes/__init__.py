@@ -8,8 +8,11 @@ from .runtime_data import (
     MesoscopeExperimentDescriptor,
 )
 from .session_data import (
+    Directories,
     SessionData,
+    RawDataFiles,
     SessionTypes,
+    ProcessingTrackers,
 )
 from .surgery_data import (
     DrugData,
@@ -21,6 +24,7 @@ from .surgery_data import (
 )
 
 __all__ = [
+    "Directories",
     "DrugData",
     "ImplantData",
     "InjectionData",
@@ -28,6 +32,8 @@ __all__ = [
     "MesoscopeExperimentDescriptor",
     "MesoscopeHardwareState",
     "ProcedureData",
+    "ProcessingTrackers",
+    "RawDataFiles",
     "RunTrainingDescriptor",
     "SessionData",
     "SessionTypes",
