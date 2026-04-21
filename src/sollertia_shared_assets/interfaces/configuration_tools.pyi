@@ -14,12 +14,12 @@ from .mcp_instance import (
     describe_dataclass as describe_dataclass,
     write_yaml_validated as write_yaml_validated,
     resolve_root_directory as resolve_root_directory,
-    session_root_from_marker as session_root_from_marker,
 )
 from ..data_classes import (
     SessionData as SessionData,
     RawDataFiles as RawDataFiles,
     SessionTypes as SessionTypes,
+    session_root_from_marker as session_root_from_marker,
 )
 from ..configuration import (
     Cue as Cue,

@@ -20,6 +20,12 @@ from .surgery_data import (
     InjectionData as InjectionData,
     ProcedureData as ProcedureData,
 )
+from .session_discovery import (
+    filter_sessions as filter_sessions,
+    iterate_sessions as iterate_sessions,
+    discover_sessions as discover_sessions,
+    session_root_from_marker as session_root_from_marker,
+)
 
 __all__ = [
     "Directories",
@@ -38,4 +44,8 @@ __all__ = [
     "SubjectData",
     "SurgeryData",
     "WindowCheckingDescriptor",
+    "discover_sessions",
+    "filter_sessions",
+    "iterate_sessions",
+    "session_root_from_marker",
 ]

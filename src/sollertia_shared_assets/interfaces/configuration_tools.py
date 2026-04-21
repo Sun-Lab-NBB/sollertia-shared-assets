@@ -25,9 +25,8 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
-    session_root_from_marker,
 )
-from ..data_classes import SessionData, RawDataFiles, SessionTypes
+from ..data_classes import SessionData, RawDataFiles, SessionTypes, session_root_from_marker
 from ..configuration import (
     Cue,
     Segment,

@@ -16,7 +16,6 @@ from .mcp_instance import (
     describe_dataclass as describe_dataclass,
     write_yaml_validated as write_yaml_validated,
     resolve_root_directory as resolve_root_directory,
-    session_root_from_marker as session_root_from_marker,
 )
 from ..data_classes import (
     DrugData as DrugData,
@@ -29,6 +28,8 @@ from ..data_classes import (
     InjectionData as InjectionData,
     ProcedureData as ProcedureData,
     MesoscopeHardwareState as MesoscopeHardwareState,
+    filter_sessions as filter_sessions,
+    session_root_from_marker as session_root_from_marker,
 )
 from ..configuration import (
     MesoscopeExperimentConfiguration as MesoscopeExperimentConfiguration,
@@ -41,7 +42,18 @@ def discover_sessions_tool(
     root_directory: str | None = None,
     project: str | None = None,
     animal_id: str | None = None,
-    session_type: str | None = None,
+    session_types: list[str] | None = None,
+) -> dict[str, Any]: ...
+def filter_sessions_tool(
+    sessions: list[dict[str, Any]],
+    start_date: str | None = None,
+    end_date: str | None = None,
+    include_sessions: list[str] | None = None,
+    exclude_sessions: list[str] | None = None,
+    include_animals: list[str] | None = None,
+    exclude_animals: list[str] | None = None,
+    *,
+    utc_timezone: bool = True,
 ) -> dict[str, Any]: ...
 def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]: ...
 def discover_subjects_tool(root_directory: str, project: str | None = None) -> dict[str, Any]: ...

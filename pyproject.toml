@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "8.0.0rc4"
+version = "8.0.0rc5"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -48,6 +48,9 @@ dependencies = [
     "platformdirs>=4,<5",
     "click>=8,<9",
 
+    # Date parsing (used by session-discovery filter helpers)
+    "python-dateutil>=2,<3",
+
     # Data Processing
     "polars>=1,<2",
     "pyarrow>=23,<24",
@@ -75,6 +78,9 @@ dev = [
 
     # Development Automation
     "ataraxis-automation>=8,<9",
+
+    # Type stubs
+    "types-python-dateutil>=2,<3",
 ]
 
 # Specifies files that should not be included in the source-code distribution but are also not

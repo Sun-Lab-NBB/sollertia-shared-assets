@@ -22,7 +22,6 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
-    session_root_from_marker,
 )
 from ..data_classes import (
     DrugData,
@@ -35,6 +34,8 @@ from ..data_classes import (
     InjectionData,
     ProcedureData,
     MesoscopeHardwareState,
+    filter_sessions,
+    session_root_from_marker,
 )
 from ..configuration import (
     MesoscopeExperimentConfiguration,
@@ -118,35 +119,45 @@ def discover_sessions_tool(
     root_directory: str | None = None,
     project: str | None = None,
     animal_id: str | None = None,
-    session_type: str | None = None,
+    session_types: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Recursively discovers all sessions under the data root.
+    """Recursively discovers all sessions under the data root and classifies eligibility by session type.
 
-    Walks the directory tree looking for ``session_data.yaml`` markers and returns a flat list of session
-    summaries. The optional ``project``, ``animal_id``, and ``session_type`` filters narrow the search.
+    Walks the directory tree looking for ``session_data.yaml`` markers and returns a flat list of
+    session summaries plus a ``session_paths`` list of eligible session roots ready to hand off to
+    downstream batch tools (e.g. forgery's ``prepare_*_batch_tool`` family). The optional ``project``
+    and ``animal_id`` arguments narrow the directory tree that is searched; ``session_types`` acts as
+    an eligibility filter that classifies every discovered session without removing it from the
+    response, so agents can still see ineligible or broken sessions for diagnosis.
 
     Args:
         root_directory: The absolute path to the root data directory to scan.
-        project: When provided, only sessions belonging to this project are returned.
-        animal_id: When provided, only sessions belonging to this animal are returned.
-        session_type: When provided, only sessions of this type are returned. Must be a valid SessionTypes value.
+        project: When provided, narrows the search to the given project subtree. A missing project
+            directory returns an error response.
+        animal_id: When provided (with ``project``), narrows the search to the given animal subtree.
+            Ignored when ``project`` is ``None``.
+        session_types: An optional list of session type strings to classify sessions against. When
+            provided, each session entry includes ``eligible=True`` only if its type is in the list,
+            and ``session_paths`` contains only eligible roots. When omitted, every discovered session
+            is eligible. Must contain only valid ``SessionTypes`` values.
 
     Returns:
-        A response dict with ``sessions`` (list of session summary dicts) and ``total_sessions``.
+        A response dict with ``sessions`` (list of per-session summary dicts each including an
+        ``eligible`` flag), ``session_paths`` (flat list of eligible session root paths),
+        ``total_sessions``, ``total_eligible``, and ``root_directory``.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
 
-    # Validates the optional session_type filter against supported values.
-    if session_type is not None:
+    # Validates the optional session_types eligibility filter against the supported values.
+    types_filter: frozenset[SessionTypes] | None = None
+    if session_types is not None:
         try:
-            session_type_filter: SessionTypes | None = SessionTypes(session_type)
-        except ValueError:
+            types_filter = frozenset(SessionTypes(candidate) for candidate in session_types)
+        except ValueError as exception:
             valid = ", ".join(member.value for member in SessionTypes)
-            return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
-    else:
-        session_type_filter = None
+            return error_response(message=f"Invalid session type in filter: {exception}. Valid values: {valid}")
 
     # Narrows the search root to a specific project and animal when provided.
     search_root = root
@@ -159,23 +170,134 @@ def discover_sessions_tool(
             if not search_root.is_dir():
                 return error_response(message=f"Animal '{animal_id}' not found at {search_root}")
 
-    # Recursively discovers session markers and applies the active filters to each summary.
+    # Recursively discovers session markers and classifies each summary against the eligibility filter.
     markers = sorted(search_root.rglob(RawDataFiles.SESSION_DATA))  # type: ignore[union-attr]
     sessions: list[dict[str, Any]] = []
+    eligible_paths: list[str] = []
     for marker in markers:
         summary = _load_session_summary(marker=marker)
         if "error" in summary:
+            summary["eligible"] = False
             sessions.append(summary)
             continue
-        if project is not None and summary.get("project") != project:
-            continue
-        if animal_id is not None and summary.get("animal") != animal_id:
-            continue
-        if session_type_filter is not None and summary.get("session_type") != session_type_filter.value:
-            continue
+
+        if types_filter is None:
+            eligible = True
+        else:
+            try:
+                eligible = SessionTypes(summary["session_type"]) in types_filter
+            except ValueError:
+                eligible = False
+        summary["eligible"] = eligible
+
+        if eligible:
+            eligible_paths.append(summary["session_path"])
+
         sessions.append(summary)
 
-    return ok_response(sessions=sessions, total_sessions=len(sessions), root_directory=str(root))
+    return ok_response(
+        sessions=sessions,
+        session_paths=eligible_paths,
+        total_sessions=len(sessions),
+        total_eligible=len(eligible_paths),
+        root_directory=str(root),
+    )
+
+
+@mcp.tool()
+def filter_sessions_tool(
+    sessions: list[dict[str, Any]],
+    start_date: str | None = None,
+    end_date: str | None = None,
+    include_sessions: list[str] | None = None,
+    exclude_sessions: list[str] | None = None,
+    include_animals: list[str] | None = None,
+    exclude_animals: list[str] | None = None,
+    *,
+    utc_timezone: bool = True,
+) -> dict[str, Any]:
+    """Filters a list of session entries by date range and inclusion-exclusion criteria.
+
+    Designed for agentic chaining with ``discover_sessions_tool``: accepts the ``sessions`` list from
+    its output and returns a filtered subset with the same structure. Each input entry must contain
+    ``session_name`` and ``animal`` keys (matching the shape produced by ``discover_sessions_tool``).
+    Animal filtering is applied before session filtering and exclusion always takes precedence over
+    inclusion.
+
+    Args:
+        sessions: A list of session entry dictionaries, each containing at least ``session_name`` and
+            ``animal`` keys. Typically, the ``sessions`` list returned by ``discover_sessions_tool``.
+        start_date: Sessions recorded on or after this date are included. Accepts formats like
+            ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``. When ``None``, no start bound is applied.
+        end_date: Sessions recorded on or before this date are included. Date-only values include the
+            entire day. When ``None``, no end bound is applied.
+        include_sessions: Session names to include regardless of the date range, unless overridden by
+            ``exclude_sessions``.
+        exclude_sessions: Session names to exclude from the results. Takes precedence over all other
+            inclusion criteria.
+        include_animals: Animal identifiers to include. When provided, only sessions from these
+            animals are considered.
+        exclude_animals: Animal identifiers to exclude. Takes precedence over ``include_animals``.
+        utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC.
+            When ``False``, uses America/New_York.
+
+    Returns:
+        A response dict with a filtered ``sessions`` list, a ``session_paths`` list of eligible
+        session roots from the filtered subset, and ``total_sessions`` / ``total_eligible`` counts.
+        Structurally identical to ``discover_sessions_tool`` output for downstream chaining. An
+        ``invalid_entries`` key appears when input entries lack the required ``session_name`` /
+        ``animal`` fields.
+    """
+    # Builds a (session_name, animal) tuple set and a reverse map from session name to the original
+    # entry so the filter helper can operate on plain tuples and results can be rehydrated to dicts.
+    session_keys: set[tuple[str, str]] = set()
+    session_map: dict[str, dict[str, Any]] = {}
+    invalid_entries: list[dict[str, Any]] = []
+
+    for entry in sessions:
+        session_name = entry.get("session_name")
+        animal = entry.get("animal")
+
+        if session_name is None or animal is None:
+            invalid_entries.append({**entry, "filter_error": "Missing required 'session_name' or 'animal' field."})
+            continue
+
+        session_keys.add((str(session_name), str(animal)))
+        session_map[str(session_name)] = entry
+
+    filtered = filter_sessions(
+        sessions=session_keys,
+        start_date=start_date,
+        end_date=end_date,
+        include_sessions=set(include_sessions) if include_sessions else None,
+        exclude_sessions=set(exclude_sessions) if exclude_sessions else None,
+        include_animals=set(include_animals) if include_animals else None,
+        exclude_animals=set(exclude_animals) if exclude_animals else None,
+        utc_timezone=utc_timezone,
+    )
+
+    # Rehydrates filtered tuples back to the original entry dictionaries and recomputes session_paths
+    # from the filtered subset.
+    filtered_entries = sorted(
+        (session_map[session_name] for session_name, _ in filtered if session_name in session_map),
+        key=lambda filtered_entry: filtered_entry.get("session_name", ""),
+    )
+
+    eligible_paths = sorted(
+        entry["session_path"] for entry in filtered_entries if entry.get("eligible", True) and "session_path" in entry
+    )
+
+    response: dict[str, Any] = ok_response(
+        sessions=filtered_entries,
+        session_paths=eligible_paths,
+        total_sessions=len(filtered_entries),
+        total_eligible=len(eligible_paths),
+    )
+
+    if invalid_entries:
+        response["invalid_entries"] = invalid_entries
+
+    return response
 
 
 @mcp.tool()

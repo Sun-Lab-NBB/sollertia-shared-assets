@@ -249,19 +249,27 @@ def resolve_root_directory(root_directory: str | None) -> tuple[Path | None, dic
     return path, None
 
 
-def session_root_from_marker(marker: Path) -> Path:
-    """Returns the session root directory given a session_data.yaml marker file.
+def validate_directory(directory: str) -> str | None:
+    """Checks that the given path string refers to an existing directory.
 
-    The marker is expected at ``<session_root>/raw_data/session_data.yaml``, so the session root is two
-    directory levels above the marker.
+    Provides a lightweight alternative to ``resolve_root_directory`` for MCP tool call sites that
+    already have a caller-supplied path and only need a boolean-shaped existence check. Returns ``None``
+    when the path is a valid directory, or a human-readable error string suitable for inclusion in an
+    MCP tool response.
 
     Args:
-        marker: The path to the ``session_data.yaml`` marker file.
+        directory: The absolute path string to validate as an existing directory.
 
     Returns:
-        The session root directory two levels above the marker.
+        ``None`` when the path points to an existing directory, otherwise a human-readable error
+        message.
     """
-    return marker.parents[1]
+    path = Path(directory)
+    if not path.exists():
+        return f"Directory does not exist: {directory}"
+    if not path.is_dir():
+        return f"Path is not a directory: {directory}"
+    return None
 
 
 def safe_iterdir(directory: Path) -> list[Path]:
