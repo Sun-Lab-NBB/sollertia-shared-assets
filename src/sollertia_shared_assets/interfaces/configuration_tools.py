@@ -15,7 +15,6 @@ from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
     DATASET_MARKER_FILENAME,
-    SESSION_MARKER_FILENAME,
     INCOMPLETE_SESSION_MARKER,
     mcp,
     read_yaml,
@@ -28,7 +27,7 @@ from .mcp_instance import (
     resolve_root_directory,
     session_root_from_marker,
 )
-from ..data_classes import SessionData, SessionTypes
+from ..data_classes import SessionData, RawDataFiles, SessionTypes
 from ..configuration import (
     Cue,
     Segment,
@@ -605,7 +604,7 @@ def get_project_overview_tool(project: str, root_directory: str) -> dict[str, An
     # Tallies sessions by type and counts incomplete sessions across the project tree.
     sessions_by_type: dict[str, int] = {member.value: 0 for member in SessionTypes}
     incomplete_count = 0
-    for marker in project_path.rglob(SESSION_MARKER_FILENAME):
+    for marker in project_path.rglob(RawDataFiles.SESSION_DATA):
         try:
             instance = SessionData.load(session_path=session_root_from_marker(marker=marker))
         except Exception:  # noqa: S112 - skip unparseable sessions during best-effort overview.
@@ -686,7 +685,7 @@ def list_supported_session_types_tool() -> dict[str, Any]:
         {
             "value": session_type.value,
             "name": session_type.name,
-            "descriptor_filename": DESCRIPTOR_REGISTRY[session_type][0],
+            "descriptor_filename": RawDataFiles.SESSION_DESCRIPTOR.value,
             "descriptor_class": DESCRIPTOR_REGISTRY[session_type][1].__name__,
         }
         for session_type in SessionTypes

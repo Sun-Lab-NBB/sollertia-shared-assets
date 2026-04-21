@@ -6,8 +6,11 @@ import pytest
 import platformdirs
 
 from sollertia_shared_assets.data_classes import (
+    Directories,
+    RawDataFiles,
     SessionData,
     SessionTypes,
+    ProcessingTrackers,
 )
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
@@ -316,7 +319,9 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy: P
 
 
 def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path) -> None:
-    """Verifies that save() serializes the raw and processed data root paths as YAML scalars."""
+    """Verifies that save() serializes the raw and processed data root paths as YAML scalars and writes to
+    the ``session_data_path`` property.
+    """
     raw_data_path = sample_session_hierarchy / "raw_data"
     raw_data_path.mkdir(parents=True, exist_ok=True)
 
@@ -331,7 +336,8 @@ def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path
     )
     session_data.save()
 
-    content = session_data.raw_data_path.joinpath("session_data.yaml").read_text()
+    assert session_data.session_data_path.exists()
+    content = session_data.session_data_path.read_text()
     assert f"raw_data_path: {raw_data_path.as_posix()}" in content
     assert "processed_data_path: ." in content
 
@@ -443,3 +449,134 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
     )
 
     assert session_data.session_type == SessionTypes.LICK_TRAINING
+
+
+def _make_session(raw: Path, processed: Path) -> SessionData:
+    """Builds a SessionData instance with explicit roots for property tests."""
+    return SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.LICK_TRAINING,
+        python_version="3.11.13",
+        sollertia_experiment_version="3.0.0",
+        raw_data_path=raw,
+        processed_data_path=processed,
+    )
+
+
+def test_session_data_raw_data_file_paths() -> None:
+    """Verifies that every raw-data file property resolves to raw_data_path / <RawDataFiles member>."""
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    assert session.session_data_path == Path("/tmp/raw") / RawDataFiles.SESSION_DATA
+    assert session.session_descriptor_path == Path("/tmp/raw") / RawDataFiles.SESSION_DESCRIPTOR
+    assert session.surgery_metadata_path == Path("/tmp/raw") / RawDataFiles.SURGERY_METADATA
+    assert session.hardware_state_path == Path("/tmp/raw") / RawDataFiles.HARDWARE_STATE
+    assert session.experiment_configuration_path == Path("/tmp/raw") / RawDataFiles.EXPERIMENT_CONFIGURATION
+    assert session.system_configuration_path == Path("/tmp/raw") / RawDataFiles.SYSTEM_CONFIGURATION
+    assert session.checksum_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM
+    assert session.checksum_tracker_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM_TRACKER
+
+
+def test_session_data_raw_data_directory_paths() -> None:
+    """Verifies that raw-data directory properties resolve to raw_data_path / <Directories member>."""
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    assert session.raw_camera_data_path == Path("/tmp/raw") / Directories.CAMERA_DATA
+    assert session.raw_behavior_data_path == Path("/tmp/raw") / Directories.BEHAVIOR_DATA
+    assert session.raw_microcontroller_data_path == Path("/tmp/raw") / Directories.MICROCONTROLLER_DATA
+    assert session.raw_mesoscope_data_path == Path("/tmp/raw") / Directories.MESOSCOPE_DATA
+
+
+def test_session_data_processed_data_directory_paths() -> None:
+    """Verifies that processed-data directory properties resolve to processed_data_path / <Directories>."""
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    assert session.behavior_data_path == Path("/tmp/proc") / Directories.BEHAVIOR_DATA
+    assert session.cindra_data_path == Path("/tmp/proc") / Directories.CINDRA
+    assert session.camera_timestamps_path == Path("/tmp/proc") / Directories.CAMERA_TIMESTAMPS
+    assert session.camera_data_path == Path("/tmp/proc") / Directories.CAMERA_DATA
+    assert session.microcontroller_data_path == Path("/tmp/proc") / Directories.MICROCONTROLLER_DATA
+
+
+def test_directories_enum_disambiguation() -> None:
+    """Verifies that raw-side and processed-side properties sharing a Directories value resolve to
+    distinct paths anchored on the correct parent.
+    """
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    assert session.raw_camera_data_path != session.camera_data_path
+    assert session.raw_behavior_data_path != session.behavior_data_path
+    assert session.raw_microcontroller_data_path != session.microcontroller_data_path
+
+
+def test_session_data_processing_tracker_paths() -> None:
+    """Verifies that each processing-tracker property resolves to the expected subdirectory + filename."""
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    assert session.behavior_tracker_path == session.behavior_data_path / ProcessingTrackers.BEHAVIOR
+    assert session.camera_tracker_path == session.camera_timestamps_path / ProcessingTrackers.CAMERA
+    assert session.video_tracker_path == session.camera_data_path / ProcessingTrackers.VIDEO
+    assert (
+        session.microcontroller_tracker_path == session.microcontroller_data_path / ProcessingTrackers.MICROCONTROLLER
+    )
+    assert (
+        session.cindra_single_recording_tracker_path
+        == session.cindra_data_path / ProcessingTrackers.CINDRA_SINGLE_RECORDING
+    )
+    assert session.cindra_multi_recording_path == session.cindra_data_path / Directories.MULTI_RECORDING
+
+
+def test_session_data_properties_on_default_instance() -> None:
+    """Verifies that properties return valid relative Paths when raw_data_path and processed_data_path are
+    left at their Path() defaults.
+    """
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.LICK_TRAINING,
+        python_version="3.11.13",
+        sollertia_experiment_version="3.0.0",
+    )
+
+    assert session.hardware_state_path == Path(RawDataFiles.HARDWARE_STATE)
+    assert session.behavior_data_path == Path(Directories.BEHAVIOR_DATA)
+    assert (
+        session.cindra_single_recording_tracker_path
+        == Path(Directories.CINDRA) / ProcessingTrackers.CINDRA_SINGLE_RECORDING
+    )
+
+
+def test_session_data_properties_are_pure() -> None:
+    """Verifies that property access returns equal values on repeat calls and does not mutate the instance."""
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    first = session.hardware_state_path
+    second = session.hardware_state_path
+    assert first == second
+
+    # Field set must be unchanged — properties should not materialize into instance state.
+    assert "hardware_state_path" not in vars(session)
+
+
+def test_raw_data_files_enum_is_string_enum() -> None:
+    """Verifies that RawDataFiles members are strings (StrEnum)."""
+    assert isinstance(RawDataFiles.SESSION_DATA, str)
+    assert RawDataFiles.SESSION_DATA == "session_data.yaml"
+    assert RawDataFiles.SESSION_DESCRIPTOR == "session_descriptor.yaml"
+
+
+def test_directories_enum_is_string_enum() -> None:
+    """Verifies that Directories members are strings (StrEnum)."""
+    assert isinstance(Directories.CINDRA, str)
+    assert Directories.CINDRA == "cindra"
+    assert Directories.MULTI_RECORDING == "multi_recording"
+
+
+def test_processing_trackers_enum_is_string_enum() -> None:
+    """Verifies that ProcessingTrackers members are strings (StrEnum)."""
+    assert isinstance(ProcessingTrackers.BEHAVIOR, str)
+    assert ProcessingTrackers.CINDRA_SINGLE_RECORDING == "single_recording_tracker.yaml"
+    assert ProcessingTrackers.VIDEO == "video_processing_tracker.yaml"

@@ -12,7 +12,6 @@ from pathlib import Path
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    SESSION_MARKER_FILENAME,
     INCOMPLETE_SESSION_MARKER,
     mcp,
     read_yaml,
@@ -31,6 +30,7 @@ from ..data_classes import (
     SessionData,
     SubjectData,
     SurgeryData,
+    RawDataFiles,
     SessionTypes,
     InjectionData,
     ProcedureData,
@@ -43,22 +43,6 @@ from ..configuration import (
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
-
-_RAW_DATA_DIR: str = "raw_data"
-"""Subdirectory under each session that holds the raw data and metadata files."""
-
-_PROCESSED_DATA_DIR: str = "processed_data"
-"""Subdirectory under each session that holds processed data on processing machines."""
-
-_HARDWARE_STATE_FILENAME: str = "hardware_state.yaml"
-"""Canonical filename for the per-session MesoscopeHardwareState YAML."""
-
-_SESSION_SYSTEM_CONFIG_FILENAME: str = "system_configuration.yaml"
-"""Canonical filename for the per-session system configuration snapshot. The system configuration classes now live
-in the acquisition runtime package; this file is listed here only to exclude it from descriptor autodetection."""
-
-_SESSION_EXPERIMENT_CONFIG_FILENAME: str = "experiment_configuration.yaml"
-"""Canonical filename for the per-session snapshot of MesoscopeExperimentConfiguration."""
 
 
 @mcp.tool()
@@ -123,7 +107,7 @@ def discover_animals_tool(project: str, root_directory: str | None = None) -> di
     for child in sorted(safe_iterdir(directory=project_path), key=lambda candidate: candidate.name):
         if not child.is_dir() or child.name == CONFIGURATION_DIR:
             continue
-        session_count = len(list(child.glob(f"*/{_RAW_DATA_DIR}/{SESSION_MARKER_FILENAME}")))
+        session_count = len(list(child.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
         animals.append({"animal_id": child.name, "path": str(child), "session_count": session_count})
 
     return ok_response(animals=animals, total_animals=len(animals), project=project)
@@ -176,7 +160,7 @@ def discover_sessions_tool(
                 return error_response(message=f"Animal '{animal_id}' not found at {search_root}")
 
     # Recursively discovers session markers and applies the active filters to each summary.
-    markers = sorted(search_root.rglob(SESSION_MARKER_FILENAME))  # type: ignore[union-attr]
+    markers = sorted(search_root.rglob(RawDataFiles.SESSION_DATA))  # type: ignore[union-attr]
     sessions: list[dict[str, Any]] = []
     for marker in markers:
         summary = _load_session_summary(marker=marker)
@@ -209,28 +193,27 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
     if error is not None:
         return error
 
-    raw_data_dir = session_root.joinpath(_RAW_DATA_DIR)  # type: ignore[union-attr]
+    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
     if not raw_data_dir.is_dir():
         return error_response(message=f"raw_data directory not found at {raw_data_dir}")
 
-    # Maps canonical filenames to human-readable kind labels for classification.
+    # Maps canonical filenames to human-readable kind labels for classification. The session descriptor
+    # always lives at ``session_descriptor.yaml`` regardless of session type; the per-type descriptor
+    # classes in DESCRIPTOR_REGISTRY parse the same file differently based on the session's session_type.
     known_kinds = {
-        SESSION_MARKER_FILENAME: "session_data",
-        _SESSION_SYSTEM_CONFIG_FILENAME: "system_configuration_snapshot",
-        _SESSION_EXPERIMENT_CONFIG_FILENAME: "experiment_configuration_snapshot",
-        _HARDWARE_STATE_FILENAME: "hardware_state",
+        RawDataFiles.SESSION_DATA: "session_data",
+        RawDataFiles.SESSION_DESCRIPTOR: "session_descriptor",
+        RawDataFiles.SURGERY_METADATA: "surgery_metadata",
+        RawDataFiles.SYSTEM_CONFIGURATION: "system_configuration_snapshot",
+        RawDataFiles.EXPERIMENT_CONFIGURATION: "experiment_configuration_snapshot",
+        RawDataFiles.HARDWARE_STATE: "hardware_state",
     }
-    descriptor_filenames = {filename for filename, _ in DESCRIPTOR_REGISTRY.values()}
 
-    # Classifies each YAML file in raw_data by matching against known filenames and the descriptor registry.
+    # Classifies each YAML file in raw_data by matching against known filenames.
     files: list[dict[str, Any]] = []
     for candidate in sorted(raw_data_dir.glob("*.yaml")):
-        if candidate.name in known_kinds:
-            kind = known_kinds[candidate.name]
-        elif candidate.name in descriptor_filenames:
-            kind = "session_descriptor"
-        else:
-            kind = "unknown"
+        # noinspection PyTypeChecker
+        kind = known_kinds.get(candidate.name, "unknown")
         files.append({"name": candidate.name, "path": str(candidate), "kind": kind})
 
     incomplete = raw_data_dir.joinpath(INCOMPLETE_SESSION_MARKER).exists()
@@ -282,7 +265,7 @@ def discover_subjects_tool(root_directory: str, project: str | None = None) -> d
             )
             if project_path.name not in entry["projects"]:
                 entry["projects"].append(project_path.name)
-            entry["session_count"] += len(list(animal_dir.glob(f"*/{_RAW_DATA_DIR}/{SESSION_MARKER_FILENAME}")))
+            entry["session_count"] += len(list(animal_dir.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
             surgery_path, _ = _resolve_surgery_path(
                 subject_id=animal_dir.name,
                 project=project_path.name,
@@ -347,7 +330,7 @@ def read_session_descriptor_tool(session_path: str) -> dict[str, Any]:
         return error_response(
             message=(
                 f"Could not locate a descriptor file for session_type '{session_type.value}' under "
-                f"{session_root}/{_RAW_DATA_DIR}"
+                f"{session_root}/raw_data"
             ),
         )
 
@@ -371,7 +354,7 @@ def read_session_hardware_state_tool(session_path: str) -> dict[str, Any]:
     session_root, error = _resolve_session_root(session_path=session_path)
     if error is not None:
         return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _HARDWARE_STATE_FILENAME)  # type: ignore[union-attr]
+    file_path = session_root.joinpath("raw_data", RawDataFiles.HARDWARE_STATE)  # type: ignore[union-attr]
     return read_yaml(file_path=file_path, validator_cls=MesoscopeHardwareState)
 
 
@@ -390,7 +373,7 @@ def read_session_experiment_configuration_tool(session_path: str) -> dict[str, A
     session_root, error = _resolve_session_root(session_path=session_path)
     if error is not None:
         return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _SESSION_EXPERIMENT_CONFIG_FILENAME)  # type: ignore[union-attr]
+    file_path = session_root.joinpath("raw_data", RawDataFiles.EXPERIMENT_CONFIGURATION)  # type: ignore[union-attr]
     return read_yaml(file_path=file_path, validator_cls=MesoscopeExperimentConfiguration)
 
 
@@ -558,8 +541,8 @@ def write_session_descriptor_tool(
     session_type = (
         session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
     )
-    canonical_filename, descriptor_class = DESCRIPTOR_REGISTRY[session_type]
-    file_path = session_root.joinpath(_RAW_DATA_DIR, canonical_filename)  # type: ignore[union-attr]
+    descriptor_class = DESCRIPTOR_REGISTRY[session_type][1]
+    file_path = session.session_descriptor_path
     response = write_yaml_validated(
         file_path=file_path,
         payload=descriptor_payload,
@@ -592,7 +575,7 @@ def write_session_hardware_state_tool(
     session_root, error = _resolve_session_root(session_path=session_path)
     if error is not None:
         return error
-    file_path = session_root.joinpath(_RAW_DATA_DIR, _HARDWARE_STATE_FILENAME)  # type: ignore[union-attr]
+    file_path = session_root.joinpath("raw_data", RawDataFiles.HARDWARE_STATE)  # type: ignore[union-attr]
     return write_yaml_validated(
         file_path=file_path,
         payload=hardware_state_payload,
@@ -617,7 +600,7 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
 
     issues: list[str] = []
 
-    raw_data_dir = session_root.joinpath(_RAW_DATA_DIR)  # type: ignore[union-attr]
+    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
     if not raw_data_dir.is_dir():
         issues.append(f"Missing raw_data directory: {raw_data_dir}")
         return ok_response(valid=False, issues=issues, session_path=str(session_root))
@@ -644,11 +627,11 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
         issues.append(f"Missing descriptor file for session_type '{session_type.value}'")
 
     if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        experiment_snapshot = raw_data_dir.joinpath(_SESSION_EXPERIMENT_CONFIG_FILENAME)
+        experiment_snapshot = raw_data_dir.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
         if not experiment_snapshot.exists():
             issues.append(f"Missing experiment configuration snapshot: {experiment_snapshot}")
 
-    system_snapshot = raw_data_dir.joinpath(_SESSION_SYSTEM_CONFIG_FILENAME)
+    system_snapshot = raw_data_dir.joinpath(RawDataFiles.SYSTEM_CONFIGURATION)
     if not system_snapshot.exists():
         issues.append(f"Missing system configuration snapshot: {system_snapshot}")
 
@@ -682,11 +665,11 @@ def get_session_status_tool(session_path: str) -> dict[str, Any]:
     session_root, error = _resolve_session_root(session_path=session_path)
     if error is not None:
         return error
-    raw_data_dir = session_root.joinpath(_RAW_DATA_DIR)  # type: ignore[union-attr]
+    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
     if not raw_data_dir.is_dir():
         return error_response(message=f"raw_data directory not found at {raw_data_dir}")
     incomplete = raw_data_dir.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-    processed_data_dir = session_root.joinpath(_PROCESSED_DATA_DIR)  # type: ignore[union-attr]
+    processed_data_dir = session_root.joinpath("processed_data")  # type: ignore[union-attr]
     has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
 
     if incomplete:
@@ -722,7 +705,7 @@ def get_batch_session_status_overview_tool(root_directory: str | None = None) ->
     # Iterates every session marker under the root, deriving lifecycle status for each.
     counts: dict[str, int] = {"incomplete": 0, "acquired": 0, "processed": 0, "error": 0}
     sessions: list[dict[str, Any]] = []
-    for marker in sorted(root.rglob(SESSION_MARKER_FILENAME)):  # type: ignore[union-attr]
+    for marker in sorted(root.rglob(RawDataFiles.SESSION_DATA)):  # type: ignore[union-attr]
         session_root = session_root_from_marker(marker=marker)
         try:
             instance = SessionData.load(session_path=session_root)
@@ -731,7 +714,7 @@ def get_batch_session_status_overview_tool(root_directory: str | None = None) ->
             sessions.append({"session_path": str(session_root), "status": "error", "error": str(exception)})
             continue
         incomplete = instance.raw_data_path.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-        processed_data_dir = session_root.joinpath(_PROCESSED_DATA_DIR)
+        processed_data_dir = session_root.joinpath("processed_data")
         has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
         if incomplete:
             status = "incomplete"
@@ -769,10 +752,10 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
     except ValueError:
         valid = ", ".join(member.value for member in SessionTypes)
         return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
-    canonical_filename, descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
+    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum][1]
     return ok_response(
         session_type=session_type_enum.value,
-        descriptor_filename=canonical_filename,
+        descriptor_filename=RawDataFiles.SESSION_DESCRIPTOR.value,
         schema=describe_dataclass(cls=descriptor_class),
     )
 
@@ -786,7 +769,7 @@ def describe_session_hardware_state_schema_tool() -> dict[str, Any]:
         schema describing every hardware parameter field and its default).
     """
     return ok_response(
-        hardware_state_filename=_HARDWARE_STATE_FILENAME,
+        hardware_state_filename=RawDataFiles.HARDWARE_STATE,
         schema=describe_dataclass(cls=MesoscopeHardwareState),
     )
 
@@ -825,11 +808,11 @@ def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any
     path = Path(session_path)
     if not path.exists():
         return None, error_response(message=f"Session path does not exist: {path}")
-    if path.joinpath(_RAW_DATA_DIR).is_dir():
+    if path.joinpath("raw_data").is_dir():
         return path, None
-    if path.name == _RAW_DATA_DIR and path.is_dir():
+    if path.name == "raw_data" and path.is_dir():
         return path.parent, None
-    return None, error_response(message=f"Could not locate the {_RAW_DATA_DIR} directory under {path}")
+    return None, error_response(message=f"Could not locate the raw_data directory under {path}")
 
 
 def _load_session_summary(marker: Path) -> dict[str, Any]:
@@ -870,42 +853,22 @@ def _find_descriptor_for_session(
     session_root: Path,
     session_type: SessionTypes,
 ) -> tuple[Path | None, type[YamlConfig]]:
-    """Locates the descriptor file for a session, falling back to scanning raw_data when necessary.
+    """Locates the session-embedded descriptor file and its parsing class for a session.
 
-    Tries the canonical descriptor filename first. If that file is not present, scans the session's raw_data
-    directory for any YAML file that successfully loads as the expected descriptor class.
+    The session-embedded descriptor always uses the canonical ``session_descriptor.yaml`` filename regardless
+    of session type; the parsing class is session-type-specific and comes from ``DESCRIPTOR_REGISTRY``.
 
     Args:
         session_root: The session root directory containing the ``raw_data`` subdirectory.
-        session_type: The session type whose descriptor to locate.
+        session_type: The session type whose descriptor class to return.
 
     Returns:
-        A tuple of the resolved descriptor file path (or None when no candidate is found) and the descriptor
-        dataclass type.
+        A tuple of the canonical descriptor file path (or None when the file does not exist) and the
+        descriptor dataclass type matching the session's type.
     """
-    canonical_filename, descriptor_class = DESCRIPTOR_REGISTRY[session_type]
-    raw_data_dir = session_root.joinpath(_RAW_DATA_DIR)
-    canonical_path = raw_data_dir.joinpath(canonical_filename)
-    if canonical_path.exists():
-        return canonical_path, descriptor_class
-
-    # Falls back to scanning raw_data for any YAML that loads as the expected descriptor class.
-    if raw_data_dir.is_dir():
-        for candidate in sorted(raw_data_dir.glob("*.yaml")):
-            if candidate.name in {
-                SESSION_MARKER_FILENAME,
-                _SESSION_SYSTEM_CONFIG_FILENAME,
-                _SESSION_EXPERIMENT_CONFIG_FILENAME,
-                _HARDWARE_STATE_FILENAME,
-            }:
-                continue
-            try:
-                descriptor_class.from_yaml(file_path=candidate)
-            except Exception:  # noqa: S112 - skip unparseable candidates during best-effort discovery.
-                continue
-            return candidate, descriptor_class
-
-    return None, descriptor_class
+    _, descriptor_class = DESCRIPTOR_REGISTRY[session_type]
+    canonical_path = session_root.joinpath("raw_data", RawDataFiles.SESSION_DESCRIPTOR)
+    return canonical_path if canonical_path.exists() else None, descriptor_class
 
 
 def _resolve_surgery_path(

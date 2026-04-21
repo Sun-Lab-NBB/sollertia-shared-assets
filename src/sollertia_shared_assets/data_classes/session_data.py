@@ -16,6 +16,71 @@ from ataraxis_data_structures import YamlConfig
 from ..configuration import AcquisitionSystems
 
 
+class RawDataFiles(StrEnum):
+    """Enumerates the canonical filenames at the root of a session's ``raw_data`` directory."""
+
+    SESSION_DATA = "session_data.yaml"
+    """The session marker YAML serialized from SessionData itself."""
+    SESSION_DESCRIPTOR = "session_descriptor.yaml"
+    """The session-embedded descriptor YAML written by the acquisition runtime. The concrete descriptor class
+    is determined by the session's session_type, but the filename is flat across all session types."""
+    SURGERY_METADATA = "surgery_metadata.yaml"
+    """The per-animal surgery metadata YAML cached into the session's raw_data at acquisition time."""
+    HARDWARE_STATE = "hardware_state.yaml"
+    """The hardware state snapshot YAML written at the start of acquisition."""
+    EXPERIMENT_CONFIGURATION = "experiment_configuration.yaml"
+    """The experiment configuration YAML copied into the session for experiment sessions only."""
+    SYSTEM_CONFIGURATION = "system_configuration.yaml"
+    """The system configuration YAML copied into the session by the acquisition runtime."""
+    CHECKSUM = "ax_checksum.txt"
+    """The ataraxis data integrity checksum for the session's raw_data directory."""
+    CHECKSUM_TRACKER = "checksum_processing_tracker.yaml"
+    """The ProcessingTracker YAML for the checksum verification job."""
+
+
+class Directories(StrEnum):
+    """Enumerates the canonical subdirectory names found under a session's ``raw_data`` or ``processed_data``."""
+
+    BEHAVIOR_DATA = "behavior_data"
+    """Behavior data directory. Contains raw DataLogger NPZ archives under ``raw_data`` and processed
+    behavior feather files under ``processed_data``."""
+    CAMERA_DATA = "camera_data"
+    """Camera data directory. Contains raw video files under ``raw_data`` and video processing pipeline
+    outputs under ``processed_data``."""
+    CAMERA_TIMESTAMPS = "camera_timestamps"
+    """Camera timestamps directory under ``processed_data``; stores the ataraxis-video-system processed camera timestamp
+    feather files."""
+    CINDRA = "cindra"
+    """Cindra output directory under ``processed_data``; root of cindra's single-recording and multi-recording
+    outputs."""
+    MESOSCOPE_DATA = "mesoscope_data"
+    """Persistent mesoscope data directory under ``raw_data``; stores LERC-compressed TIFF stacks and
+    acquisition metadata written by sollertia-experiment's preprocessing."""
+    MICROCONTROLLER_DATA = "microcontroller_data"
+    """Microcontroller data directory. Contains raw microcontroller logs under ``raw_data`` and processed
+    microcontroller event feathers under ``processed_data``."""
+    MULTI_RECORDING = "multi_recording"
+    """Multi-recording subdirectory inside cindra's output directory; each child is a dataset-named directory
+    holding cindra's multi-day analysis output."""
+
+
+class ProcessingTrackers(StrEnum):
+    """Enumerates canonical ProcessingTracker filenames placed inside each pipeline's output directory."""
+
+    BEHAVIOR = "behavior_processing_tracker.yaml"
+    """Tracker for the behavior processing pipeline; lives inside ``processed_data/behavior_data/``."""
+    CAMERA = "camera_processing_tracker.yaml"
+    """Tracker for the ataraxis-video-system camera timestamp processing pipeline; lives inside
+    ``processed_data/camera_timestamps/``."""
+    VIDEO = "video_processing_tracker.yaml"
+    """Tracker for the forthcoming video processing pipeline; lives inside ``processed_data/camera_data/``."""
+    MICROCONTROLLER = "microcontroller_processing_tracker.yaml"
+    """Tracker for the ataraxis-communication-interface microcontroller log processing pipeline; lives inside
+    ``processed_data/microcontroller_data/``."""
+    CINDRA_SINGLE_RECORDING = "single_recording_tracker.yaml"
+    """Tracker for cindra's single-recording pipeline; lives at the root of ``processed_data/cindra/``."""
+
+
 class SessionTypes(StrEnum):
     """Defines the data acquisition session types supported by all data acquisition systems in the Sollertia
     platform.
@@ -78,6 +143,150 @@ class SessionData(YamlConfig):
             self.session_type = SessionTypes(self.session_type)
         if isinstance(self.acquisition_system, str):
             self.acquisition_system = AcquisitionSystems(self.acquisition_system)
+
+    @property
+    def session_data_path(self) -> Path:
+        """Returns the path to the session's ``session_data.yaml`` marker file."""
+        return self.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
+
+    @property
+    def session_descriptor_path(self) -> Path:
+        """Returns the path to the session's ``session_descriptor.yaml`` file."""
+        return self.raw_data_path.joinpath(RawDataFiles.SESSION_DESCRIPTOR)
+
+    @property
+    def surgery_metadata_path(self) -> Path:
+        """Returns the path to the session's ``surgery_metadata.yaml`` file."""
+        return self.raw_data_path.joinpath(RawDataFiles.SURGERY_METADATA)
+
+    @property
+    def hardware_state_path(self) -> Path:
+        """Returns the path to the session's ``hardware_state.yaml`` file."""
+        return self.raw_data_path.joinpath(RawDataFiles.HARDWARE_STATE)
+
+    @property
+    def experiment_configuration_path(self) -> Path:
+        """Returns the path to the session's ``experiment_configuration.yaml`` file.
+
+        Only populated for experiment sessions. Callers should check existence via ``.exists()``.
+        """
+        return self.raw_data_path.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
+
+    @property
+    def system_configuration_path(self) -> Path:
+        """Returns the path to the session's ``system_configuration.yaml`` file."""
+        return self.raw_data_path.joinpath(RawDataFiles.SYSTEM_CONFIGURATION)
+
+    @property
+    def checksum_path(self) -> Path:
+        """Returns the path to the session's ``ax_checksum.txt`` data integrity checksum file."""
+        return self.raw_data_path.joinpath(RawDataFiles.CHECKSUM)
+
+    @property
+    def checksum_tracker_path(self) -> Path:
+        """Returns the path to the session's checksum ProcessingTracker YAML."""
+        return self.raw_data_path.joinpath(RawDataFiles.CHECKSUM_TRACKER)
+
+    @property
+    def raw_camera_data_path(self) -> Path:
+        """Returns the path to the session's ``raw_data/camera_data`` directory holding ataraxis-video-system raw
+        videos.
+        """
+        return self.raw_data_path.joinpath(Directories.CAMERA_DATA)
+
+    @property
+    def raw_behavior_data_path(self) -> Path:
+        """Returns the path to the session's ``raw_data/behavior_data`` directory holding DataLogger NPZ
+        archives for the behavior instance.
+        """
+        return self.raw_data_path.joinpath(Directories.BEHAVIOR_DATA)
+
+    @property
+    def raw_microcontroller_data_path(self) -> Path:
+        """Returns the path to the session's ``raw_data/microcontroller_data`` directory holding raw
+        microcontroller logs.
+        """
+        return self.raw_data_path.joinpath(Directories.MICROCONTROLLER_DATA)
+
+    @property
+    def raw_mesoscope_data_path(self) -> Path:
+        """Returns the path to the session's ``raw_data/mesoscope_data`` directory holding the persistent
+        LERC-compressed TIFF stacks and acquisition metadata.
+        """
+        return self.raw_data_path.joinpath(Directories.MESOSCOPE_DATA)
+
+    @property
+    def behavior_data_path(self) -> Path:
+        """Returns the path to the session's ``processed_data/behavior_data`` directory holding processed
+        behavior feather files.
+        """
+        return self.processed_data_path.joinpath(Directories.BEHAVIOR_DATA)
+
+    @property
+    def cindra_data_path(self) -> Path:
+        """Returns the path to the session's ``processed_data/cindra`` directory; the root of Cindra's
+        single-recording and multi-recording outputs.
+        """
+        return self.processed_data_path.joinpath(Directories.CINDRA)
+
+    @property
+    def camera_timestamps_path(self) -> Path:
+        """Returns the path to the session's ``processed_data/camera_timestamps`` directory holding
+        ataraxis-video-system processed camera timestamp feather files.
+        """
+        return self.processed_data_path.joinpath(Directories.CAMERA_TIMESTAMPS)
+
+    @property
+    def camera_data_path(self) -> Path:
+        """Returns the path to the session's ``processed_data/camera_data`` directory holding video
+        processing pipeline outputs (forthcoming; not yet populated by the current pipeline).
+        """
+        return self.processed_data_path.joinpath(Directories.CAMERA_DATA)
+
+    @property
+    def microcontroller_data_path(self) -> Path:
+        """Returns the path to the session's ``processed_data/microcontroller_data`` directory holding
+        processed microcontroller event feathers.
+        """
+        return self.processed_data_path.joinpath(Directories.MICROCONTROLLER_DATA)
+
+    @property
+    def behavior_tracker_path(self) -> Path:
+        """Returns the path to the behavior processing ProcessingTracker YAML inside ``behavior_data/``."""
+        return self.behavior_data_path.joinpath(ProcessingTrackers.BEHAVIOR)
+
+    @property
+    def camera_tracker_path(self) -> Path:
+        """Returns the path to the ataraxis-video-system camera processing ProcessingTracker YAML inside
+        ``camera_timestamps/``.
+        """
+        return self.camera_timestamps_path.joinpath(ProcessingTrackers.CAMERA)
+
+    @property
+    def video_tracker_path(self) -> Path:
+        """Returns the path to the video processing ProcessingTracker YAML inside ``camera_data/``
+        (forthcoming pipeline; not yet populated).
+        """
+        return self.camera_data_path.joinpath(ProcessingTrackers.VIDEO)
+
+    @property
+    def microcontroller_tracker_path(self) -> Path:
+        """Returns the path to the ataraxis-communication-interface microcontroller processing ProcessingTracker YAML
+        inside ``microcontroller_data/``.
+        """
+        return self.microcontroller_data_path.joinpath(ProcessingTrackers.MICROCONTROLLER)
+
+    @property
+    def cindra_single_recording_tracker_path(self) -> Path:
+        """Returns the path to cindra's single-recording ProcessingTracker YAML at the root of ``cindra/``."""
+        return self.cindra_data_path.joinpath(ProcessingTrackers.CINDRA_SINGLE_RECORDING)
+
+    @property
+    def cindra_multi_recording_path(self) -> Path:
+        """Returns the path to cindra's ``multi_recording`` subdirectory; each child is a dataset-named
+        directory holding cindra's multi-day analysis output.
+        """
+        return self.cindra_data_path.joinpath(Directories.MULTI_RECORDING)
 
     @classmethod
     def create(
@@ -178,7 +387,7 @@ class SessionData(YamlConfig):
             )
             shutil.copy2(
                 src=experiment_configuration_path,
-                dst=instance.raw_data_path.joinpath("experiment_configuration.yaml"),
+                dst=instance.experiment_configuration_path,
             )
 
         # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
@@ -207,7 +416,7 @@ class SessionData(YamlConfig):
         """
         # To properly initialize the SessionData instance, the provided path should contain a single session_data.yaml
         # file at any hierarchy level.
-        session_data_files = list(session_path.rglob("session_data.yaml"))
+        session_data_files = list(session_path.rglob(RawDataFiles.SESSION_DATA))
         if len(session_data_files) != 1:
             message = (
                 f"Unable to load the target session's data. Expected a single session_data.yaml file to be located "
@@ -245,4 +454,4 @@ class SessionData(YamlConfig):
 
     def save(self) -> None:
         """Caches the instance's data to the session's 'raw_data' directory as a 'session_data.yaml' file."""
-        self.to_yaml(file_path=self.raw_data_path.joinpath("session_data.yaml"))
+        self.to_yaml(file_path=self.session_data_path)
