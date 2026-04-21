@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -11,11 +12,32 @@ from dateutil import parser
 from .session_data import SessionData, RawDataFiles
 
 if TYPE_CHECKING:
-    from pathlib import Path
     from collections.abc import Iterable, Iterator
 
 _SESSION_NAME_COMPONENTS: int = 7
 """The number of hyphen-separated components in a valid session name (YYYY-MM-DD-HH-MM-SS-microseconds)."""
+
+
+def validate_directory(directory: str) -> str | None:
+    """Checks that the given path string refers to an existing directory.
+
+    Provides a lightweight existence check for MCP tool and pipeline call sites that already have a
+    caller-supplied path and only need a boolean-shaped verdict. Returns ``None`` when the path is a
+    valid directory, or a human-readable error string suitable for inclusion in an MCP tool response.
+
+    Args:
+        directory: The absolute path string to validate as an existing directory.
+
+    Returns:
+        ``None`` when the path points to an existing directory, otherwise a human-readable error
+        message.
+    """
+    path = Path(directory)
+    if not path.exists():
+        return f"Directory does not exist: {directory}"
+    if not path.is_dir():
+        return f"Path is not a directory: {directory}"
+    return None
 
 
 def iterate_sessions(root_path: Path) -> Iterator[SessionData]:

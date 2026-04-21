@@ -32,6 +32,7 @@ from .data_classes import (
     filter_sessions,
     iterate_sessions,
     discover_sessions,
+    validate_directory,
     session_root_from_marker,
 )
 from .configuration import (
@@ -100,4 +101,5 @@ __all__ = [
     "set_google_credentials_path",
     "set_task_templates_directory",
     "set_working_directory",
+    "validate_directory",
 ]

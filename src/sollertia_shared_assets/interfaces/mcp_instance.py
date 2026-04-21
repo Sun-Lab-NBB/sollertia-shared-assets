@@ -249,29 +249,6 @@ def resolve_root_directory(root_directory: str | None) -> tuple[Path | None, dic
     return path, None
 
 
-def validate_directory(directory: str) -> str | None:
-    """Checks that the given path string refers to an existing directory.
-
-    Provides a lightweight alternative to ``resolve_root_directory`` for MCP tool call sites that
-    already have a caller-supplied path and only need a boolean-shaped existence check. Returns ``None``
-    when the path is a valid directory, or a human-readable error string suitable for inclusion in an
-    MCP tool response.
-
-    Args:
-        directory: The absolute path string to validate as an existing directory.
-
-    Returns:
-        ``None`` when the path points to an existing directory, otherwise a human-readable error
-        message.
-    """
-    path = Path(directory)
-    if not path.exists():
-        return f"Directory does not exist: {directory}"
-    if not path.is_dir():
-        return f"Path is not a directory: {directory}"
-    return None
-
-
 def safe_iterdir(directory: Path) -> list[Path]:
     """Returns immediate non-hidden children of a directory, ignoring permission errors.
 
