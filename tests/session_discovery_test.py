@@ -14,6 +14,7 @@ from sollertia_shared_assets.data_classes import (
     filter_sessions,
     iterate_sessions,
     discover_sessions,
+    validate_directory,
     session_root_from_marker,
 )
 from sollertia_shared_assets.data_classes.session_discovery import (
@@ -64,6 +65,34 @@ def populated_project_tree(tmp_path: Path) -> Path:
     _write_session(root, "proj_a", "2", "2026-03-10-12-00-00-000000", "mesoscope experiment")
     _write_session(root, "proj_b", "3", "2026-03-15-12-00-00-000000", "window checking")
     return root
+
+
+def test_validate_directory_returns_none_for_existing_directory(tmp_path: Path) -> None:
+    """Verifies that validate_directory returns None when the path points to a real directory."""
+    assert validate_directory(directory=str(tmp_path)) is None
+
+
+def test_validate_directory_reports_missing_path(tmp_path: Path) -> None:
+    """Verifies that validate_directory returns a ``does not exist`` error for a missing path."""
+    missing = tmp_path / "does_not_exist"
+
+    result = validate_directory(directory=str(missing))
+
+    assert result is not None
+    assert "does not exist" in result
+    assert str(missing) in result
+
+
+def test_validate_directory_reports_non_directory_path(tmp_path: Path) -> None:
+    """Verifies that validate_directory returns a ``not a directory`` error for a file path."""
+    file_path = tmp_path / "a_file.txt"
+    file_path.write_text("")
+
+    result = validate_directory(directory=str(file_path))
+
+    assert result is not None
+    assert "not a directory" in result
+    assert str(file_path) in result
 
 
 def test_session_root_from_marker_returns_grandparent(tmp_path: Path) -> None:

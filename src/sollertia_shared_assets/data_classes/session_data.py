@@ -34,8 +34,12 @@ class RawDataFiles(StrEnum):
     """The system configuration YAML copied into the session by the acquisition runtime."""
     CHECKSUM = "ax_checksum.txt"
     """The ataraxis data integrity checksum for the session's raw_data directory."""
-    CHECKSUM_TRACKER = "checksum_processing_tracker.yaml"
-    """The ProcessingTracker YAML for the checksum verification job."""
+    ZABER_POSITIONS = "zaber_positions.yaml"
+    """The Zaber motor position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
+    MESOSCOPE_POSITIONS = "mesoscope_positions.yaml"
+    """The Mesoscope objective position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
+    WINDOW_SCREENSHOT = "window_screenshot.png"
+    """The cranial imaging window screenshot captured at session start by the Mesoscope-VR acquisition runtime."""
 
 
 class Directories(StrEnum):
@@ -48,25 +52,27 @@ class Directories(StrEnum):
     """Camera data directory. Contains raw video files under ``raw_data`` and video processing pipeline
     outputs under ``processed_data``."""
     CAMERA_TIMESTAMPS = "camera_timestamps"
-    """Camera timestamps directory under ``processed_data``; stores the ataraxis-video-system processed camera timestamp
+    """Camera timestamps directory under ``processed_data``. Stores the ataraxis-video-system processed camera timestamp
     feather files."""
     CINDRA = "cindra"
-    """Cindra output directory under ``processed_data``; root of cindra's single-recording and multi-recording
+    """Cindra output directory under ``processed_data``. The root of cindra's single-recording and multi-recording
     outputs."""
     MESOSCOPE_DATA = "mesoscope_data"
-    """Persistent mesoscope data directory under ``raw_data``; stores LERC-compressed TIFF stacks and
+    """Persistent mesoscope data directory under ``raw_data``. Stores LERC-compressed TIFF stacks and
     acquisition metadata written by sollertia-experiment's preprocessing."""
     MICROCONTROLLER_DATA = "microcontroller_data"
     """Microcontroller data directory. Contains raw microcontroller logs under ``raw_data`` and processed
     microcontroller event feathers under ``processed_data``."""
     MULTI_RECORDING = "multi_recording"
-    """Multi-recording subdirectory inside cindra's output directory; each child is a dataset-named directory
+    """Multi-recording subdirectory inside cindra's output directory. Each child is a dataset-named directory
     holding cindra's multi-day analysis output."""
 
 
 class ProcessingTrackers(StrEnum):
-    """Enumerates canonical ProcessingTracker filenames placed inside each pipeline's output directory."""
+    """Enumerates canonical ProcessingTracker filenames written by each data-integrity and processing pipeline."""
 
+    CHECKSUM = "checksum_processing_tracker.yaml"
+    """Tracker for the checksum verification pipeline; lives at the root of ``raw_data/``."""
     BEHAVIOR = "behavior_processing_tracker.yaml"
     """Tracker for the behavior processing pipeline; lives inside ``processed_data/behavior_data/``."""
     CAMERA = "camera_processing_tracker.yaml"
@@ -78,7 +84,17 @@ class ProcessingTrackers(StrEnum):
     """Tracker for the ataraxis-communication-interface microcontroller log processing pipeline; lives inside
     ``processed_data/microcontroller_data/``."""
     CINDRA_SINGLE_RECORDING = "single_recording_tracker.yaml"
-    """Tracker for cindra's single-recording pipeline; lives at the root of ``processed_data/cindra/``."""
+    """Tracker for cindra's single-recording pipeline. Lives at the root of ``processed_data/cindra/``."""
+    CINDRA_MULTI_RECORDING = "multi_recording_tracker.yaml"
+    """Tracker for cindra's multi-recording pipeline. Lives inside each dataset-named subdirectory of
+    ``processed_data/cindra/multi_recording/``."""
+    FORGING = "forging_tracker.yaml"
+    """Tracker for the dataset-forging pipeline; lives at the root of each dataset directory."""
+    MANIFEST = "manifest_processing_tracker.yaml"
+    """Tracker for the project manifest generation pipeline; lives at the project root alongside the manifest
+    feather file."""
+    TRANSFER = "transfer_processing_tracker.yaml"
+    """Tracker for batch session transfer and deletion jobs; location is specified by the caller."""
 
 
 class SessionTypes(StrEnum):
@@ -185,7 +201,31 @@ class SessionData(YamlConfig):
     @property
     def checksum_tracker_path(self) -> Path:
         """Returns the path to the session's checksum ProcessingTracker YAML."""
-        return self.raw_data_path.joinpath(RawDataFiles.CHECKSUM_TRACKER)
+        return self.raw_data_path.joinpath(ProcessingTrackers.CHECKSUM)
+
+    @property
+    def zaber_positions_path(self) -> Path:
+        """Returns the path to the session's ``zaber_positions.yaml`` motor-position snapshot.
+
+        Only populated for Mesoscope-VR sessions. Callers should check existence via ``.exists()``.
+        """
+        return self.raw_data_path.joinpath(RawDataFiles.ZABER_POSITIONS)
+
+    @property
+    def mesoscope_positions_path(self) -> Path:
+        """Returns the path to the session's ``mesoscope_positions.yaml`` objective-position snapshot.
+
+        Only populated for Mesoscope-VR sessions. Callers should check existence via ``.exists()``.
+        """
+        return self.raw_data_path.joinpath(RawDataFiles.MESOSCOPE_POSITIONS)
+
+    @property
+    def window_screenshot_path(self) -> Path:
+        """Returns the path to the session's ``window_screenshot.png`` cranial-window screenshot.
+
+        Only populated for Mesoscope-VR sessions. Callers should check existence via ``.exists()``.
+        """
+        return self.raw_data_path.joinpath(RawDataFiles.WINDOW_SCREENSHOT)
 
     @property
     def raw_camera_data_path(self) -> Path:
@@ -390,9 +430,11 @@ class SessionData(YamlConfig):
                 dst=instance.experiment_configuration_path,
             )
 
-        # All newly created sessions are marked with the 'nk.bin' file. If the marker is not removed during runtime,
-        # the session becomes a valid target for deletion (purging) runtimes operating from the main acquisition
-        # machine of any data acquisition system.
+        # Marks the session as 'uninitialized' by writing the 'nk.bin' file into raw_data. The acquisition
+        # runtime removes this marker once it has finished creating snapshots and initializing instruments
+        # (see mark_runtime_initialized). Sessions that still carry the marker hold no data of value and
+        # are valid targets for purging. Distinct from the descriptor ``incomplete`` field, which marks
+        # initialized sessions that ran into runtime issues but still hold usable data.
         instance.raw_data_path.joinpath("nk.bin").touch()
 
         return instance
@@ -443,12 +485,14 @@ class SessionData(YamlConfig):
         return instance
 
     def mark_runtime_initialized(self) -> None:
-        """Removes the 'nk.bin' marker file from the session's raw_data directory to signal that runtime
-        initialization has completed.
+        """Removes the 'nk.bin' uninitialized-session marker to signal that the acquisition runtime has
+        finished creating snapshots and initializing instruments for this session.
 
         Notes:
-            This service method is used by the sollertia-experiment library to acquire the session's data. Do not call
-            this method manually.
+            This service method is used by the sollertia-experiment library when it acquires a session's
+            data. Do not call it manually. Removal of the marker only changes the ``uninitialized`` signal;
+            the separate descriptor ``incomplete`` field is updated independently by the runtime at session
+            end to report whether acquisition completed without issues.
         """
         self.raw_data_path.joinpath("nk.bin").unlink(missing_ok=True)
 

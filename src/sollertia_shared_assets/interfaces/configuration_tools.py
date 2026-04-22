@@ -15,7 +15,7 @@ from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
     DATASET_MARKER_FILENAME,
-    INCOMPLETE_SESSION_MARKER,
+    UNINITIALIZED_SESSION_MARKER,
     mcp,
     read_yaml,
     serialize,
@@ -24,6 +24,7 @@ from .mcp_instance import (
     error_response,
     describe_dataclass,
     write_yaml_validated,
+    read_descriptor_incomplete,
     resolve_root_directory,
 )
 from ..data_classes import SessionData, RawDataFiles, SessionTypes, session_root_from_marker
@@ -576,14 +577,19 @@ def validate_experiment_configuration_tool(project: str, experiment: str, root_d
 def get_project_overview_tool(project: str, root_directory: str) -> dict[str, Any]:
     """Returns aggregate counts (animals, sessions by type, experiments, datasets) for a project.
 
+    Distinguishes **uninitialized** sessions (``nk.bin`` marker still present — trash that the
+    acquisition runtime never finished setting up) from **incomplete** sessions (descriptor's
+    ``incomplete`` field is True — session ran but had runtime issues and may have data gaps).
+
     Args:
         project: The name of the project.
         root_directory: The absolute path to the root data directory that contains the project. Required — the
             system-configuration-based fallback has moved to the acquisition runtime package.
 
     Returns:
-        A response dict with ``project``, ``project_path``, ``animal_count``, ``animals``, ``sessions_by_type``,
-        ``total_sessions``, ``incomplete_sessions``, ``experiment_count``, and ``dataset_count``.
+        A response dict with ``project``, ``project_path``, ``animal_count``, ``animals``,
+        ``sessions_by_type``, ``total_sessions``, ``uninitialized_sessions``,
+        ``incomplete_sessions``, ``experiment_count``, and ``dataset_count``.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -600,8 +606,9 @@ def get_project_overview_tool(project: str, root_directory: str) -> dict[str, An
         if child.is_dir() and child.name != CONFIGURATION_DIR
     ]
 
-    # Tallies sessions by type and counts incomplete sessions across the project tree.
+    # Tallies sessions by type and counts the two independent "not-healthy" states.
     sessions_by_type: dict[str, int] = {member.value: 0 for member in SessionTypes}
+    uninitialized_count = 0
     incomplete_count = 0
     for marker in project_path.rglob(RawDataFiles.SESSION_DATA):
         try:
@@ -611,7 +618,14 @@ def get_project_overview_tool(project: str, root_directory: str) -> dict[str, An
         session_type_value = serialize(value=instance.session_type)
         if isinstance(session_type_value, str):
             sessions_by_type[session_type_value] = sessions_by_type.get(session_type_value, 0) + 1
-        if instance.raw_data_path.joinpath(INCOMPLETE_SESSION_MARKER).exists():
+
+        uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+        if uninitialized:
+            uninitialized_count += 1
+            # Uninitialized sessions don't have a meaningful descriptor; skip the descriptor read.
+            continue
+        descriptor_incomplete, _descriptor_error = read_descriptor_incomplete(session=instance)
+        if descriptor_incomplete:
             incomplete_count += 1
 
     # Counts experiment configurations and datasets under the project.
@@ -626,6 +640,7 @@ def get_project_overview_tool(project: str, root_directory: str) -> dict[str, An
         animals=sorted(animals),
         sessions_by_type=sessions_by_type,
         total_sessions=sum(sessions_by_type.values()),
+        uninitialized_sessions=uninitialized_count,
         incomplete_sessions=incomplete_count,
         experiment_count=experiment_count,
         dataset_count=dataset_count,
@@ -678,14 +693,15 @@ def list_supported_session_types_tool() -> dict[str, Any]:
 
     Returns:
         A response dict with ``session_types`` (a list of dicts containing ``value``, ``name``,
-        ``descriptor_filename``, and ``descriptor_class`` for each supported session type).
+        and ``descriptor_class`` for each supported session type). The descriptor filename is
+        always ``session_descriptor.yaml`` regardless of session type and is therefore not
+        returned.
     """
     entries: list[dict[str, Any]] = [
         {
             "value": session_type.value,
             "name": session_type.name,
-            "descriptor_filename": RawDataFiles.SESSION_DESCRIPTOR.value,
-            "descriptor_class": DESCRIPTOR_REGISTRY[session_type][1].__name__,
+            "descriptor_class": DESCRIPTOR_REGISTRY[session_type].__name__,
         }
         for session_type in SessionTypes
     ]

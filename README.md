@@ -160,12 +160,7 @@ slsa mcp
 | `read_session_descriptor_tool`                  | Detects the appropriate descriptor class and loads the descriptor YAML                         |
 | `read_session_experiment_configuration_tool`    | Loads the per-session snapshot of the experiment configuration                                 |
 | `read_session_hardware_state_tool`              | Loads the MesoscopeHardwareState YAML for a session                                            |
-| `read_subject_drugs_tool`                       | Loads the DrugData payload for a subject from the cached SurgeryData YAML                      |
-| `read_subject_implants_tool`                    | Loads the list of ImplantData for a subject from the cached SurgeryData YAML                   |
-| `read_subject_injections_tool`                  | Loads the list of InjectionData for a subject from the cached SurgeryData YAML                 |
-| `read_subject_procedure_tool`                   | Loads the ProcedureData payload for a subject from the cached SurgeryData YAML                 |
-| `read_subject_surgery_tool`                     | Loads the full SurgeryData payload for a subject                                               |
-| `read_subject_tool`                             | Loads SubjectData for a subject from the cached SurgeryData YAML                               |
+| `read_subject_surgery_tool`                     | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                      |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
