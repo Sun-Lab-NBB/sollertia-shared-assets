@@ -24,8 +24,8 @@ from .mcp_instance import (
     error_response,
     describe_dataclass,
     write_yaml_validated,
-    read_descriptor_incomplete,
     resolve_root_directory,
+    read_descriptor_incomplete,
 )
 from ..data_classes import SessionData, RawDataFiles, SessionTypes, session_root_from_marker
 from ..configuration import (
@@ -145,41 +145,35 @@ def discover_templates_tool() -> dict[str, Any]:
 
 
 @mcp.tool()
-def read_experiment_configuration_tool(project: str, experiment: str, root_directory: str) -> dict[str, Any]:
-    """Loads a MesoscopeExperimentConfiguration YAML for a project's experiment.
+def read_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
+    """Loads a MesoscopeExperimentConfiguration YAML.
 
     Args:
-        project: The name of the project containing the experiment.
-        experiment: The name of the experiment configuration (without the ``.yaml`` extension).
-        root_directory: The absolute path to the root data directory that contains the project. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
+        file_path: Absolute path to the experiment configuration YAML file. Canonical per-project
+            location is ``<root>/<project>/configuration/<experiment>.yaml``; the frozen per-session
+            snapshot lives at ``<session>/raw_data/experiment_configuration.yaml`` and is read via
+            ``read_session_experiment_configuration_tool``.
 
     Returns:
         A response dict with ``data`` containing the full experiment configuration payload.
     """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-    configuration_path = root.joinpath(project, CONFIGURATION_DIR, f"{experiment}.yaml")  # type: ignore[union-attr]
-    return read_yaml(file_path=configuration_path, validator_cls=MesoscopeExperimentConfiguration)
+    return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeExperimentConfiguration)
 
 
 @mcp.tool()
-def read_template_tool(template_name: str) -> dict[str, Any]:
-    """Loads a TaskTemplate YAML by name from the configured templates directory.
+def read_template_tool(file_path: str) -> dict[str, Any]:
+    """Loads a TaskTemplate YAML.
 
     Args:
-        template_name: The name of the template (without the ``.yaml`` extension).
+        file_path: Absolute path to the template YAML file. The canonical home of task templates is
+            the directory configured via ``set_task_templates_directory_tool``; ``discover_templates_tool``
+            returns the full paths of templates in that directory.
 
     Returns:
-        A response dict with ``data`` containing the full TaskTemplate payload and the resolved ``file_path``.
+        A response dict with ``data`` containing the full TaskTemplate payload and the resolved
+        ``file_path``.
     """
-    try:
-        templates_directory = get_task_templates_directory()
-    except FileNotFoundError as exception:
-        return error_response(message=str(exception))
-    template_path = templates_directory.joinpath(f"{template_name}.yaml")
-    return read_yaml(file_path=template_path, validator_cls=TaskTemplate)
+    return read_yaml(file_path=Path(file_path), validator_cls=TaskTemplate)
 
 
 @mcp.tool()
@@ -226,32 +220,28 @@ def read_task_templates_directory_tool() -> dict[str, Any]:
 
 @mcp.tool()
 def write_template_tool(
-    template_name: str,
+    file_path: str,
     template_payload: dict[str, Any],
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates or replaces a TaskTemplate YAML in the configured templates directory.
+    """Creates or replaces a TaskTemplate YAML.
 
     The ``template_payload`` must match the TaskTemplate schema (use ``describe_template_schema_tool`` to
     inspect the required structure). The payload is validated against ``TaskTemplate.__post_init__`` before
     being persisted.
 
     Args:
-        template_name: The destination filename without the ``.yaml`` extension.
+        file_path: Absolute path to the destination template YAML file. The canonical home of task
+            templates is the directory configured via ``set_task_templates_directory_tool``.
         template_payload: The complete TaskTemplate payload as a JSON-friendly dict.
         overwrite: Determines whether to overwrite an existing template file.
 
     Returns:
         A response dict with ``file_path`` and ``data`` (the validated template payload).
     """
-    try:
-        templates_directory = get_task_templates_directory()
-    except FileNotFoundError as exception:
-        return error_response(message=str(exception))
-    file_path = templates_directory.joinpath(f"{template_name}.yaml")
     return write_yaml_validated(
-        file_path=file_path,
+        file_path=Path(file_path),
         payload=template_payload,
         validator_cls=TaskTemplate,
         overwrite=overwrite,
@@ -260,40 +250,28 @@ def write_template_tool(
 
 @mcp.tool()
 def write_experiment_configuration_tool(
-    project: str,
-    experiment: str,
+    file_path: str,
     configuration_payload: dict[str, Any],
-    root_directory: str,
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates or replaces an experiment configuration YAML for a project.
+    """Creates or replaces an experiment configuration YAML.
 
     The ``configuration_payload`` must match the MesoscopeExperimentConfiguration schema. Use
     ``describe_experiment_configuration_schema_tool`` to inspect the required structure.
 
     Args:
-        project: The name of the project that owns the experiment.
-        experiment: The destination filename (without the ``.yaml`` extension).
+        file_path: Absolute path to the destination experiment configuration YAML file. Canonical
+            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``; callers
+            must create the project directory first (see ``create_project_tool``).
         configuration_payload: The complete experiment configuration payload.
-        root_directory: The absolute path to the root data directory that contains the project. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
         A response dict with ``file_path`` and ``data`` (the validated configuration payload).
     """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-    project_path = root.joinpath(project)  # type: ignore[union-attr]
-    if not project_path.is_dir():
-        return error_response(
-            message=f"Project '{project}' does not exist at {project_path}. Use create_project_tool first."
-        )
-    file_path = project_path.joinpath(CONFIGURATION_DIR, f"{experiment}.yaml")
     return write_yaml_validated(
-        file_path=file_path,
+        file_path=Path(file_path),
         payload=configuration_payload,
         validator_cls=MesoscopeExperimentConfiguration,
         overwrite=overwrite,
@@ -328,81 +306,66 @@ def create_project_tool(project: str, root_directory: str) -> dict[str, Any]:
 
 @mcp.tool()
 def create_experiment_config_tool(
-    project: str,
-    experiment: str,
-    template: str,
-    root_directory: str,
+    file_path: str,
+    template_path: str,
     state_count: int = 1,
+    unity_scene_name: str | None = None,
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
     """Creates an experiment configuration from a task template using sensible defaults.
 
-    Loads the named template, builds an experiment configuration via ``create_experiment_configuration``,
-    populates the requested number of default-valued runtime states, and writes the result. Use
-    ``write_experiment_configuration_tool`` instead when full control over the payload is required.
+    Loads the template at ``template_path``, builds an experiment configuration via
+    ``create_experiment_configuration``, populates the requested number of default-valued runtime
+    states, and writes the result to ``file_path``. Use ``write_experiment_configuration_tool``
+    instead when full control over the payload is required.
 
     Args:
-        project: The name of the project for which to create the experiment.
-        experiment: The destination experiment name (without the ``.yaml`` extension).
-        template: The name of the task template to use (without the ``.yaml`` extension).
-        root_directory: The absolute path to the root data directory that contains the project. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
+        file_path: Absolute path to the destination experiment configuration YAML file. Canonical
+            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``; callers
+            must create the project directory first (see ``create_project_tool``).
+        template_path: Absolute path to the TaskTemplate YAML to instantiate.
         state_count: Number of default-valued runtime states to generate.
+        unity_scene_name: The Unity scene name to embed in the experiment configuration. Defaults
+            to the template file's stem (the filename without the ``.yaml`` extension), which is the
+            convention most projects follow.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
-        A response dict with ``project``, ``experiment``, ``template``, ``file_path``, and ``data`` (the
-        generated experiment configuration payload).
+        A response dict with ``file_path``, ``template_path``, and ``data`` (the generated experiment
+        configuration payload).
     """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-    project_path = root.joinpath(project)  # type: ignore[union-attr]
-    if not project_path.exists():
+    destination = Path(file_path)
+    template_file = Path(template_path)
+    if destination.exists() and not overwrite:
         return error_response(
-            message=f"Project '{project}' does not exist. Use create_project_tool to create it first."
+            message=f"File already exists: {destination}. Pass overwrite=True to replace."
         )
+    if not template_file.exists():
+        return error_response(message=f"Template file not found: {template_file}")
 
-    file_path = project_path.joinpath(CONFIGURATION_DIR, f"{experiment}.yaml")
-    if file_path.exists() and not overwrite:
-        return error_response(message=f"Experiment '{experiment}' already exists in project '{project}'.")
-
-    # Resolves the template file and verifies it exists in the templates directory.
-    try:
-        templates_directory = get_task_templates_directory()
-    except FileNotFoundError as exception:
-        return error_response(message=str(exception))
-    template_path = templates_directory.joinpath(f"{template}.yaml")
-    if not template_path.exists():
-        available = sorted(template_file.stem for template_file in templates_directory.glob("*.yaml"))
-        return error_response(
-            message=(
-                f"Template '{template}' not found. Available templates: {', '.join(available) if available else 'none'}"
-            ),
-        )
+    resolved_scene_name = unity_scene_name if unity_scene_name is not None else template_file.stem
 
     # Loads the template, generates the experiment configuration, and populates default runtime states.
     try:
-        task_template = TaskTemplate.from_yaml(file_path=template_path)
+        task_template = TaskTemplate.from_yaml(file_path=template_file)
         experiment_configuration = create_experiment_configuration(
             template=task_template,
             system=AcquisitionSystems.MESOSCOPE_VR,
-            unity_scene_name=template,
+            unity_scene_name=resolved_scene_name,
         )
         populate_default_experiment_states(
             experiment_configuration=experiment_configuration,
             state_count=state_count,
         )
-        experiment_configuration.to_yaml(file_path=file_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        experiment_configuration.to_yaml(file_path=destination)
     except Exception as exception:
         return error_response(message=f"Failed to create experiment configuration: {exception}")
 
     return ok_response(
-        project=project,
-        experiment=experiment,
-        template=template,
-        file_path=str(file_path),
+        file_path=str(destination),
+        template_path=str(template_file),
         data=serialize(value=experiment_configuration),
     )
 
@@ -510,23 +473,19 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
 
 
 @mcp.tool()
-def validate_template_tool(template_name: str) -> dict[str, Any]:
+def validate_template_tool(file_path: str) -> dict[str, Any]:
     """Loads and validates a TaskTemplate against its schema and cross-reference constraints.
 
     Args:
-        template_name: The name of the template (without the ``.yaml`` extension).
+        file_path: Absolute path to the template YAML file.
 
     Returns:
         A response dict with ``valid`` and either ``summary`` (cue, segment, and trial counts plus the
         cue offset) or ``issues`` (a list of validation error messages).
     """
-    try:
-        templates_directory = get_task_templates_directory()
-    except FileNotFoundError as exception:
-        return error_response(message=str(exception))
-    template_path = templates_directory.joinpath(f"{template_name}.yaml")
+    template_path = Path(file_path)
     if not template_path.exists():
-        return error_response(message=f"Template '{template_name}' not found at {template_path}")
+        return error_response(message=f"File not found: {template_path}")
     try:
         template = TaskTemplate.from_yaml(file_path=template_path)
     except Exception as exception:
@@ -541,24 +500,18 @@ def validate_template_tool(template_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def validate_experiment_configuration_tool(project: str, experiment: str, root_directory: str) -> dict[str, Any]:
-    """Loads and validates an experiment configuration YAML for a project.
+def validate_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
+    """Loads and validates an experiment configuration YAML.
 
     Args:
-        project: The name of the project containing the experiment.
-        experiment: The name of the experiment configuration (without the ``.yaml`` extension).
-        root_directory: The absolute path to the root data directory that contains the project. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
+        file_path: Absolute path to the experiment configuration YAML file.
 
     Returns:
         A response dict with ``valid`` and either ``summary`` or ``issues``.
     """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-    configuration_path = root.joinpath(project, CONFIGURATION_DIR, f"{experiment}.yaml")  # type: ignore[union-attr]
+    configuration_path = Path(file_path)
     if not configuration_path.exists():
-        return error_response(message=f"Experiment '{experiment}' not found at {configuration_path}")
+        return error_response(message=f"File not found: {configuration_path}")
     try:
         experiment_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=configuration_path)
     except Exception as exception:

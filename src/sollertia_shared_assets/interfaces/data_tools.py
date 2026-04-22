@@ -6,7 +6,7 @@ shared ``mcp`` instance from ``mcp_instance``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from pathlib import Path
 
 from .mcp_instance import (
@@ -21,8 +21,8 @@ from .mcp_instance import (
     error_response,
     describe_dataclass,
     write_yaml_validated,
-    read_descriptor_incomplete,
     resolve_root_directory,
+    read_descriptor_incomplete,
 )
 from ..data_classes import (
     DrugData,
@@ -38,13 +38,7 @@ from ..data_classes import (
     filter_sessions,
     session_root_from_marker,
 )
-from ..configuration import (
-    MesoscopeExperimentConfiguration,
-    get_working_directory,
-)
-
-if TYPE_CHECKING:
-    from ataraxis_data_structures import YamlConfig
+from ..configuration import MesoscopeExperimentConfiguration
 
 
 @mcp.tool()
@@ -404,8 +398,13 @@ def discover_subjects_tool(root_directory: str, project: str | None = None) -> d
 def read_session_data_tool(session_path: str) -> dict[str, Any]:
     """Loads the SessionData YAML for a session.
 
+    ``SessionData`` is the session's identity marker (the file whose presence promotes a directory
+    into a Sollertia session), so this tool is scoped at the session level. For per-asset reads
+    (descriptors, hardware state, surgery metadata, frozen experiment configuration) use the
+    file-path-based read tools.
+
     Args:
-        session_path: Path to the session root directory.
+        session_path: Path to the session root directory (or its ``raw_data`` subdirectory).
 
     Returns:
         A response dict with ``data`` (the full SessionData payload) and ``uninitialized`` (True when
@@ -430,178 +429,149 @@ def read_session_data_tool(session_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def read_session_descriptor_tool(session_path: str) -> dict[str, Any]:
-    """Detects the appropriate descriptor class for a session and loads its descriptor YAML.
+def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str, Any]:
+    """Loads a session descriptor YAML, parsing it with the dataclass that matches ``session_type``.
+
+    The descriptor filename is always ``session_descriptor.yaml`` regardless of session type — only the
+    parsing class varies. The caller must supply ``session_type`` because the file path alone does not
+    disambiguate which descriptor class to instantiate.
 
     Args:
-        session_path: Path to the session root directory.
+        file_path: Absolute path to the descriptor YAML file. Canonical location is
+            ``<session>/raw_data/session_descriptor.yaml``.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use
+            (``lick training``, ``run training``, ``mesoscope experiment``, or ``window checking``).
 
     Returns:
-        A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``, and
-        the resolved ``file_path``.
+        A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``,
+        and ``file_path``.
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
     try:
-        session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return error_response(message=f"Failed to load SessionData: {exception}")
-
-    session_type = (
-        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
-    )
-    descriptor_path, descriptor_class = _find_descriptor_for_session(
-        session_root=session_root,  # type: ignore[arg-type]
-        session_type=session_type,
-    )
-    if descriptor_path is None:
-        return error_response(
-            message=(
-                f"Could not locate a descriptor file for session_type '{session_type.value}' under "
-                f"{session_root}/raw_data"
-            ),
-        )
-
-    response = read_yaml(file_path=descriptor_path, validator_cls=descriptor_class)
+        session_type_enum = SessionTypes(session_type)
+    except ValueError:
+        valid = ", ".join(member.value for member in SessionTypes)
+        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
+    response = read_yaml(file_path=Path(file_path), validator_cls=descriptor_class)
     if response.get("success"):
         response["descriptor_class"] = descriptor_class.__name__
-        response["session_type"] = session_type.value
+        response["session_type"] = session_type_enum.value
     return response
 
 
 @mcp.tool()
-def read_session_hardware_state_tool(session_path: str) -> dict[str, Any]:
-    """Loads the MesoscopeHardwareState YAML for a session.
+def read_session_hardware_state_tool(file_path: str) -> dict[str, Any]:
+    """Loads a MesoscopeHardwareState YAML.
 
     Args:
-        session_path: Path to the session root directory.
+        file_path: Absolute path to the hardware-state YAML file. Canonical location is
+            ``<session>/raw_data/hardware_state.yaml``.
 
     Returns:
         A response dict with ``data`` containing the hardware state payload.
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.HARDWARE_STATE)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=MesoscopeHardwareState)
+    return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeHardwareState)
 
 
 @mcp.tool()
-def read_session_experiment_configuration_tool(session_path: str) -> dict[str, Any]:
+def read_session_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
     """Loads the per-session snapshot of MesoscopeExperimentConfiguration.
 
     Only meaningful for sessions of type ``mesoscope experiment``.
 
     Args:
-        session_path: Path to the session root directory.
+        file_path: Absolute path to the frozen experiment configuration YAML file. Canonical location
+            is ``<session>/raw_data/experiment_configuration.yaml``.
 
     Returns:
         A response dict with ``data`` containing the experiment configuration snapshot payload.
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.EXPERIMENT_CONFIGURATION)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=MesoscopeExperimentConfiguration)
+    return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeExperimentConfiguration)
 
 
 @mcp.tool()
-def read_subject_surgery_tool(session_path: str) -> dict[str, Any]:
-    """Loads the full SurgeryData payload from a session's per-session surgery-metadata snapshot.
+def read_subject_surgery_tool(file_path: str) -> dict[str, Any]:
+    """Loads the full SurgeryData payload from a per-session surgery-metadata snapshot.
 
-    Reads the canonical ``<session>/raw_data/surgery_metadata.yaml`` file that the acquisition
-    runtime writes into every session at session start. The returned payload is the whole YAML —
-    callers extract the ``subject``, ``procedure``, ``drugs``, ``implants``, or ``injections``
-    sections themselves. Surgery metadata is treated as a single monolithic record; there are no
-    per-section MCP tools.
+    The returned payload is the whole YAML — callers extract the ``subject``, ``procedure``, ``drugs``,
+    ``implants``, or ``injections`` sections themselves. Surgery metadata is treated as a single
+    monolithic record; there are no per-section MCP tools.
 
     Args:
-        session_path: Path to the session root directory (or its ``raw_data`` subdirectory).
+        file_path: Absolute path to the surgery-metadata YAML file. Canonical location is
+            ``<session>/raw_data/surgery_metadata.yaml``.
 
     Returns:
         A response dict with ``data`` containing the full SurgeryData payload (subject, procedure,
-        drugs, implants, and injections sections) and the resolved ``session_path``.
+        drugs, implants, and injections sections).
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.SURGERY_METADATA)  # type: ignore[union-attr]
-    response = read_yaml(file_path=file_path, validator_cls=SurgeryData)
-    if response.get("success"):
-        response["session_path"] = str(session_root)
-    return response
+    return read_yaml(file_path=Path(file_path), validator_cls=SurgeryData)
 
 
 @mcp.tool()
 def write_session_descriptor_tool(
-    session_path: str,
+    file_path: str,
+    session_type: str,
     descriptor_payload: dict[str, Any],
     *,
     overwrite: bool = True,
 ) -> dict[str, Any]:
-    """Creates or replaces a session descriptor YAML for a session.
+    """Creates or replaces a session descriptor YAML.
 
-    Detects the appropriate descriptor class from the session's ``session_type`` (loaded from
-    ``session_data.yaml``) and writes the payload to the canonical descriptor filename in ``raw_data``.
+    Validates ``descriptor_payload`` against the descriptor dataclass that matches ``session_type`` and
+    writes the result to ``file_path``. The caller is responsible for choosing the destination path;
+    canonical location is ``<session>/raw_data/session_descriptor.yaml``.
 
     Args:
-        session_path: Path to the session root directory.
+        file_path: Absolute path to the destination descriptor YAML file.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate
+            against (``lick training``, ``run training``, ``mesoscope experiment``, or
+            ``window checking``).
         descriptor_payload: The complete descriptor payload matching the appropriate descriptor schema.
         overwrite: Determines whether to overwrite an existing descriptor file.
 
     Returns:
-        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``, and
-        ``session_type``.
+        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``,
+        and ``session_type``.
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
     try:
-        session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return error_response(message=f"Failed to load SessionData: {exception}")
-
-    session_type = (
-        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
-    )
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type]
-    file_path = session.session_descriptor_path
+        session_type_enum = SessionTypes(session_type)
+    except ValueError:
+        valid = ", ".join(member.value for member in SessionTypes)
+        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
     response = write_yaml_validated(
-        file_path=file_path,
+        file_path=Path(file_path),
         payload=descriptor_payload,
         validator_cls=descriptor_class,
         overwrite=overwrite,
     )
     if response.get("success"):
         response["descriptor_class"] = descriptor_class.__name__
-        response["session_type"] = session_type.value
+        response["session_type"] = session_type_enum.value
     return response
 
 
 @mcp.tool()
 def write_session_hardware_state_tool(
-    session_path: str,
+    file_path: str,
     hardware_state_payload: dict[str, Any],
     *,
     overwrite: bool = True,
 ) -> dict[str, Any]:
-    """Creates or replaces the MesoscopeHardwareState YAML for a session.
+    """Creates or replaces a MesoscopeHardwareState YAML.
 
     Args:
-        session_path: Path to the session root directory.
+        file_path: Absolute path to the destination hardware-state YAML file. Canonical location is
+            ``<session>/raw_data/hardware_state.yaml``.
         hardware_state_payload: The complete MesoscopeHardwareState payload.
         overwrite: Determines whether to overwrite an existing hardware state file.
 
     Returns:
         A response dict with ``file_path`` and ``data`` (the validated payload).
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.HARDWARE_STATE)  # type: ignore[union-attr]
     return write_yaml_validated(
-        file_path=file_path,
+        file_path=Path(file_path),
         payload=hardware_state_payload,
         validator_cls=MesoscopeHardwareState,
         overwrite=overwrite,
@@ -643,12 +613,9 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
     )
 
     # Verifies that the required descriptor and configuration snapshot files are present.
-    descriptor_path, _ = _find_descriptor_for_session(
-        session_root=session_root,  # type: ignore[arg-type]
-        session_type=session_type,
-    )
-    if descriptor_path is None:
-        issues.append(f"Missing descriptor file for session_type '{session_type.value}'")
+    descriptor_path = raw_data_dir.joinpath(RawDataFiles.SESSION_DESCRIPTOR)
+    if not descriptor_path.exists():
+        issues.append(f"Missing descriptor file: {descriptor_path}")
 
     if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
         experiment_snapshot = raw_data_dir.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
@@ -951,27 +918,5 @@ def _load_session_summary(marker: Path) -> dict[str, Any]:
         "processed_data_path": str(instance.processed_data_path),
         "uninitialized": uninitialized,
     }
-
-
-def _find_descriptor_for_session(
-    session_root: Path,
-    session_type: SessionTypes,
-) -> tuple[Path | None, type[YamlConfig]]:
-    """Locates the session-embedded descriptor file and its parsing class for a session.
-
-    The session-embedded descriptor always uses the canonical ``session_descriptor.yaml`` filename regardless
-    of session type; the parsing class is session-type-specific and comes from ``DESCRIPTOR_REGISTRY``.
-
-    Args:
-        session_root: The session root directory containing the ``raw_data`` subdirectory.
-        session_type: The session type whose descriptor class to return.
-
-    Returns:
-        A tuple of the canonical descriptor file path (or None when the file does not exist) and the
-        descriptor dataclass type matching the session's type.
-    """
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type]
-    canonical_path = session_root.joinpath("raw_data", RawDataFiles.SESSION_DESCRIPTOR)
-    return canonical_path if canonical_path.exists() else None, descriptor_class
 
 
