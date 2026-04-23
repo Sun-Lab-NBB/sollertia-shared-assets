@@ -53,10 +53,14 @@ dependencies = [
 
     # Data Processing
     "polars>=1,<2",
-    "pyarrow>=23,<24",
+
+    # YAML serialization (used directly by MCP helpers to stage caller-supplied dicts for YamlConfig validation)
+    "pyyaml>=6,<7",
 
     # MCP and HTTP
     "mcp>=1,<2",
+    # Constraint pin (not imported directly): prevents mcp from resolving a pre-release httpx
+    # that fails to load at import time.
     "httpx>=0.28,<1",
 ]
 

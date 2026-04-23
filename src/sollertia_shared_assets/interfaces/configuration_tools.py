@@ -60,7 +60,7 @@ _TRIAL_CLASSES: dict[str, type[BaseTrial]] = {
 
 @mcp.tool()
 def discover_experiments_tool(
-    root_directory: str | None = None,
+    root_directory: str,
     project: str | None = None,
 ) -> dict[str, Any]:
     """Discovers all experiment configuration YAML files under the data root.
@@ -536,8 +536,7 @@ def get_project_overview_tool(project: str, root_directory: str) -> dict[str, An
 
     Args:
         project: The name of the project.
-        root_directory: The absolute path to the root data directory that contains the project. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
+        root_directory: The absolute path to the root data directory that contains the project.
 
     Returns:
         A response dict with ``project``, ``project_path``, ``animal_count``, ``animals``,

@@ -42,15 +42,14 @@ from ..configuration import MesoscopeExperimentConfiguration
 
 
 @mcp.tool()
-def discover_projects_tool(root_directory: str | None = None) -> dict[str, Any]:
+def discover_projects_tool(root_directory: str) -> dict[str, Any]:
     """Lists all projects accessible to the data acquisition system.
 
     Scans the immediate children of the data root for project directories, returning each project's name and
     aggregate counts (animals and experiment configurations).
 
     Args:
-        root_directory: The absolute path to the root data directory to scan. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
+        root_directory: The absolute path to the root data directory to scan.
 
     Returns:
         A response dict with ``projects`` (list of project summary dicts) and ``total_projects``.
@@ -81,7 +80,7 @@ def discover_projects_tool(root_directory: str | None = None) -> dict[str, Any]:
 
 
 @mcp.tool()
-def discover_animals_tool(project: str, root_directory: str | None = None) -> dict[str, Any]:
+def discover_animals_tool(project: str, root_directory: str) -> dict[str, Any]:
     """Lists animal subdirectories within a project.
 
     Args:
@@ -111,7 +110,7 @@ def discover_animals_tool(project: str, root_directory: str | None = None) -> di
 
 @mcp.tool()
 def discover_sessions_tool(
-    root_directory: str | None = None,
+    root_directory: str,
     project: str | None = None,
     animal_id: str | None = None,
     session_types: list[str] | None = None,
@@ -509,6 +508,36 @@ def read_subject_surgery_tool(file_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def write_subject_surgery_tool(
+    file_path: str,
+    surgery_payload: dict[str, Any],
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """Creates or replaces a per-session surgery-metadata YAML.
+
+    Validates ``surgery_payload`` against the full ``SurgeryData`` schema and writes the result to
+    ``file_path``. Surgery metadata is a single monolithic record; the payload must contain all
+    sections (``subject``, ``procedure``, ``drugs``, ``implants``, and ``injections``).
+
+    Args:
+        file_path: Absolute path to the destination surgery-metadata YAML file. Canonical location is
+            ``<session>/raw_data/surgery_metadata.yaml``.
+        surgery_payload: The complete SurgeryData payload.
+        overwrite: Determines whether to overwrite an existing surgery-metadata file.
+
+    Returns:
+        A response dict with ``file_path`` and ``data`` (the validated payload).
+    """
+    return write_yaml_validated(
+        file_path=Path(file_path),
+        payload=surgery_payload,
+        validator_cls=SurgeryData,
+        overwrite=overwrite,
+    )
+
+
+@mcp.tool()
 def write_session_descriptor_tool(
     file_path: str,
     session_type: str,
@@ -729,7 +758,7 @@ def get_session_status_tool(session_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def get_batch_session_status_overview_tool(root_directory: str | None = None) -> dict[str, Any]:
+def get_batch_session_status_overview_tool(root_directory: str) -> dict[str, Any]:
     """Aggregates session lifecycle status across every session under the data root.
 
     Uses the same two-signal model as ``get_session_status_tool``: the ``nk.bin`` uninitialized

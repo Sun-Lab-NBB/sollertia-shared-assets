@@ -230,25 +230,15 @@ def read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, Any
     return ok_response(file_path=str(file_path), data=serialize(value=instance))
 
 
-def resolve_root_directory(root_directory: str | None) -> tuple[Path | None, dict[str, Any] | None]:
-    """Resolves the root data directory from an explicit override.
+def resolve_root_directory(root_directory: str) -> tuple[Path | None, dict[str, Any] | None]:
+    """Resolves the root data directory from an explicit path.
 
     Args:
-        root_directory: An explicit path to the root data directory. Required; the previous fallback to the
-            active system configuration's root directory was removed when the system configuration moved out of
-            this package and into the acquisition runtime package (sl-experiment).
+        root_directory: An absolute path to the root data directory.
 
     Returns:
         A tuple of the resolved Path and an error dict. Exactly one element is non-None.
     """
-    if root_directory is None:
-        return None, error_response(
-            message=(
-                "Unable to resolve the root data directory. The 'root_directory' argument is now required — the "
-                "active system configuration no longer lives in this package, so it cannot be auto-resolved here. "
-                "Pass the root directory explicitly, or query it from the acquisition runtime's own MCP/CLI."
-            ),
-        )
     path = Path(root_directory)
     if not path.exists():
         return None, error_response(message=f"Root directory does not exist: {path}")
