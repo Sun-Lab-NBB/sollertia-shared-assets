@@ -4,7 +4,7 @@ channels:
 dependencies:
   - _openmp_mutex=4.5=20_gnu
   - bzip2=1.0.8=hda65f42_9
-  - ca-certificates=2026.2.25=hbd8a1cb_0
+  - ca-certificates=2026.4.22=hbd8a1cb_0
   - cachetools=7.0.6=pyhd8ed1ab_0
   - colorama=0.4.6=pyhd8ed1ab_1
   - distlib=0.4.0=pyhd8ed1ab_0
@@ -68,12 +68,12 @@ dependencies:
     - beautifulsoup4==4.14.3
     - bracex==2.6
     - breathe==4.36.0
-    - build==1.4.3
-    - certifi==2026.2.25
+    - build==1.4.4
+    - certifi==2026.4.22
     - cffi==2.0.0
     - charset-normalizer==3.4.7
     - cibuildwheel==3.4.1
-    - click==8.3.2
+    - click==8.3.3
     - coverage==7.13.5
     - cryptography==46.0.7
     - dacite==1.9.2
@@ -90,7 +90,7 @@ dependencies:
     - httpx-sse==0.4.3
     - humanize==4.15.0
     - id==1.6.1
-    - idna==3.12
+    - idna==3.13
     - imagesize==2.0.0
     - iniconfig==2.3.0
     - jaraco.classes==3.4.0
@@ -113,10 +113,9 @@ dependencies:
     - nh3==0.3.4
     - numpy==2.4.4
     - patchelf==0.18.1.0a1
-    - pathspec==1.0.4
-    - polars==1.40.0
-    - polars-runtime-32==1.40.0
-    - pyarrow==23.0.1
+    - pathspec==1.1.0
+    - polars==1.40.1
+    - polars-runtime-32==1.40.1
     - pycparser==3.0
     - pydantic==2.13.3
     - pydantic-settings==2.14.0
@@ -142,7 +141,6 @@ dependencies:
     - six==1.17.0
     - smmap==5.0.2
     - snowballstemmer==3.0.1
-    - sollertia-forgery==1.0.0rc3
     - soupsieve==2.8.3
     - sphinx-autodoc-typehints==3.10.2
     - sphinx-basic-ng==1.0.0b2
@@ -161,7 +159,7 @@ dependencies:
     - types-python-dateutil==2.9.0.20260408
     - typing-inspection==0.4.2
     - urllib3==2.6.3
-    - uvicorn==0.45.0
-    - wheel==0.46.3
+    - uvicorn==0.46.0
+    - wheel==0.47.0
     - xxhash==3.6.0
 
