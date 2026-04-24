@@ -5,13 +5,9 @@ from __future__ import annotations
 from typing import Any
 from pathlib import Path
 
-from ataraxis_base_utilities import ensure_directory_exists
-
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    DATASET_MARKER_FILENAME,
-    UNINITIALIZED_SESSION_MARKER,
     mcp,
     read_yaml,
     serialize,
@@ -21,9 +17,8 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
-    read_descriptor_incomplete,
 )
-from ..data_classes import SessionData, RawDataFiles, SessionTypes, session_root_from_marker
+from ..data_classes import SessionTypes
 from ..configuration import (
     Cue,
     Segment,
@@ -188,105 +183,6 @@ def set_task_templates_directory_tool(directory: str) -> dict[str, Any]:
     except (FileNotFoundError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(task_templates_directory=str(path))
-
-
-@mcp.tool()
-def create_project_tool(project: str, root_directory: str) -> dict[str, Any]:
-    """Creates a new project directory and its ``configuration`` subdirectory under the root data directory.
-
-    Args:
-        project: The name of the project to create.
-        root_directory: The absolute path to the root data directory under which to create the project.
-
-    Returns:
-        A response dict with ``project``, ``project_path``, and ``already_exists`` (True when the project
-        directory was already present and no changes were made).
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-    project_path = root.joinpath(project)  # type: ignore[union-attr]
-    configuration_path = project_path.joinpath(CONFIGURATION_DIR)
-    if project_path.exists():
-        return ok_response(project=project, project_path=str(project_path), already_exists=True)
-    try:
-        ensure_directory_exists(path=configuration_path)
-    except (FileNotFoundError, OSError) as exception:
-        return error_response(message=f"Failed to create project directory: {exception}")
-    return ok_response(project=project, project_path=str(project_path), already_exists=False)
-
-
-@mcp.tool()
-def get_project_overview_tool(project: str, root_directory: str) -> dict[str, Any]:
-    """Returns aggregate counts (animals, sessions by type, experiments, datasets) for a project.
-
-    Distinguishes **uninitialized** sessions (``nk.bin`` marker still present — trash that the
-    acquisition runtime never finished setting up) from **incomplete** sessions (descriptor's
-    ``incomplete`` field is True — session ran but had runtime issues and may have data gaps).
-
-    Args:
-        project: The name of the project.
-        root_directory: The absolute path to the root data directory that contains the project.
-
-    Returns:
-        A response dict with ``project``, ``project_path``, ``animal_count``, ``animals``,
-        ``sessions_by_type``, ``total_sessions``, ``uninitialized_sessions``,
-        ``incomplete_sessions``, ``experiment_count``, and ``dataset_count``.
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-
-    project_path = root.joinpath(project)  # type: ignore[union-attr]
-    if not project_path.is_dir():
-        return error_response(message=f"Project '{project}' not found at {project_path}")
-
-    # Enumerates animal subdirectories, excluding the configuration directory.
-    animals = [
-        child.name
-        for child in safe_iterdir(directory=project_path)
-        if child.is_dir() and child.name != CONFIGURATION_DIR
-    ]
-
-    # Tallies sessions by type and counts the two independent "not-healthy" states.
-    sessions_by_type: dict[str, int] = {member.value: 0 for member in SessionTypes}
-    uninitialized_count = 0
-    incomplete_count = 0
-    for marker in project_path.rglob(RawDataFiles.SESSION_DATA):
-        try:
-            instance = SessionData.load(session_path=session_root_from_marker(marker=marker))
-        except Exception:  # noqa: S112 - skip unparseable sessions during best-effort overview.
-            continue
-        session_type_value = serialize(value=instance.session_type)
-        if isinstance(session_type_value, str):
-            sessions_by_type[session_type_value] = sessions_by_type.get(session_type_value, 0) + 1
-
-        uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
-        if uninitialized:
-            uninitialized_count += 1
-            # Skips the descriptor read for uninitialized sessions because their descriptor is not meaningful.
-            continue
-        descriptor_incomplete, _descriptor_error = read_descriptor_incomplete(session=instance)
-        if descriptor_incomplete:
-            incomplete_count += 1
-
-    # Counts experiment configurations and datasets under the project.
-    configuration_directory = project_path.joinpath(CONFIGURATION_DIR)
-    experiment_count = len(list(configuration_directory.glob("*.yaml"))) if configuration_directory.is_dir() else 0
-    dataset_count = len(list(project_path.rglob(DATASET_MARKER_FILENAME)))
-
-    return ok_response(
-        project=project,
-        project_path=str(project_path),
-        animal_count=len(animals),
-        animals=sorted(animals),
-        sessions_by_type=sessions_by_type,
-        total_sessions=sum(sessions_by_type.values()),
-        uninitialized_sessions=uninitialized_count,
-        incomplete_sessions=incomplete_count,
-        experiment_count=experiment_count,
-        dataset_count=dataset_count,
-    )
 
 
 @mcp.tool()
@@ -503,8 +399,9 @@ def write_experiment_configuration_tool(
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical
-            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``; callers
-            must create the project directory first (see ``create_project_tool``).
+            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``. Project
+            directories are created implicitly by the sollertia-experiment session-creation flow;
+            this tool does not create them.
         configuration_payload: The complete experiment configuration payload.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
@@ -537,8 +434,9 @@ def create_experiment_config_tool(
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical
-            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``; callers
-            must create the project directory first (see ``create_project_tool``).
+            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``. Project
+            directories are created implicitly by the sollertia-experiment session-creation flow;
+            this tool does not create them.
         template_path: Absolute path to the TaskTemplate YAML to instantiate.
         state_count: Number of default-valued runtime states to generate.
         unity_scene_name: The Unity scene name to embed in the experiment configuration. Defaults
@@ -553,9 +451,7 @@ def create_experiment_config_tool(
     destination = Path(file_path)
     template_file = Path(template_path)
     if destination.exists() and not overwrite:
-        return error_response(
-            message=f"File already exists: {destination}. Pass overwrite=True to replace."
-        )
+        return error_response(message=f"File already exists: {destination}. Pass overwrite=True to replace.")
     if not template_file.exists():
         return error_response(message=f"Template file not found: {template_file}")
 

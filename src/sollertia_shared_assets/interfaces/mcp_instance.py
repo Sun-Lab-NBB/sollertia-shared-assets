@@ -285,9 +285,7 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
         ``incomplete`` is None and ``error_message`` describes the failure.
     """
     session_type = (
-        session.session_type
-        if isinstance(session.session_type, SessionTypes)
-        else SessionTypes(session.session_type)
+        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
     )
     descriptor_class = DESCRIPTOR_REGISTRY[session_type]
     descriptor_path = session.session_descriptor_path
@@ -298,4 +296,4 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
     except Exception as exception:
         return None, str(exception)
     # noinspection PyUnresolvedReferences
-    return bool(descriptor.incomplete), None
+    return bool(descriptor.incomplete), None  # type: ignore[attr-defined]
