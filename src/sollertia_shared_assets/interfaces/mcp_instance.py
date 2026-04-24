@@ -1,8 +1,4 @@
-"""Provides the shared FastMCP server instance, constants, and helper functions for MCP tool modules.
-
-All tool modules import the ``mcp`` instance from this module and register tools via the ``@mcp.tool()``
-decorator. The helper functions in this module are shared across all tool modules.
-"""
+"""Provides the shared FastMCP server instance, constants, and helper functions for MCP tool modules."""
 
 from __future__ import annotations
 
@@ -21,9 +17,11 @@ from ..data_classes import (
     SessionTypes,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
+    MesoscopeHardwareState,
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
+from ..configuration import AcquisitionSystems
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
@@ -51,6 +49,13 @@ DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
 """Maps each session type to its descriptor dataclass. The canonical on-disk filename is always the
 flat ``session_descriptor.yaml`` (``RawDataFiles.SESSION_DESCRIPTOR``) regardless of session type —
 the only thing that varies per type is the parsing class."""
+
+HARDWARE_STATE_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeHardwareState,
+}
+"""Maps each acquisition system to its hardware-state dataclass. The canonical on-disk filename is
+always ``hardware_state.yaml`` (``RawDataFiles.HARDWARE_STATE``) regardless of system — the only
+thing that varies is the parsing class. Future acquisition systems register here."""
 
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 """The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""

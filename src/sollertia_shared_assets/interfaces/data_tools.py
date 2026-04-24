@@ -1,17 +1,17 @@
-"""Provides MCP tools for discovering, reading, writing, and validating runtime data assets.
-
-Covers sessions, datasets, subjects, surgery data, and session descriptors. All tools register on the
-shared ``mcp`` instance from ``mcp_instance``.
-"""
+"""Provides MCP tools for discovering, reading, writing, and validating runtime data assets."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
+    HARDWARE_STATE_REGISTRY,
     UNINITIALIZED_SESSION_MARKER,
     mcp,
     read_yaml,
@@ -34,11 +34,10 @@ from ..data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
-    MesoscopeHardwareState,
     filter_sessions,
     session_root_from_marker,
 )
-from ..configuration import MesoscopeExperimentConfiguration
+from ..configuration import AcquisitionSystems
 
 
 @mcp.tool()
@@ -62,8 +61,8 @@ def discover_projects_tool(root_directory: str) -> dict[str, Any]:
     for child in sorted(safe_iterdir(directory=root), key=lambda candidate: candidate.name):  # type: ignore[arg-type]
         if not child.is_dir():
             continue
-        configuration_dir = child.joinpath(CONFIGURATION_DIR)
-        experiment_count = len(list(configuration_dir.glob("*.yaml"))) if configuration_dir.is_dir() else 0
+        configuration_directory = child.joinpath(CONFIGURATION_DIR)
+        experiment_count = len(list(configuration_directory.glob("*.yaml"))) if configuration_directory.is_dir() else 0
         animal_count = sum(
             1 for animal in safe_iterdir(directory=child) if animal.is_dir() and animal.name != CONFIGURATION_DIR
         )
@@ -80,32 +79,64 @@ def discover_projects_tool(root_directory: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def discover_animals_tool(project: str, root_directory: str) -> dict[str, Any]:
-    """Lists animal subdirectories within a project.
+def discover_animals_tool(root_directory: str, project: str | None = None) -> dict[str, Any]:
+    """Discovers animals under the data root, optionally scoped to a single project.
+
+    When ``project`` is ``None``, walks every project directory under the root and deduplicates
+    animals that appear in multiple projects into a single entry, aggregating session counts and
+    per-project directory paths across each project the animal is enrolled in. When ``project``
+    is provided, narrows the search to that project subtree; each animal then has exactly one
+    entry in ``projects`` and ``paths``.
 
     Args:
-        project: The name of the project to enumerate animals for.
         root_directory: The absolute path to the root data directory to scan.
+        project: When provided, narrows the search to the given project subtree. A missing
+            project directory returns an error response.
 
     Returns:
-        A response dict with ``animals`` (list of animal summary dicts), ``total_animals``, and ``project``.
+        A response dict with ``animals`` (list of ``{animal_id, projects, paths, session_count}``
+        dicts, where ``projects`` and ``paths`` are aligned per-index lists of the projects the
+        animal appears in and the animal directory path within each) and ``total_animals``. When
+        ``project`` is provided, the response also echoes the ``project`` field.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
 
-    project_path = root.joinpath(project)  # type: ignore[union-attr]
-    if not project_path.is_dir():
-        return error_response(message=f"Project '{project}' not found at {project_path}")
+    if project is not None:
+        project_path = root.joinpath(project)  # type: ignore[union-attr]
+        if not project_path.is_dir():
+            return error_response(message=f"Project '{project}' not found at {project_path}")
+        project_paths: list[Path] = [project_path]
+    else:
+        project_paths = [child for child in safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
 
-    animals: list[dict[str, Any]] = []
-    for child in sorted(safe_iterdir(directory=project_path), key=lambda candidate: candidate.name):
-        if not child.is_dir() or child.name == CONFIGURATION_DIR:
-            continue
-        session_count = len(list(child.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
-        animals.append({"animal_id": child.name, "path": str(child), "session_count": session_count})
+    # Deduplicates animals across projects, merging project membership, per-project directory paths,
+    # and session counts into a single entry per animal_id.
+    seen: dict[str, dict[str, Any]] = {}
+    for project_path in project_paths:
+        for animal_directory in safe_iterdir(directory=project_path):
+            if not animal_directory.is_dir() or animal_directory.name == CONFIGURATION_DIR:
+                continue
+            entry = seen.setdefault(
+                animal_directory.name,
+                {
+                    "animal_id": animal_directory.name,
+                    "projects": [],
+                    "paths": [],
+                    "session_count": 0,
+                },
+            )
+            if project_path.name not in entry["projects"]:
+                entry["projects"].append(project_path.name)
+                entry["paths"].append(str(animal_directory))
+            entry["session_count"] += len(list(animal_directory.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
 
-    return ok_response(animals=animals, total_animals=len(animals), project=project)
+    animals = sorted(seen.values(), key=lambda candidate: candidate["animal_id"])
+    response = ok_response(animals=animals, total_animals=len(animals))
+    if project is not None:
+        response["project"] = project
+    return response
 
 
 @mcp.tool()
@@ -309,9 +340,9 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
     if error is not None:
         return error
 
-    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
-    if not raw_data_dir.is_dir():
-        return error_response(message=f"raw_data directory not found at {raw_data_dir}")
+    raw_data_directory = session_root.joinpath("raw_data")  # type: ignore[union-attr]
+    if not raw_data_directory.is_dir():
+        return error_response(message=f"raw_data directory not found at {raw_data_directory}")
 
     # Maps canonical filenames to human-readable kind labels for classification. The session descriptor
     # always lives at ``session_descriptor.yaml`` regardless of session type; the per-type descriptor
@@ -327,283 +358,17 @@ def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
 
     # Classifies each YAML file in raw_data by matching against known filenames.
     files: list[dict[str, Any]] = []
-    for candidate in sorted(raw_data_dir.glob("*.yaml")):
+    for candidate in sorted(raw_data_directory.glob("*.yaml")):
         # noinspection PyTypeChecker
         kind = known_kinds.get(candidate.name, "unknown")
         files.append({"name": candidate.name, "path": str(candidate), "kind": kind})
 
-    uninitialized = raw_data_dir.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+    uninitialized = raw_data_directory.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
     return ok_response(
         files=files,
         total_files=len(files),
         session_path=str(session_root),
         uninitialized=uninitialized,
-    )
-
-
-@mcp.tool()
-def discover_subjects_tool(root_directory: str, project: str | None = None) -> dict[str, Any]:
-    """Discovers subjects (animals) by scanning project directories on disk.
-
-    Enumerates animal subdirectories under each project and reports the project(s) each animal
-    belongs to and the number of sessions acquired for it. To read the animal's surgery-metadata,
-    locate one of its sessions via ``discover_sessions_tool`` and call ``read_subject_surgery_tool``
-    with that session's path.
-
-    Args:
-        root_directory: The absolute path to the root data directory to scan.
-        project: When provided, only subjects belonging to this project are returned.
-
-    Returns:
-        A response dict with ``subjects`` (list of ``{subject_id, projects, session_count}`` dicts)
-        and ``total_subjects``.
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-
-    project_paths: list[Path]
-    if project is not None:
-        project_path = root.joinpath(project)  # type: ignore[union-attr]
-        if not project_path.is_dir():
-            return error_response(message=f"Project '{project}' not found at {project_path}")
-        project_paths = [project_path]
-    else:
-        project_paths = [child for child in safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
-
-    # Deduplicates subjects that appear across multiple projects, merging session counts.
-    seen: dict[str, dict[str, Any]] = {}
-    for project_path in project_paths:
-        for animal_dir in safe_iterdir(directory=project_path):
-            if not animal_dir.is_dir() or animal_dir.name == CONFIGURATION_DIR:
-                continue
-            entry = seen.setdefault(
-                animal_dir.name,
-                {
-                    "subject_id": animal_dir.name,
-                    "projects": [],
-                    "session_count": 0,
-                },
-            )
-            if project_path.name not in entry["projects"]:
-                entry["projects"].append(project_path.name)
-            entry["session_count"] += len(list(animal_dir.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
-
-    subjects = sorted(seen.values(), key=lambda subject: subject["subject_id"])
-    return ok_response(subjects=subjects, total_subjects=len(subjects))
-
-
-@mcp.tool()
-def read_session_data_tool(session_path: str) -> dict[str, Any]:
-    """Loads the SessionData YAML for a session.
-
-    ``SessionData`` is the session's identity marker (the file whose presence promotes a directory
-    into a Sollertia session), so this tool is scoped at the session level. For per-asset reads
-    (descriptors, hardware state, surgery metadata, frozen experiment configuration) use the
-    file-path-based read tools.
-
-    Args:
-        session_path: Path to the session root directory (or its ``raw_data`` subdirectory).
-
-    Returns:
-        A response dict with ``data`` (the full SessionData payload) and ``uninitialized`` (True when
-        the ``nk.bin`` marker is still present, i.e. the acquisition runtime has not yet finished
-        initializing the session and its data is not considered valid). To check whether the session
-        ran into issues during acquisition (the descriptor ``incomplete`` field), call
-        ``read_session_descriptor_tool`` or ``get_session_status_tool``.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    try:
-        instance = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return error_response(message=f"Failed to load SessionData: {exception}")
-    uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
-    return ok_response(
-        data=serialize(value=instance),
-        uninitialized=uninitialized,
-        session_path=str(session_root),
-    )
-
-
-@mcp.tool()
-def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str, Any]:
-    """Loads a session descriptor YAML, parsing it with the dataclass that matches ``session_type``.
-
-    The descriptor filename is always ``session_descriptor.yaml`` regardless of session type — only the
-    parsing class varies. The caller must supply ``session_type`` because the file path alone does not
-    disambiguate which descriptor class to instantiate.
-
-    Args:
-        file_path: Absolute path to the descriptor YAML file. Canonical location is
-            ``<session>/raw_data/session_descriptor.yaml``.
-        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use
-            (``lick training``, ``run training``, ``mesoscope experiment``, or ``window checking``).
-
-    Returns:
-        A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``,
-        and ``file_path``.
-    """
-    try:
-        session_type_enum = SessionTypes(session_type)
-    except ValueError:
-        valid = ", ".join(member.value for member in SessionTypes)
-        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
-    response = read_yaml(file_path=Path(file_path), validator_cls=descriptor_class)
-    if response.get("success"):
-        response["descriptor_class"] = descriptor_class.__name__
-        response["session_type"] = session_type_enum.value
-    return response
-
-
-@mcp.tool()
-def read_session_hardware_state_tool(file_path: str) -> dict[str, Any]:
-    """Loads a MesoscopeHardwareState YAML.
-
-    Args:
-        file_path: Absolute path to the hardware-state YAML file. Canonical location is
-            ``<session>/raw_data/hardware_state.yaml``.
-
-    Returns:
-        A response dict with ``data`` containing the hardware state payload.
-    """
-    return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeHardwareState)
-
-
-@mcp.tool()
-def read_session_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
-    """Loads the per-session snapshot of MesoscopeExperimentConfiguration.
-
-    Only meaningful for sessions of type ``mesoscope experiment``.
-
-    Args:
-        file_path: Absolute path to the frozen experiment configuration YAML file. Canonical location
-            is ``<session>/raw_data/experiment_configuration.yaml``.
-
-    Returns:
-        A response dict with ``data`` containing the experiment configuration snapshot payload.
-    """
-    return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeExperimentConfiguration)
-
-
-@mcp.tool()
-def read_subject_surgery_tool(file_path: str) -> dict[str, Any]:
-    """Loads the full SurgeryData payload from a per-session surgery-metadata snapshot.
-
-    The returned payload is the whole YAML — callers extract the ``subject``, ``procedure``, ``drugs``,
-    ``implants``, or ``injections`` sections themselves. Surgery metadata is treated as a single
-    monolithic record; there are no per-section MCP tools.
-
-    Args:
-        file_path: Absolute path to the surgery-metadata YAML file. Canonical location is
-            ``<session>/raw_data/surgery_metadata.yaml``.
-
-    Returns:
-        A response dict with ``data`` containing the full SurgeryData payload (subject, procedure,
-        drugs, implants, and injections sections).
-    """
-    return read_yaml(file_path=Path(file_path), validator_cls=SurgeryData)
-
-
-@mcp.tool()
-def write_subject_surgery_tool(
-    file_path: str,
-    surgery_payload: dict[str, Any],
-    *,
-    overwrite: bool = True,
-) -> dict[str, Any]:
-    """Creates or replaces a per-session surgery-metadata YAML.
-
-    Validates ``surgery_payload`` against the full ``SurgeryData`` schema and writes the result to
-    ``file_path``. Surgery metadata is a single monolithic record; the payload must contain all
-    sections (``subject``, ``procedure``, ``drugs``, ``implants``, and ``injections``).
-
-    Args:
-        file_path: Absolute path to the destination surgery-metadata YAML file. Canonical location is
-            ``<session>/raw_data/surgery_metadata.yaml``.
-        surgery_payload: The complete SurgeryData payload.
-        overwrite: Determines whether to overwrite an existing surgery-metadata file.
-
-    Returns:
-        A response dict with ``file_path`` and ``data`` (the validated payload).
-    """
-    return write_yaml_validated(
-        file_path=Path(file_path),
-        payload=surgery_payload,
-        validator_cls=SurgeryData,
-        overwrite=overwrite,
-    )
-
-
-@mcp.tool()
-def write_session_descriptor_tool(
-    file_path: str,
-    session_type: str,
-    descriptor_payload: dict[str, Any],
-    *,
-    overwrite: bool = True,
-) -> dict[str, Any]:
-    """Creates or replaces a session descriptor YAML.
-
-    Validates ``descriptor_payload`` against the descriptor dataclass that matches ``session_type`` and
-    writes the result to ``file_path``. The caller is responsible for choosing the destination path;
-    canonical location is ``<session>/raw_data/session_descriptor.yaml``.
-
-    Args:
-        file_path: Absolute path to the destination descriptor YAML file.
-        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate
-            against (``lick training``, ``run training``, ``mesoscope experiment``, or
-            ``window checking``).
-        descriptor_payload: The complete descriptor payload matching the appropriate descriptor schema.
-        overwrite: Determines whether to overwrite an existing descriptor file.
-
-    Returns:
-        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``,
-        and ``session_type``.
-    """
-    try:
-        session_type_enum = SessionTypes(session_type)
-    except ValueError:
-        valid = ", ".join(member.value for member in SessionTypes)
-        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
-    response = write_yaml_validated(
-        file_path=Path(file_path),
-        payload=descriptor_payload,
-        validator_cls=descriptor_class,
-        overwrite=overwrite,
-    )
-    if response.get("success"):
-        response["descriptor_class"] = descriptor_class.__name__
-        response["session_type"] = session_type_enum.value
-    return response
-
-
-@mcp.tool()
-def write_session_hardware_state_tool(
-    file_path: str,
-    hardware_state_payload: dict[str, Any],
-    *,
-    overwrite: bool = True,
-) -> dict[str, Any]:
-    """Creates or replaces a MesoscopeHardwareState YAML.
-
-    Args:
-        file_path: Absolute path to the destination hardware-state YAML file. Canonical location is
-            ``<session>/raw_data/hardware_state.yaml``.
-        hardware_state_payload: The complete MesoscopeHardwareState payload.
-        overwrite: Determines whether to overwrite an existing hardware state file.
-
-    Returns:
-        A response dict with ``file_path`` and ``data`` (the validated payload).
-    """
-    return write_yaml_validated(
-        file_path=Path(file_path),
-        payload=hardware_state_payload,
-        validator_cls=MesoscopeHardwareState,
-        overwrite=overwrite,
     )
 
 
@@ -623,9 +388,9 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
 
     issues: list[str] = []
 
-    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
-    if not raw_data_dir.is_dir():
-        issues.append(f"Missing raw_data directory: {raw_data_dir}")
+    raw_data_directory = session_root.joinpath("raw_data")  # type: ignore[union-attr]
+    if not raw_data_directory.is_dir():
+        issues.append(f"Missing raw_data directory: {raw_data_directory}")
         return ok_response(valid=False, issues=issues, session_path=str(session_root))
 
     try:
@@ -642,20 +407,20 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
     )
 
     # Verifies that the required descriptor and configuration snapshot files are present.
-    descriptor_path = raw_data_dir.joinpath(RawDataFiles.SESSION_DESCRIPTOR)
+    descriptor_path = raw_data_directory.joinpath(RawDataFiles.SESSION_DESCRIPTOR)
     if not descriptor_path.exists():
         issues.append(f"Missing descriptor file: {descriptor_path}")
 
     if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        experiment_snapshot = raw_data_dir.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
+        experiment_snapshot = raw_data_directory.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
         if not experiment_snapshot.exists():
             issues.append(f"Missing experiment configuration snapshot: {experiment_snapshot}")
 
-    system_snapshot = raw_data_dir.joinpath(RawDataFiles.SYSTEM_CONFIGURATION)
+    system_snapshot = raw_data_directory.joinpath(RawDataFiles.SYSTEM_CONFIGURATION)
     if not system_snapshot.exists():
         issues.append(f"Missing system configuration snapshot: {system_snapshot}")
 
-    uninitialized = raw_data_dir.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+    uninitialized = raw_data_directory.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
     descriptor_incomplete, _descriptor_error = read_descriptor_incomplete(session=session)
 
     summary = {
@@ -673,21 +438,18 @@ def validate_session_tool(session_path: str) -> dict[str, Any]:
 def get_session_status_tool(session_path: str) -> dict[str, Any]:
     """Returns lifecycle status for a single session.
 
-    Inspects three independent signals to derive the high-level state:
-
-    - The presence of the ``nk.bin`` marker under ``raw_data/``. When present, the acquisition
-      runtime has not yet finished initializing the session — the data is not valid and the
-      session is a trash target (``uninitialized``). No further checks are meaningful.
-    - The ``incomplete`` field on the session's descriptor YAML. True when the session ran but
-      encountered a runtime issue that may have left data gaps; the session still holds real
-      data and should be reviewed manually rather than skipped. This signal is independent of
-      ``uninitialized``.
-    - The population of ``processed_data/``. When any files exist, downstream processing has
-      started or completed.
-
-    The ``status`` field is a coarse projection with priority ``uninitialized`` > ``error`` >
-    ``incomplete`` > ``processed`` > ``acquired``. The individual boolean / nullable flags are
-    also returned so callers can compose their own logic.
+    Inspects three independent signals to derive the high-level state. The presence of the
+    ``nk.bin`` marker under ``raw_data/`` indicates that the acquisition runtime has not yet
+    finished initializing the session; in that case the data is not valid, the session is a
+    trash target (``uninitialized``), and no further checks are meaningful. The ``incomplete``
+    field on the session's descriptor YAML is true when the session ran but encountered a
+    runtime issue that may have left data gaps, in which case the session still holds real
+    data and should be reviewed manually rather than skipped; this signal is independent of
+    ``uninitialized``. The population of ``processed_data/`` indicates that downstream
+    processing has started or completed when any files exist there. The ``status`` field is
+    a coarse projection with priority ``uninitialized`` > ``error`` > ``incomplete`` >
+    ``processed`` > ``acquired``, and the individual boolean and nullable flags are also
+    returned so callers can compose their own logic.
 
     Args:
         session_path: Path to the session root directory.
@@ -700,15 +462,15 @@ def get_session_status_tool(session_path: str) -> dict[str, Any]:
     session_root, error = _resolve_session_root(session_path=session_path)
     if error is not None:
         return error
-    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
-    if not raw_data_dir.is_dir():
-        return error_response(message=f"raw_data directory not found at {raw_data_dir}")
+    raw_data_directory = session_root.joinpath("raw_data")  # type: ignore[union-attr]
+    if not raw_data_directory.is_dir():
+        return error_response(message=f"raw_data directory not found at {raw_data_directory}")
 
-    uninitialized = raw_data_dir.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
-    processed_data_dir = session_root.joinpath("processed_data")  # type: ignore[union-attr]
-    has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
+    uninitialized = raw_data_directory.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+    processed_data_directory = session_root.joinpath("processed_data")  # type: ignore[union-attr]
+    has_processed_data = processed_data_directory.is_dir() and any(processed_data_directory.iterdir())
 
-    # Uninitialized sessions never have a meaningful descriptor; short-circuit without a descriptor load.
+    # Skips the descriptor load for uninitialized sessions because their descriptor is never meaningful.
     if uninitialized:
         return ok_response(
             status="uninitialized",
@@ -799,8 +561,8 @@ def get_batch_session_status_overview_tool(root_directory: str) -> dict[str, Any
             continue
 
         uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
-        processed_data_dir = session_root.joinpath("processed_data")
-        has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
+        processed_data_directory = session_root.joinpath("processed_data")
+        has_processed_data = processed_data_directory.is_dir() and any(processed_data_directory.iterdir())
 
         if uninitialized:
             status = "uninitialized"
@@ -835,6 +597,116 @@ def get_batch_session_status_overview_tool(root_directory: str) -> dict[str, Any
 
 
 @mcp.tool()
+def read_session_data_tool(session_path: str) -> dict[str, Any]:
+    """Loads the SessionData YAML for a session.
+
+    ``SessionData`` is the session's identity marker (the file whose presence promotes a directory
+    into a Sollertia session), so this tool is scoped at the session level. For per-asset reads
+    (descriptors, hardware state, surgery metadata, frozen experiment configuration) use the
+    file-path-based read tools.
+
+    Args:
+        session_path: Path to the session root directory (or its ``raw_data`` subdirectory).
+
+    Returns:
+        A response dict with ``data`` (the full SessionData payload) and ``uninitialized`` (True when
+        the ``nk.bin`` marker is still present, i.e. the acquisition runtime has not yet finished
+        initializing the session and its data is not considered valid). To check whether the session
+        ran into issues during acquisition (the descriptor ``incomplete`` field), call
+        ``read_session_descriptor_tool`` or ``get_session_status_tool``.
+    """
+    session_root, error = _resolve_session_root(session_path=session_path)
+    if error is not None:
+        return error
+    try:
+        instance = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
+    except Exception as exception:
+        return error_response(message=f"Failed to load SessionData: {exception}")
+    uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+    return ok_response(
+        data=serialize(value=instance),
+        uninitialized=uninitialized,
+        session_path=str(session_root),
+    )
+
+
+@mcp.tool()
+def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str, Any]:
+    """Loads a session descriptor YAML, parsing it with the dataclass that matches ``session_type``.
+
+    The descriptor filename is always ``session_descriptor.yaml`` regardless of session type — only the
+    parsing class varies. The caller must supply ``session_type`` because the file path alone does not
+    disambiguate which descriptor class to instantiate; use ``list_supported_session_types_tool`` to
+    enumerate the valid values.
+
+    Args:
+        file_path: Absolute path to the descriptor YAML file. Canonical location is
+            ``<session>/raw_data/session_descriptor.yaml``.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use
+            (``lick training``, ``run training``, ``mesoscope experiment``, or ``window checking``).
+
+    Returns:
+        A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``,
+        and ``file_path``.
+    """
+    try:
+        session_type_enum = SessionTypes(session_type)
+    except ValueError:
+        valid = ", ".join(member.value for member in SessionTypes)
+        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
+    response = read_yaml(file_path=Path(file_path), validator_cls=descriptor_class)
+    if response.get("success"):
+        response["descriptor_class"] = descriptor_class.__name__
+        response["session_type"] = session_type_enum.value
+    return response
+
+
+@mcp.tool()
+def write_session_descriptor_tool(
+    file_path: str,
+    session_type: str,
+    descriptor_payload: dict[str, Any],
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """Creates or replaces a session descriptor YAML.
+
+    Validates ``descriptor_payload`` against the descriptor dataclass that matches ``session_type`` and
+    writes the result to ``file_path``. The caller is responsible for choosing the destination path;
+    canonical location is ``<session>/raw_data/session_descriptor.yaml``.
+
+    Args:
+        file_path: Absolute path to the destination descriptor YAML file.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate
+            against (``lick training``, ``run training``, ``mesoscope experiment``, or
+            ``window checking``).
+        descriptor_payload: The complete descriptor payload matching the appropriate descriptor schema.
+        overwrite: Determines whether to overwrite an existing descriptor file.
+
+    Returns:
+        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``,
+        and ``session_type``.
+    """
+    try:
+        session_type_enum = SessionTypes(session_type)
+    except ValueError:
+        valid = ", ".join(member.value for member in SessionTypes)
+        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum]
+    response = write_yaml_validated(
+        file_path=Path(file_path),
+        payload=descriptor_payload,
+        validator_cls=descriptor_class,
+        overwrite=overwrite,
+    )
+    if response.get("success"):
+        response["descriptor_class"] = descriptor_class.__name__
+        response["session_type"] = session_type_enum.value
+    return response
+
+
+@mcp.tool()
 def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]:
     """Returns the schema for the descriptor associated with a given session type.
 
@@ -861,21 +733,151 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
 
 
 @mcp.tool()
-def describe_session_hardware_state_schema_tool() -> dict[str, Any]:
-    """Returns the schema for MesoscopeHardwareState.
+def read_session_hardware_state_tool(file_path: str, acquisition_system: str) -> dict[str, Any]:
+    """Loads a hardware-state YAML, parsing it with the dataclass that matches ``acquisition_system``.
 
-    The hardware-state snapshot always lives at the canonical
-    ``<session>/raw_data/hardware_state.yaml`` path.
+    The hardware-state filename is always ``hardware_state.yaml`` regardless of acquisition system —
+    only the parsing class varies. The caller must supply ``acquisition_system`` because the file
+    path alone does not disambiguate which hardware-state class to instantiate; use
+    ``list_supported_acquisition_systems_tool`` to enumerate the valid values.
+
+    Args:
+        file_path: Absolute path to the hardware-state YAML file. Canonical location is
+            ``<session>/raw_data/hardware_state.yaml``.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state
+            dataclass to use. Today only ``mesoscope`` is registered; future systems join
+            ``HARDWARE_STATE_REGISTRY``.
 
     Returns:
-        A response dict with ``schema`` (the MesoscopeHardwareState dataclass schema describing
-        every hardware parameter field and its default).
+        A response dict with ``data`` (the hardware-state payload), ``hardware_state_class``,
+        ``acquisition_system``, and ``file_path``.
     """
-    return ok_response(schema=describe_dataclass(cls=MesoscopeHardwareState))
+    resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    response = read_yaml(file_path=Path(file_path), validator_cls=resolved)
+    if response.get("success"):
+        response["hardware_state_class"] = resolved.__name__
+        response["acquisition_system"] = acquisition_system
+    return response
 
 
 @mcp.tool()
-def describe_surgery_schema_tool() -> dict[str, Any]:
+def write_session_hardware_state_tool(
+    file_path: str,
+    acquisition_system: str,
+    hardware_state_payload: dict[str, Any],
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """Creates or replaces a hardware-state YAML.
+
+    Validates ``hardware_state_payload`` against the hardware-state dataclass that matches
+    ``acquisition_system`` and writes the result to ``file_path``. Use
+    ``list_supported_acquisition_systems_tool`` to enumerate the valid values.
+
+    Args:
+        file_path: Absolute path to the destination hardware-state YAML file. Canonical location is
+            ``<session>/raw_data/hardware_state.yaml``.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state
+            dataclass to validate against.
+        hardware_state_payload: The complete hardware-state payload.
+        overwrite: Determines whether to overwrite an existing hardware state file.
+
+    Returns:
+        A response dict with ``file_path``, ``data`` (the validated payload), ``hardware_state_class``,
+        and ``acquisition_system``.
+    """
+    resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    response = write_yaml_validated(
+        file_path=Path(file_path),
+        payload=hardware_state_payload,
+        validator_cls=resolved,
+        overwrite=overwrite,
+    )
+    if response.get("success"):
+        response["hardware_state_class"] = resolved.__name__
+        response["acquisition_system"] = acquisition_system
+    return response
+
+
+@mcp.tool()
+def describe_session_hardware_state_schema_tool(acquisition_system: str = "mesoscope") -> dict[str, Any]:
+    """Returns the schema for the hardware-state dataclass of a given acquisition system.
+
+    The hardware-state snapshot always lives at the canonical
+    ``<session>/raw_data/hardware_state.yaml`` path regardless of acquisition system; only the
+    parsing class varies.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value to describe. Defaults to ``"mesoscope"``.
+
+    Returns:
+        A response dict with ``acquisition_system`` (the validated enum value) and ``schema``
+        (the hardware-state dataclass field schema).
+    """
+    resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    return ok_response(
+        acquisition_system=acquisition_system,
+        schema=describe_dataclass(cls=resolved),
+    )
+
+
+@mcp.tool()
+def read_surgery_data_tool(file_path: str) -> dict[str, Any]:
+    """Loads the full SurgeryData payload from a per-session surgery-metadata snapshot.
+
+    The returned payload is the whole YAML — callers extract the ``subject``, ``procedure``, ``drugs``,
+    ``implants``, or ``injections`` sections themselves. Surgery metadata is treated as a single
+    monolithic record; there are no per-section MCP tools.
+
+    Args:
+        file_path: Absolute path to the surgery-metadata YAML file. Canonical location is
+            ``<session>/raw_data/surgery_metadata.yaml``.
+
+    Returns:
+        A response dict with ``data`` containing the full SurgeryData payload (subject, procedure,
+        drugs, implants, and injections sections).
+    """
+    return read_yaml(file_path=Path(file_path), validator_cls=SurgeryData)
+
+
+@mcp.tool()
+def write_surgery_data_tool(
+    file_path: str,
+    surgery_payload: dict[str, Any],
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """Creates or replaces a per-session surgery-metadata YAML.
+
+    Validates ``surgery_payload`` against the full ``SurgeryData`` schema and writes the result to
+    ``file_path``. Surgery metadata is a single monolithic record; the payload must contain all
+    sections (``subject``, ``procedure``, ``drugs``, ``implants``, and ``injections``).
+
+    Args:
+        file_path: Absolute path to the destination surgery-metadata YAML file. Canonical location is
+            ``<session>/raw_data/surgery_metadata.yaml``.
+        surgery_payload: The complete SurgeryData payload.
+        overwrite: Determines whether to overwrite an existing surgery-metadata file.
+
+    Returns:
+        A response dict with ``file_path`` and ``data`` (the validated payload).
+    """
+    return write_yaml_validated(
+        file_path=Path(file_path),
+        payload=surgery_payload,
+        validator_cls=SurgeryData,
+        overwrite=overwrite,
+    )
+
+
+@mcp.tool()
+def describe_surgery_data_schema_tool() -> dict[str, Any]:
     """Returns the schema for SurgeryData and its nested subclasses.
 
     Returns:
@@ -891,6 +893,36 @@ def describe_surgery_schema_tool() -> dict[str, Any]:
         "InjectionData": describe_dataclass(cls=InjectionData),
     }
     return ok_response(schema=schema)
+
+
+def _resolve_hardware_state_class(acquisition_system: str) -> type[YamlConfig] | dict[str, Any]:
+    """Resolves an ``acquisition_system`` string to its registered hardware-state dataclass.
+
+    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding
+    class in ``HARDWARE_STATE_REGISTRY``. Returns an error response dict when the value is not a
+    valid acquisition system or when no hardware-state class has been registered for that system yet.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value supplied by the caller.
+
+    Returns:
+        The resolved hardware-state dataclass on success, or an error response dict on failure.
+        Callers discriminate via ``isinstance(result, dict)``.
+    """
+    try:
+        acquisition_enum = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        return error_response(
+            message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}"
+        )
+    hardware_state_class = HARDWARE_STATE_REGISTRY.get(acquisition_enum)
+    if hardware_state_class is None:
+        registered = ", ".join(member.value for member in HARDWARE_STATE_REGISTRY)
+        return error_response(
+            message=f"No hardware-state class registered for '{acquisition_system}'. Registered: {registered}"
+        )
+    return hardware_state_class
 
 
 def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any] | None]:
@@ -947,5 +979,3 @@ def _load_session_summary(marker: Path) -> dict[str, Any]:
         "processed_data_path": str(instance.processed_data_path),
         "uninitialized": uninitialized,
     }
-
-
