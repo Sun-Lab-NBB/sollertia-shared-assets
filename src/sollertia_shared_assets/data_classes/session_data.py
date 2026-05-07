@@ -15,6 +15,9 @@ from ataraxis_data_structures import YamlConfig
 
 from ..configuration import AcquisitionSystems
 
+RAW_DATA_DIRECTORY: str = "raw_data"
+"""Canonical name of the per-session raw data directory under each session root."""
+
 
 class RawDataFiles(StrEnum):
     """Enumerates the canonical filenames at the root of a session's ``raw_data`` directory."""
@@ -399,7 +402,7 @@ class SessionData(YamlConfig):
         # Generates the session's raw data directory. This method assumes that the session is created on the
         # data acquisition machine that only acquires the data and does not create the other session's directories used
         # during data processing.
-        raw_data_path = session_path.joinpath("raw_data")
+        raw_data_path = session_path.joinpath(RAW_DATA_DIRECTORY)
         ensure_directory_exists(path=raw_data_path)
 
         # Generates the SessionData instance. processed_data_path is left at the default Path() because the data
@@ -479,7 +482,7 @@ class SessionData(YamlConfig):
         # to be processed. Uses this heuristic to get the path to the root session's directory and re-resolves the
         # raw and processed data root paths against the local filesystem layout so the session remains portable.
         local_root = session_data_path.parents[1]
-        instance.raw_data_path = local_root.joinpath("raw_data")
+        instance.raw_data_path = local_root.joinpath(RAW_DATA_DIRECTORY)
         instance.processed_data_path = local_root.joinpath("processed_data")
 
         return instance

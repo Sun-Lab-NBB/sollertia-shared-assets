@@ -284,10 +284,7 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
         of the descriptor's ``incomplete`` field and ``error_message`` is None. On failure,
         ``incomplete`` is None and ``error_message`` describes the failure.
     """
-    session_type = (
-        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
-    )
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type]
+    descriptor_class = DESCRIPTOR_REGISTRY[SessionTypes(session.session_type)]
     descriptor_path = session.session_descriptor_path
     if not descriptor_path.exists():
         return None, f"Descriptor file not found at {descriptor_path}"
