@@ -7,7 +7,12 @@ import platformdirs
 
 from sollertia_shared_assets.data_classes import (
     Directories,
+    MesoscopeRawData,
+    MesoscopeRawDataFiles,
+    MesoscopeDirectories,
+    RawData,
     RawDataFiles,
+    ProcessedData,
     SessionData,
     SessionTypes,
     ProcessingTrackers,
@@ -319,8 +324,8 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy: P
 
 
 def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path) -> None:
-    """Verifies that save() serializes the raw and processed data root paths as YAML scalars and writes to
-    the ``session_data_path`` property.
+    """Verifies that save() serializes the raw and processed data root paths as YAML scalars and writes the marker
+    file at ``raw_data_path / session_data.yaml``.
     """
     raw_data_path = sample_session_hierarchy / "raw_data"
     raw_data_path.mkdir(parents=True, exist_ok=True)
@@ -336,8 +341,9 @@ def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path
     )
     session_data.save()
 
-    assert session_data.session_data_path.exists()
-    content = session_data.session_data_path.read_text()
+    marker_path = raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
+    assert marker_path.exists()
+    content = marker_path.read_text()
     assert f"raw_data_path: {raw_data_path.as_posix()}" in content
     assert "processed_data_path: ." in content
 
@@ -452,8 +458,8 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
 
 
 def _make_session(raw: Path, processed: Path) -> SessionData:
-    """Builds a SessionData instance with explicit roots for property tests."""
-    return SessionData(
+    """Builds a SessionData instance with explicit roots and the runtime sub-dataclasses populated."""
+    session = SessionData(
         project_name="test_project",
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
@@ -463,77 +469,111 @@ def _make_session(raw: Path, processed: Path) -> SessionData:
         raw_data_path=raw,
         processed_data_path=processed,
     )
+    session._build_sub_dataclasses()
+    return session
 
 
 def test_session_data_raw_data_file_paths() -> None:
-    """Verifies that every raw-data file property resolves to raw_data_path / <RawDataFiles member>."""
+    """Verifies that every generic raw-data file path resolves to raw_data_path / <RawDataFiles member>."""
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    assert session.session_data_path == Path("/tmp/raw") / RawDataFiles.SESSION_DATA
-    assert session.session_descriptor_path == Path("/tmp/raw") / RawDataFiles.SESSION_DESCRIPTOR
-    assert session.surgery_metadata_path == Path("/tmp/raw") / RawDataFiles.SURGERY_METADATA
-    assert session.hardware_state_path == Path("/tmp/raw") / RawDataFiles.HARDWARE_STATE
-    assert session.experiment_configuration_path == Path("/tmp/raw") / RawDataFiles.EXPERIMENT_CONFIGURATION
-    assert session.system_configuration_path == Path("/tmp/raw") / RawDataFiles.SYSTEM_CONFIGURATION
-    assert session.checksum_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM
-    assert session.checksum_tracker_path == Path("/tmp/raw") / ProcessingTrackers.CHECKSUM
-    assert session.zaber_positions_path == Path("/tmp/raw") / RawDataFiles.ZABER_POSITIONS
-    assert session.mesoscope_positions_path == Path("/tmp/raw") / RawDataFiles.MESOSCOPE_POSITIONS
-    assert session.window_screenshot_path == Path("/tmp/raw") / RawDataFiles.WINDOW_SCREENSHOT
+    assert session.raw_data.session_data_path == Path("/tmp/raw") / RawDataFiles.SESSION_DATA
+    assert session.raw_data.session_descriptor_path == Path("/tmp/raw") / RawDataFiles.SESSION_DESCRIPTOR
+    assert session.raw_data.surgery_metadata_path == Path("/tmp/raw") / RawDataFiles.SURGERY_METADATA
+    assert session.raw_data.hardware_state_path == Path("/tmp/raw") / RawDataFiles.HARDWARE_STATE
+    assert session.raw_data.experiment_configuration_path == Path("/tmp/raw") / RawDataFiles.EXPERIMENT_CONFIGURATION
+    assert session.raw_data.system_configuration_path == Path("/tmp/raw") / RawDataFiles.SYSTEM_CONFIGURATION
+    assert session.raw_data.checksum_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM
+    assert session.raw_data.checksum_tracker_path == Path("/tmp/raw") / ProcessingTrackers.CHECKSUM
+    assert session.raw_data.nk_path == Path("/tmp/raw") / RawDataFiles.NK_MARKER
+
+
+def test_session_data_system_raw_data_file_paths() -> None:
+    """Verifies that every Mesoscope-VR-specific raw-data file path resolves under raw_data_path."""
+    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+
+    assert isinstance(session.system_raw_data, MesoscopeRawData)
+    assert session.system_raw_data.zaber_positions_path == Path("/tmp/raw") / MesoscopeRawDataFiles.ZABER_POSITIONS
+    assert (
+        session.system_raw_data.mesoscope_positions_path == Path("/tmp/raw") / MesoscopeRawDataFiles.MESOSCOPE_POSITIONS
+    )
+    assert session.system_raw_data.window_screenshot_path == Path("/tmp/raw") / MesoscopeRawDataFiles.WINDOW_SCREENSHOT
+    assert session.system_raw_data.mesoscope_data_path == Path("/tmp/raw") / MesoscopeDirectories.MESOSCOPE_DATA
 
 
 def test_session_data_raw_data_directory_paths() -> None:
-    """Verifies that raw-data directory properties resolve to raw_data_path / <Directories member>."""
+    """Verifies that raw-data directory paths resolve to raw_data_path / <Directories member>."""
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    assert session.raw_camera_data_path == Path("/tmp/raw") / Directories.CAMERA_DATA
-    assert session.raw_behavior_data_path == Path("/tmp/raw") / Directories.BEHAVIOR_DATA
-    assert session.raw_microcontroller_data_path == Path("/tmp/raw") / Directories.MICROCONTROLLER_DATA
-    assert session.raw_mesoscope_data_path == Path("/tmp/raw") / Directories.MESOSCOPE_DATA
+    assert session.raw_data.camera_data_path == Path("/tmp/raw") / Directories.CAMERA_DATA
+    assert session.raw_data.behavior_data_path == Path("/tmp/raw") / Directories.BEHAVIOR_DATA
+    assert session.raw_data.microcontroller_data_path == Path("/tmp/raw") / Directories.MICROCONTROLLER_DATA
 
 
 def test_session_data_processed_data_directory_paths() -> None:
-    """Verifies that processed-data directory properties resolve to processed_data_path / <Directories>."""
+    """Verifies that processed-data directory paths resolve to processed_data_path / <Directories member>."""
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    assert session.behavior_data_path == Path("/tmp/proc") / Directories.BEHAVIOR_DATA
-    assert session.cindra_data_path == Path("/tmp/proc") / Directories.CINDRA
-    assert session.camera_timestamps_path == Path("/tmp/proc") / Directories.CAMERA_TIMESTAMPS
-    assert session.camera_data_path == Path("/tmp/proc") / Directories.CAMERA_DATA
-    assert session.microcontroller_data_path == Path("/tmp/proc") / Directories.MICROCONTROLLER_DATA
+    assert session.processed_data.behavior_data_path == Path("/tmp/proc") / Directories.BEHAVIOR_DATA
+    assert session.processed_data.cindra_data_path == Path("/tmp/proc") / Directories.CINDRA
+    assert session.processed_data.camera_timestamps_path == Path("/tmp/proc") / Directories.CAMERA_TIMESTAMPS
+    assert session.processed_data.camera_data_path == Path("/tmp/proc") / Directories.CAMERA_DATA
+    assert session.processed_data.microcontroller_data_path == Path("/tmp/proc") / Directories.MICROCONTROLLER_DATA
 
 
 def test_directories_enum_disambiguation() -> None:
-    """Verifies that raw-side and processed-side properties sharing a Directories value resolve to
-    distinct paths anchored on the correct parent.
+    """Verifies that raw-side and processed-side fields sharing a Directories value resolve to distinct paths
+    anchored on the correct parent.
     """
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    assert session.raw_camera_data_path != session.camera_data_path
-    assert session.raw_behavior_data_path != session.behavior_data_path
-    assert session.raw_microcontroller_data_path != session.microcontroller_data_path
+    assert session.raw_data.camera_data_path != session.processed_data.camera_data_path
+    assert session.raw_data.behavior_data_path != session.processed_data.behavior_data_path
+    assert session.raw_data.microcontroller_data_path != session.processed_data.microcontroller_data_path
 
 
 def test_session_data_processing_tracker_paths() -> None:
-    """Verifies that each processing-tracker property resolves to the expected subdirectory + filename."""
+    """Verifies that each processing-tracker path resolves to the expected subdirectory + filename."""
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    assert session.behavior_tracker_path == session.behavior_data_path / ProcessingTrackers.BEHAVIOR
-    assert session.camera_tracker_path == session.camera_timestamps_path / ProcessingTrackers.CAMERA
-    assert session.video_tracker_path == session.camera_data_path / ProcessingTrackers.VIDEO
+    processed = session.processed_data
+    assert processed.behavior_tracker_path == processed.behavior_data_path / ProcessingTrackers.BEHAVIOR
+    assert processed.camera_tracker_path == processed.camera_timestamps_path / ProcessingTrackers.CAMERA
+    assert processed.video_tracker_path == processed.camera_data_path / ProcessingTrackers.VIDEO
     assert (
-        session.microcontroller_tracker_path == session.microcontroller_data_path / ProcessingTrackers.MICROCONTROLLER
+        processed.microcontroller_tracker_path
+        == processed.microcontroller_data_path / ProcessingTrackers.MICROCONTROLLER
     )
     assert (
-        session.cindra_single_recording_tracker_path
-        == session.cindra_data_path / ProcessingTrackers.CINDRA_SINGLE_RECORDING
+        processed.cindra_single_recording_tracker_path
+        == processed.cindra_data_path / ProcessingTrackers.CINDRA_SINGLE_RECORDING
     )
-    assert session.cindra_multi_recording_path == session.cindra_data_path / Directories.MULTI_RECORDING
+    assert processed.cindra_multi_recording_path == processed.cindra_data_path / Directories.MULTI_RECORDING
 
 
-def test_session_data_properties_on_default_instance() -> None:
-    """Verifies that properties return valid relative Paths when raw_data_path and processed_data_path are
-    left at their Path() defaults.
+def test_session_data_paths_on_default_instance() -> None:
+    """Verifies that sub-dataclass paths resolve relative to Path() when the SessionData roots are at their defaults."""
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.LICK_TRAINING,
+        python_version="3.11.13",
+        sollertia_experiment_version="3.0.0",
+    )
+    session._build_sub_dataclasses()
+
+    assert session.raw_data.hardware_state_path == Path(RawDataFiles.HARDWARE_STATE)
+    assert session.processed_data.behavior_data_path == Path(Directories.BEHAVIOR_DATA)
+    assert (
+        session.processed_data.cindra_single_recording_tracker_path
+        == Path(Directories.CINDRA) / ProcessingTrackers.CINDRA_SINGLE_RECORDING
+    )
+
+
+def test_session_data_sub_dataclass_attributes_unset_without_build() -> None:
+    """Verifies that the sub-dataclass attributes are unset when SessionData is constructed without going through
+    create() / load() / _build_sub_dataclasses().
     """
     session = SessionData(
         project_name="test_project",
@@ -544,34 +584,32 @@ def test_session_data_properties_on_default_instance() -> None:
         sollertia_experiment_version="3.0.0",
     )
 
-    assert session.hardware_state_path == Path(RawDataFiles.HARDWARE_STATE)
-    assert session.behavior_data_path == Path(Directories.BEHAVIOR_DATA)
-    assert (
-        session.cindra_single_recording_tracker_path
-        == Path(Directories.CINDRA) / ProcessingTrackers.CINDRA_SINGLE_RECORDING
-    )
+    with pytest.raises(AttributeError):
+        _ = session.raw_data
+    with pytest.raises(AttributeError):
+        _ = session.processed_data
+    with pytest.raises(AttributeError):
+        _ = session.system_raw_data
 
 
-def test_session_data_properties_are_pure() -> None:
-    """Verifies that property access returns equal values on repeat calls and does not mutate the instance."""
+def test_session_data_build_sub_dataclasses_returns_typed_instances() -> None:
+    """Verifies that _build_sub_dataclasses populates the three sub-dataclass attributes with their concrete types."""
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    first = session.hardware_state_path
-    second = session.hardware_state_path
-    assert first == second
-
-    # Field set must be unchanged — properties should not materialize into instance state.
-    assert "hardware_state_path" not in vars(session)
+    assert isinstance(session.raw_data, RawData)
+    assert isinstance(session.processed_data, ProcessedData)
+    assert isinstance(session.system_raw_data, MesoscopeRawData)
 
 
 def test_raw_data_files_enum_is_string_enum() -> None:
-    """Verifies that RawDataFiles members are strings (StrEnum)."""
+    """Verifies that RawDataFiles members are strings (StrEnum) and that Mesoscope-specific entries live separately."""
     assert isinstance(RawDataFiles.SESSION_DATA, str)
     assert RawDataFiles.SESSION_DATA == "session_data.yaml"
     assert RawDataFiles.SESSION_DESCRIPTOR == "session_descriptor.yaml"
-    assert RawDataFiles.ZABER_POSITIONS == "zaber_positions.yaml"
-    assert RawDataFiles.MESOSCOPE_POSITIONS == "mesoscope_positions.yaml"
-    assert RawDataFiles.WINDOW_SCREENSHOT == "window_screenshot.png"
+    assert RawDataFiles.NK_MARKER == "nk.bin"
+    assert MesoscopeRawDataFiles.ZABER_POSITIONS == "zaber_positions.yaml"
+    assert MesoscopeRawDataFiles.MESOSCOPE_POSITIONS == "mesoscope_positions.yaml"
+    assert MesoscopeRawDataFiles.WINDOW_SCREENSHOT == "window_screenshot.png"
 
 
 def test_directories_enum_is_string_enum() -> None:

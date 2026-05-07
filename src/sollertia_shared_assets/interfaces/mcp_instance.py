@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ..data_classes import (
     SessionData,
+    RawDataFiles,
     SessionTypes,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 DATASET_MARKER_FILENAME: str = "dataset.yaml"
 """Marker filename used to identify dataset directories during recursive discovery walks."""
 
-UNINITIALIZED_SESSION_MARKER: str = "nk.bin"
+UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
 """Marker file present in ``raw_data`` while a session is **uninitialized** — the acquisition runtime has
 not yet finished creating hardware / experiment snapshots or initializing instruments. A session with this
 marker holds no data of value and is a valid target for purging (treat it as trash). The acquisition
@@ -292,7 +293,7 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
         ``incomplete`` is None and ``error_message`` describes the failure.
     """
     descriptor_class = DESCRIPTOR_REGISTRY[SessionTypes(session.session_type)]
-    descriptor_path = session.session_descriptor_path
+    descriptor_path = session.raw_data.session_descriptor_path
     if not descriptor_path.exists():
         return None, f"Descriptor file not found at {descriptor_path}"
     try:
