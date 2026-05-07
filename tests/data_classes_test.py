@@ -476,7 +476,10 @@ def test_session_data_raw_data_file_paths() -> None:
     assert session.experiment_configuration_path == Path("/tmp/raw") / RawDataFiles.EXPERIMENT_CONFIGURATION
     assert session.system_configuration_path == Path("/tmp/raw") / RawDataFiles.SYSTEM_CONFIGURATION
     assert session.checksum_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM
-    assert session.checksum_tracker_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM_TRACKER
+    assert session.checksum_tracker_path == Path("/tmp/raw") / ProcessingTrackers.CHECKSUM
+    assert session.zaber_positions_path == Path("/tmp/raw") / RawDataFiles.ZABER_POSITIONS
+    assert session.mesoscope_positions_path == Path("/tmp/raw") / RawDataFiles.MESOSCOPE_POSITIONS
+    assert session.window_screenshot_path == Path("/tmp/raw") / RawDataFiles.WINDOW_SCREENSHOT
 
 
 def test_session_data_raw_data_directory_paths() -> None:
@@ -566,6 +569,9 @@ def test_raw_data_files_enum_is_string_enum() -> None:
     assert isinstance(RawDataFiles.SESSION_DATA, str)
     assert RawDataFiles.SESSION_DATA == "session_data.yaml"
     assert RawDataFiles.SESSION_DESCRIPTOR == "session_descriptor.yaml"
+    assert RawDataFiles.ZABER_POSITIONS == "zaber_positions.yaml"
+    assert RawDataFiles.MESOSCOPE_POSITIONS == "mesoscope_positions.yaml"
+    assert RawDataFiles.WINDOW_SCREENSHOT == "window_screenshot.png"
 
 
 def test_directories_enum_is_string_enum() -> None:
@@ -578,5 +584,10 @@ def test_directories_enum_is_string_enum() -> None:
 def test_processing_trackers_enum_is_string_enum() -> None:
     """Verifies that ProcessingTrackers members are strings (StrEnum)."""
     assert isinstance(ProcessingTrackers.BEHAVIOR, str)
+    assert ProcessingTrackers.CHECKSUM == "checksum_processing_tracker.yaml"
     assert ProcessingTrackers.CINDRA_SINGLE_RECORDING == "single_recording_tracker.yaml"
+    assert ProcessingTrackers.CINDRA_MULTI_RECORDING == "multi_recording_tracker.yaml"
     assert ProcessingTrackers.VIDEO == "video_processing_tracker.yaml"
+    assert ProcessingTrackers.FORGING == "forging_tracker.yaml"
+    assert ProcessingTrackers.MANIFEST == "manifest_processing_tracker.yaml"
+    assert ProcessingTrackers.TRANSFER == "transfer_processing_tracker.yaml"

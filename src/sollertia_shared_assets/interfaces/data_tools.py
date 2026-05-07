@@ -1,30 +1,34 @@
-"""Provides MCP tools for discovering, reading, writing, and validating runtime data assets.
-
-Covers sessions, datasets, subjects, surgery data, and session descriptors. All tools register on the
-shared ``mcp`` instance from ``mcp_instance``.
-"""
+"""Provides MCP tools for discovering, reading, writing, and validating runtime data assets."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from pathlib import Path
+from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    INCOMPLETE_SESSION_MARKER,
+    DATASET_MARKER_FILENAME,
+    HARDWARE_STATE_REGISTRY,
+    UNINITIALIZED_SESSION_MARKER,
     mcp,
     read_yaml,
     serialize,
     ok_response,
-    safe_iterdir,
     error_response,
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
+    read_descriptor_incomplete,
 )
 from ..data_classes import (
+    RAW_DATA_DIRECTORY,
     DrugData,
+    Directories,
     ImplantData,
     SessionData,
     SubjectData,
@@ -33,175 +37,155 @@ from ..data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
-    MesoscopeHardwareState,
     filter_sessions,
     session_root_from_marker,
 )
-from ..configuration import (
-    MesoscopeExperimentConfiguration,
-    get_working_directory,
-)
+from ..configuration import AcquisitionSystems
 
-if TYPE_CHECKING:
-    from ataraxis_data_structures import YamlConfig
+_STATUS_KEYS: tuple[str, ...] = ("uninitialized", "incomplete", "acquired", "processed", "error")
+"""Canonical lifecycle status keys used in ``counts`` dicts across the overview and inspection tools."""
 
 
 @mcp.tool()
-def discover_projects_tool(root_directory: str | None = None) -> dict[str, Any]:
-    """Lists all projects accessible to the data acquisition system.
+def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
+    """Walks the data root and groups loadable ``session_data.yaml`` markers into a project / animal / session tree.
 
-    Scans the immediate children of the data root for project directories, returning each project's name and
-    aggregate counts (animals and experiment configurations).
+    Sessions are bucketed by their SessionData identity fields, not by directory structure, so stray
+    directories cannot surface as phantom projects. Markers that fail to load appear in the flat
+    ``sessions`` list with ``status="error"`` and an ``error_detail`` field, but do not contribute to
+    project or animal aggregation.
 
     Args:
-        root_directory: The absolute path to the root data directory to scan. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
+        root_directory: Absolute path to the data root to scan.
 
     Returns:
-        A response dict with ``projects`` (list of project summary dicts) and ``total_projects``.
+        A response dict with ``projects`` (per-project entries with ``name``, ``path``, ``animals``,
+        ``session_count``, ``counts``, ``sessions_by_type``, ``experiment_count``, ``dataset_count``;
+        each animals entry carries ``id``, ``session_paths``, ``session_count``, ``counts``);
+        ``sessions`` (flat per-session entries suitable for chaining into ``filter_sessions_tool``);
+        top-level ``counts`` (status tally including errors); and ``total_projects``,
+        ``total_animals``, ``total_sessions``, ``root_directory``.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
 
-    projects: list[dict[str, Any]] = []
-    for child in sorted(safe_iterdir(directory=root), key=lambda candidate: candidate.name):  # type: ignore[arg-type]
-        if not child.is_dir():
-            continue
-        configuration_dir = child.joinpath(CONFIGURATION_DIR)
-        experiment_count = len(list(configuration_dir.glob("*.yaml"))) if configuration_dir.is_dir() else 0
-        animal_count = sum(
-            1 for animal in safe_iterdir(directory=child) if animal.is_dir() and animal.name != CONFIGURATION_DIR
-        )
-        projects.append(
-            {
-                "name": child.name,
-                "path": str(child),
-                "animal_count": animal_count,
-                "experiment_count": experiment_count,
-            }
-        )
+    flat_sessions: list[dict[str, Any]] = []
+    top_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
 
-    return ok_response(projects=projects, total_projects=len(projects), root_directory=str(root))
-
-
-@mcp.tool()
-def discover_animals_tool(project: str, root_directory: str | None = None) -> dict[str, Any]:
-    """Lists animal subdirectories within a project.
-
-    Args:
-        project: The name of the project to enumerate animals for.
-        root_directory: The absolute path to the root data directory to scan.
-
-    Returns:
-        A response dict with ``animals`` (list of animal summary dicts), ``total_animals``, and ``project``.
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-
-    project_path = root.joinpath(project)  # type: ignore[union-attr]
-    if not project_path.is_dir():
-        return error_response(message=f"Project '{project}' not found at {project_path}")
-
-    animals: list[dict[str, Any]] = []
-    for child in sorted(safe_iterdir(directory=project_path), key=lambda candidate: candidate.name):
-        if not child.is_dir() or child.name == CONFIGURATION_DIR:
-            continue
-        session_count = len(list(child.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
-        animals.append({"animal_id": child.name, "path": str(child), "session_count": session_count})
-
-    return ok_response(animals=animals, total_animals=len(animals), project=project)
-
-
-@mcp.tool()
-def discover_sessions_tool(
-    root_directory: str | None = None,
-    project: str | None = None,
-    animal_id: str | None = None,
-    session_types: list[str] | None = None,
-) -> dict[str, Any]:
-    """Recursively discovers all sessions under the data root and classifies eligibility by session type.
-
-    Walks the directory tree looking for ``session_data.yaml`` markers and returns a flat list of
-    session summaries plus a ``session_paths`` list of eligible session roots ready to hand off to
-    downstream batch tools (e.g. forgery's ``prepare_*_batch_tool`` family). The optional ``project``
-    and ``animal_id`` arguments narrow the directory tree that is searched; ``session_types`` acts as
-    an eligibility filter that classifies every discovered session without removing it from the
-    response, so agents can still see ineligible or broken sessions for diagnosis.
-
-    Args:
-        root_directory: The absolute path to the root data directory to scan.
-        project: When provided, narrows the search to the given project subtree. A missing project
-            directory returns an error response.
-        animal_id: When provided (with ``project``), narrows the search to the given animal subtree.
-            Ignored when ``project`` is ``None``.
-        session_types: An optional list of session type strings to classify sessions against. When
-            provided, each session entry includes ``eligible=True`` only if its type is in the list,
-            and ``session_paths`` contains only eligible roots. When omitted, every discovered session
-            is eligible. Must contain only valid ``SessionTypes`` values.
-
-    Returns:
-        A response dict with ``sessions`` (list of per-session summary dicts each including an
-        ``eligible`` flag), ``session_paths`` (flat list of eligible session root paths),
-        ``total_sessions``, ``total_eligible``, and ``root_directory``.
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-
-    # Validates the optional session_types eligibility filter against the supported values.
-    types_filter: frozenset[SessionTypes] | None = None
-    if session_types is not None:
-        try:
-            types_filter = frozenset(SessionTypes(candidate) for candidate in session_types)
-        except ValueError as exception:
-            valid = ", ".join(member.value for member in SessionTypes)
-            return error_response(message=f"Invalid session type in filter: {exception}. Valid values: {valid}")
-
-    # Narrows the search root to a specific project and animal when provided.
-    search_root = root
-    if project is not None:
-        search_root = root.joinpath(project)  # type: ignore[union-attr]
-        if not search_root.is_dir():
-            return error_response(message=f"Project '{project}' not found at {search_root}")
-        if animal_id is not None:
-            search_root = search_root.joinpath(animal_id)
-            if not search_root.is_dir():
-                return error_response(message=f"Animal '{animal_id}' not found at {search_root}")
-
-    # Recursively discovers session markers and classifies each summary against the eligibility filter.
-    markers = sorted(search_root.rglob(RawDataFiles.SESSION_DATA))  # type: ignore[union-attr]
-    sessions: list[dict[str, Any]] = []
-    eligible_paths: list[str] = []
+    # Walks every session marker under the root. Broken markers produce error-status entries but do
+    # not corrupt the project / animal aggregation because their identity cannot be trusted.
+    markers = sorted(root.rglob(RawDataFiles.SESSION_DATA))  # type: ignore[union-attr]
     for marker in markers:
-        summary = _load_session_summary(marker=marker)
-        if "error" in summary:
-            summary["eligible"] = False
-            sessions.append(summary)
+        session_root = session_root_from_marker(marker=marker)
+        try:
+            instance = SessionData.load(session_path=session_root)
+        except Exception as exception:
+            flat_sessions.append(
+                {
+                    "session_path": str(session_root),
+                    "marker": str(marker),
+                    "status": "error",
+                    "error_detail": f"Failed to load SessionData: {exception}",
+                }
+            )
+            top_counts["error"] += 1
             continue
 
-        if types_filter is None:
-            eligible = True
-        else:
-            try:
-                eligible = SessionTypes(summary["session_type"]) in types_filter
-            except ValueError:
-                eligible = False
-        summary["eligible"] = eligible
+        status_info = _compute_session_status(instance=instance)
+        entry: dict[str, Any] = {
+            "session_name": instance.session_name,
+            "project": instance.project_name,
+            "animal": instance.animal_id,
+            "session_type": serialize(value=instance.session_type),
+            "acquisition_system": serialize(value=instance.acquisition_system),
+            "experiment_name": instance.experiment_name,
+            "session_path": str(session_root),
+            "raw_data_path": str(instance.raw_data_path),
+            "processed_data_path": str(instance.processed_data_path),
+            "status": status_info.status,
+            "uninitialized": status_info.uninitialized,
+            "incomplete": status_info.incomplete,
+            "has_processed_data": status_info.has_processed_data,
+        }
+        if status_info.error_detail is not None:
+            entry["error_detail"] = status_info.error_detail
+        flat_sessions.append(entry)
+        top_counts[status_info.status] += 1
 
-        if eligible:
-            eligible_paths.append(summary["session_path"])
+    projects = _aggregate_projects(root=root, sessions=flat_sessions)  # type: ignore[arg-type]
 
-        sessions.append(summary)
+    # Augments each project with filesystem-derived experiment configuration and dataset counts.
+    for project in projects:
+        experiment_count, dataset_count = _count_project_artifacts(project_path=Path(project["path"]))
+        project["experiment_count"] = experiment_count
+        project["dataset_count"] = dataset_count
+
+    total_animals = sum(len(project["animals"]) for project in projects)
 
     return ok_response(
-        sessions=sessions,
-        session_paths=eligible_paths,
-        total_sessions=len(sessions),
-        total_eligible=len(eligible_paths),
+        projects=projects,
+        sessions=flat_sessions,
+        counts=top_counts,
+        total_projects=len(projects),
+        total_animals=total_animals,
+        total_sessions=len(flat_sessions),
         root_directory=str(root),
     )
+
+
+@mcp.tool()
+def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
+    """Produces a per-session health and inventory report for each supplied session path.
+
+    Each report carries lifecycle status, an existence flag for every canonical ``raw_data`` file and
+    every ``processed_data`` subdirectory (with paired processing-tracker presence), and a
+    ``required_assets`` check (descriptor and system configuration always required; experiment
+    configuration also required for ``mesoscope experiment`` sessions). Paths that fail to resolve
+    or load surface with ``status="error"`` and an ``error_detail`` field without aborting the batch.
+
+    Args:
+        session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a
+            single-element list to inspect one session.
+
+    Returns:
+        A response dict with ``sessions`` (per-session report dicts), ``total_sessions``, and
+        ``counts`` (status tally across the batch).
+    """
+    reports: list[dict[str, Any]] = []
+    counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
+
+    for raw_path in session_paths:
+        session_root, resolve_error = _resolve_session_root(session_path=raw_path)
+        if resolve_error is not None or session_root is None:
+            reports.append(
+                {
+                    "session_path": raw_path,
+                    "status": "error",
+                    "error_detail": resolve_error["error"] if resolve_error is not None else "Unresolved session path",
+                }
+            )
+            counts["error"] += 1
+            continue
+
+        try:
+            instance = SessionData.load(session_path=session_root)
+        except Exception as exception:
+            reports.append(
+                {
+                    "session_path": str(session_root),
+                    "status": "error",
+                    "error_detail": f"Failed to load SessionData: {exception}",
+                }
+            )
+            counts["error"] += 1
+            continue
+
+        report = _build_session_report(instance=instance, session_root=session_root)
+        reports.append(report)
+        counts[report["status"]] += 1
+
+    return ok_response(sessions=reports, total_sessions=len(reports), counts=counts)
 
 
 @mcp.tool()
@@ -218,35 +202,29 @@ def filter_sessions_tool(
 ) -> dict[str, Any]:
     """Filters a list of session entries by date range and inclusion-exclusion criteria.
 
-    Designed for agentic chaining with ``discover_sessions_tool``: accepts the ``sessions`` list from
-    its output and returns a filtered subset with the same structure. Each input entry must contain
-    ``session_name`` and ``animal`` keys (matching the shape produced by ``discover_sessions_tool``).
-    Animal filtering is applied before session filtering and exclusion always takes precedence over
-    inclusion.
+    Designed to chain after ``get_data_root_overview_tool``: pass its ``sessions`` list and receive
+    a filtered subset with the same structure. Animal filters apply before session filters;
+    exclusions take precedence over inclusions.
 
     Args:
-        sessions: A list of session entry dictionaries, each containing at least ``session_name`` and
-            ``animal`` keys. Typically, the ``sessions`` list returned by ``discover_sessions_tool``.
-        start_date: Sessions recorded on or after this date are included. Accepts formats like
-            ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``. When ``None``, no start bound is applied.
-        end_date: Sessions recorded on or before this date are included. Date-only values include the
-            entire day. When ``None``, no end bound is applied.
-        include_sessions: Session names to include regardless of the date range, unless overridden by
-            ``exclude_sessions``.
-        exclude_sessions: Session names to exclude from the results. Takes precedence over all other
-            inclusion criteria.
-        include_animals: Animal identifiers to include. When provided, only sessions from these
-            animals are considered.
-        exclude_animals: Animal identifiers to exclude. Takes precedence over ``include_animals``.
-        utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC.
-            When ``False``, uses America/New_York.
+        sessions: Session entry dictionaries, each containing at least ``session_name`` and
+            ``animal`` keys. Typically the ``sessions`` list returned by ``get_data_root_overview_tool``.
+        start_date: Lower bound (inclusive). Accepts ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``.
+            None disables the lower bound.
+        end_date: Upper bound (inclusive). Date-only values include the entire day. None disables
+            the upper bound.
+        include_sessions: Session names to include regardless of the date range, unless overridden
+            by ``exclude_sessions``.
+        exclude_sessions: Session names to exclude. Takes precedence over all inclusion criteria.
+        include_animals: When provided, only sessions from these animal IDs are considered.
+        exclude_animals: Animal IDs to exclude. Takes precedence over ``include_animals``.
+        utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC;
+            falls back to America/New_York when False.
 
     Returns:
-        A response dict with a filtered ``sessions`` list, a ``session_paths`` list of eligible
-        session roots from the filtered subset, and ``total_sessions`` / ``total_eligible`` counts.
-        Structurally identical to ``discover_sessions_tool`` output for downstream chaining. An
-        ``invalid_entries`` key appears when input entries lack the required ``session_name`` /
-        ``animal`` fields.
+        A response dict with the filtered ``sessions`` list, a ``session_paths`` list of eligible
+        session roots from the filtered subset, ``total_sessions`` / ``total_eligible`` counts, and
+        an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``.
     """
     # Builds a (session_name, animal) tuple set and a reverse map from session name to the original
     # entry so the filter helper can operate on plain tuples and results can be rehydrated to dicts.
@@ -284,7 +262,9 @@ def filter_sessions_tool(
     )
 
     eligible_paths = sorted(
-        entry["session_path"] for entry in filtered_entries if entry.get("eligible", True) and "session_path" in entry
+        entry["session_path"]
+        for entry in filtered_entries
+        if entry.get("status") != "error" and "session_path" in entry
     )
 
     response: dict[str, Any] = ok_response(
@@ -301,603 +281,284 @@ def filter_sessions_tool(
 
 
 @mcp.tool()
-def discover_session_descriptors_tool(session_path: str) -> dict[str, Any]:
-    """Returns the inventory of descriptor, hardware state, and configuration snapshot files present in a
-    session's raw_data directory.
+def read_session_data_tool(file_path: str) -> dict[str, Any]:
+    """Parses a ``session_data.yaml`` file and returns its serialized ``SessionData`` payload.
+
+    For session discovery or lifecycle-status decisions, prefer ``get_data_root_overview_tool`` or
+    ``inspect_sessions_tool`` instead — this tool only parses the marker file.
 
     Args:
-        session_path: Path to the session root directory (containing the ``raw_data`` subdirectory).
+        file_path: Absolute path to the ``session_data.yaml`` file. Canonical location is
+            ``<session>/raw_data/session_data.yaml``.
 
     Returns:
-        A response dict with ``files`` (list of name, path, and kind entries describing each YAML file found).
+        A response dict with ``file_path`` and ``data`` (the full SessionData payload).
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-
-    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
-    if not raw_data_dir.is_dir():
-        return error_response(message=f"raw_data directory not found at {raw_data_dir}")
-
-    # Maps canonical filenames to human-readable kind labels for classification. The session descriptor
-    # always lives at ``session_descriptor.yaml`` regardless of session type; the per-type descriptor
-    # classes in DESCRIPTOR_REGISTRY parse the same file differently based on the session's session_type.
-    known_kinds = {
-        RawDataFiles.SESSION_DATA: "session_data",
-        RawDataFiles.SESSION_DESCRIPTOR: "session_descriptor",
-        RawDataFiles.SURGERY_METADATA: "surgery_metadata",
-        RawDataFiles.SYSTEM_CONFIGURATION: "system_configuration_snapshot",
-        RawDataFiles.EXPERIMENT_CONFIGURATION: "experiment_configuration_snapshot",
-        RawDataFiles.HARDWARE_STATE: "hardware_state",
-    }
-
-    # Classifies each YAML file in raw_data by matching against known filenames.
-    files: list[dict[str, Any]] = []
-    for candidate in sorted(raw_data_dir.glob("*.yaml")):
-        # noinspection PyTypeChecker
-        kind = known_kinds.get(candidate.name, "unknown")
-        files.append({"name": candidate.name, "path": str(candidate), "kind": kind})
-
-    incomplete = raw_data_dir.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-    return ok_response(files=files, total_files=len(files), session_path=str(session_root), incomplete=incomplete)
+    return read_yaml(file_path=Path(file_path), validator_cls=SessionData)
 
 
 @mcp.tool()
-def discover_subjects_tool(root_directory: str, project: str | None = None) -> dict[str, Any]:
-    """Discovers subjects (animals) by scanning project directories on disk.
+def write_session_data_tool(
+    file_path: str,
+    session_data_payload: dict[str, Any],
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """Validates ``session_data_payload`` against ``SessionData`` and writes it to ``file_path``.
 
-    For each subject found on disk, attempts to locate a cached SurgeryData YAML and reports whether one was
-    found. This tool is the disk-side counterpart to a future Google Sheets-backed surgery lookup.
-
-    Args:
-        root_directory: The absolute path to the root data directory to scan. Required — the
-            system-configuration-based fallback has moved to the acquisition runtime package.
-        project: When provided, only subjects belonging to this project are returned.
-
-    Returns:
-        A response dict with ``subjects`` (list of subject summary dicts) and ``total_subjects``.
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-
-    project_paths: list[Path]
-    if project is not None:
-        project_path = root.joinpath(project)  # type: ignore[union-attr]
-        if not project_path.is_dir():
-            return error_response(message=f"Project '{project}' not found at {project_path}")
-        project_paths = [project_path]
-    else:
-        project_paths = [child for child in safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
-
-    # Deduplicates subjects that appear across multiple projects, merging session counts.
-    seen: dict[str, dict[str, Any]] = {}
-    for project_path in project_paths:
-        for animal_dir in safe_iterdir(directory=project_path):
-            if not animal_dir.is_dir() or animal_dir.name == CONFIGURATION_DIR:
-                continue
-            entry = seen.setdefault(
-                animal_dir.name,
-                {
-                    "subject_id": animal_dir.name,
-                    "projects": [],
-                    "session_count": 0,
-                    "has_cached_surgery_data": False,
-                },
-            )
-            if project_path.name not in entry["projects"]:
-                entry["projects"].append(project_path.name)
-            entry["session_count"] += len(list(animal_dir.glob(f"*/raw_data/{RawDataFiles.SESSION_DATA}")))
-            surgery_path, _ = _resolve_surgery_path(
-                subject_id=animal_dir.name,
-                project=project_path.name,
-                root_directory=root_directory,
-            )
-            if surgery_path is not None:
-                entry["has_cached_surgery_data"] = True
-                entry["surgery_data_path"] = str(surgery_path)
-
-    subjects = sorted(seen.values(), key=lambda subject: subject["subject_id"])
-    return ok_response(subjects=subjects, total_subjects=len(subjects))
-
-
-@mcp.tool()
-def read_session_data_tool(session_path: str) -> dict[str, Any]:
-    """Loads the SessionData YAML for a session.
+    Intended for agent-driven repair of a corrupted or missing session marker. The primary
+    on-disk copy is normally authored by the acquisition runtime via ``SessionData.create``.
 
     Args:
-        session_path: Path to the session root directory.
+        file_path: Absolute path to the destination ``session_data.yaml``. Canonical location is
+            ``<session>/raw_data/session_data.yaml``.
+        session_data_payload: The complete SessionData payload.
+        overwrite: Determines whether to overwrite an existing file.
 
     Returns:
-        A response dict with ``data`` (the full SessionData payload) and ``incomplete`` (the nk.bin marker flag).
+        A response dict with ``file_path`` and ``data`` (the validated payload).
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    try:
-        instance = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return error_response(message=f"Failed to load SessionData: {exception}")
-    incomplete = instance.raw_data_path.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-    return ok_response(data=serialize(value=instance), incomplete=incomplete, session_path=str(session_root))
-
-
-@mcp.tool()
-def read_session_descriptor_tool(session_path: str) -> dict[str, Any]:
-    """Detects the appropriate descriptor class for a session and loads its descriptor YAML.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``, and
-        the resolved ``file_path``.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    try:
-        session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return error_response(message=f"Failed to load SessionData: {exception}")
-
-    session_type = (
-        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
+    return write_yaml_validated(
+        file_path=Path(file_path),
+        payload=session_data_payload,
+        validator_cls=SessionData,
+        overwrite=overwrite,
     )
-    descriptor_path, descriptor_class = _find_descriptor_for_session(
-        session_root=session_root,  # type: ignore[arg-type]
-        session_type=session_type,
-    )
-    if descriptor_path is None:
-        return error_response(
-            message=(
-                f"Could not locate a descriptor file for session_type '{session_type.value}' under "
-                f"{session_root}/raw_data"
-            ),
-        )
 
-    response = read_yaml(file_path=descriptor_path, validator_cls=descriptor_class)
+
+@mcp.tool()
+def describe_session_data_schema_tool() -> dict[str, Any]:
+    """Returns the schema for the ``SessionData`` dataclass.
+
+    Returns:
+        A response dict with ``schema`` containing the SessionData field schema.
+    """
+    return ok_response(schema=describe_dataclass(cls=SessionData))
+
+
+@mcp.tool()
+def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str, Any]:
+    """Loads a session descriptor YAML, parsing it with the dataclass that matches ``session_type``.
+
+    The descriptor filename is always ``session_descriptor.yaml`` — only the parsing class varies, so
+    ``session_type`` must be supplied. Use ``list_supported_session_types_tool`` to enumerate valid values.
+
+    Args:
+        file_path: Absolute path to the descriptor YAML. Canonical location is
+            ``<session>/raw_data/session_descriptor.yaml``.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use
+            (``lick training``, ``run training``, ``mesoscope experiment``, or ``window checking``).
+
+    Returns:
+        A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``,
+        and ``file_path``.
+    """
+    resolved = _resolve_descriptor_class(session_type=session_type)
+    if isinstance(resolved, dict):
+        return resolved
+    response = read_yaml(file_path=Path(file_path), validator_cls=resolved)
     if response.get("success"):
-        response["descriptor_class"] = descriptor_class.__name__
-        response["session_type"] = session_type.value
+        response["descriptor_class"] = resolved.__name__
+        response["session_type"] = session_type
     return response
 
 
 @mcp.tool()
-def read_session_hardware_state_tool(session_path: str) -> dict[str, Any]:
-    """Loads the MesoscopeHardwareState YAML for a session.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``data`` containing the hardware state payload.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.HARDWARE_STATE)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=MesoscopeHardwareState)
-
-
-@mcp.tool()
-def read_session_experiment_configuration_tool(session_path: str) -> dict[str, Any]:
-    """Loads the per-session snapshot of MesoscopeExperimentConfiguration.
-
-    Only meaningful for sessions of type ``mesoscope experiment``.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``data`` containing the experiment configuration snapshot payload.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.EXPERIMENT_CONFIGURATION)  # type: ignore[union-attr]
-    return read_yaml(file_path=file_path, validator_cls=MesoscopeExperimentConfiguration)
-
-
-@mcp.tool()
-def read_subject_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
-    """Loads SubjectData for a subject from the cached SurgeryData YAML.
-
-    Args:
-        subject_id: The unique identifier of the subject.
-        project: Optional project hint to scope the surgery cache lookup.
-
-    Returns:
-        A response dict with ``data`` containing the SubjectData payload and ``surgery_data_path``.
-    """
-    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
-    if error is not None:
-        return error
-    response = read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
-    if not response.get("success"):
-        return response
-    data = response.get("data", {})
-    subject = data.get("subject") if isinstance(data, dict) else None
-    if subject is None:
-        return error_response(message=f"SurgeryData at {surgery_path} does not contain a subject section")
-    return ok_response(data=subject, surgery_data_path=str(surgery_path))
-
-
-@mcp.tool()
-def read_subject_surgery_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
-    """Loads the full SurgeryData payload for a subject.
-
-    Args:
-        subject_id: The unique identifier of the subject.
-        project: Optional project hint to scope the surgery cache lookup.
-
-    Returns:
-        A response dict with ``data`` containing the full SurgeryData payload (subject, procedure, drugs,
-        implants, and injections sections).
-    """
-    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
-    if error is not None:
-        return error
-    return read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
-
-
-@mcp.tool()
-def read_subject_implants_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
-    """Loads the list of ImplantData for a subject from the cached SurgeryData YAML.
-
-    Args:
-        subject_id: The unique identifier of the subject.
-        project: Optional project hint to scope the surgery cache lookup.
-
-    Returns:
-        A response dict with ``implants`` (list of ImplantData payloads), ``total_implants``, and
-        ``surgery_data_path``.
-    """
-    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
-    if error is not None:
-        return error
-    response = read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
-    if not response.get("success"):
-        return response
-    implants = response.get("data", {}).get("implants", []) if isinstance(response.get("data"), dict) else []
-    return ok_response(implants=implants, total_implants=len(implants), surgery_data_path=str(surgery_path))
-
-
-@mcp.tool()
-def read_subject_injections_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
-    """Loads the list of InjectionData for a subject from the cached SurgeryData YAML.
-
-    Args:
-        subject_id: The unique identifier of the subject.
-        project: Optional project hint to scope the surgery cache lookup.
-
-    Returns:
-        A response dict with ``injections`` (list of InjectionData payloads), ``total_injections``, and
-        ``surgery_data_path``.
-    """
-    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
-    if error is not None:
-        return error
-    response = read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
-    if not response.get("success"):
-        return response
-    injections = response.get("data", {}).get("injections", []) if isinstance(response.get("data"), dict) else []
-    return ok_response(injections=injections, total_injections=len(injections), surgery_data_path=str(surgery_path))
-
-
-@mcp.tool()
-def read_subject_drugs_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
-    """Loads the DrugData payload for a subject from the cached SurgeryData YAML.
-
-    Args:
-        subject_id: The unique identifier of the subject.
-        project: Optional project hint to scope the surgery cache lookup.
-
-    Returns:
-        A response dict with ``data`` containing the DrugData payload and ``surgery_data_path``.
-    """
-    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
-    if error is not None:
-        return error
-    response = read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
-    if not response.get("success"):
-        return response
-    drugs = response.get("data", {}).get("drugs") if isinstance(response.get("data"), dict) else None
-    if drugs is None:
-        return error_response(message=f"SurgeryData at {surgery_path} does not contain a drugs section")
-    return ok_response(data=drugs, surgery_data_path=str(surgery_path))
-
-
-@mcp.tool()
-def read_subject_procedure_tool(subject_id: str, project: str | None = None) -> dict[str, Any]:
-    """Loads the ProcedureData payload for a subject from the cached SurgeryData YAML.
-
-    Args:
-        subject_id: The unique identifier of the subject.
-        project: Optional project hint to scope the surgery cache lookup.
-
-    Returns:
-        A response dict with ``data`` containing the ProcedureData payload and ``surgery_data_path``.
-    """
-    surgery_path, error = _resolve_surgery_path(subject_id=subject_id, project=project)
-    if error is not None:
-        return error
-    response = read_yaml(file_path=surgery_path, validator_cls=SurgeryData)  # type: ignore[arg-type]
-    if not response.get("success"):
-        return response
-    procedure = response.get("data", {}).get("procedure") if isinstance(response.get("data"), dict) else None
-    if procedure is None:
-        return error_response(message=f"SurgeryData at {surgery_path} does not contain a procedure section")
-    return ok_response(data=procedure, surgery_data_path=str(surgery_path))
-
-
-@mcp.tool()
 def write_session_descriptor_tool(
-    session_path: str,
+    file_path: str,
+    session_type: str,
     descriptor_payload: dict[str, Any],
     *,
     overwrite: bool = True,
 ) -> dict[str, Any]:
-    """Creates or replaces a session descriptor YAML for a session.
+    """Validates ``descriptor_payload`` against the descriptor for ``session_type`` and writes it to ``file_path``.
 
-    Detects the appropriate descriptor class from the session's ``session_type`` (loaded from
-    ``session_data.yaml``) and writes the payload to the canonical descriptor filename in ``raw_data``.
+    Use ``list_supported_session_types_tool`` to enumerate valid ``session_type`` values.
 
     Args:
-        session_path: Path to the session root directory.
-        descriptor_payload: The complete descriptor payload matching the appropriate descriptor schema.
-        overwrite: Determines whether to overwrite an existing descriptor file.
+        file_path: Absolute path to the destination descriptor YAML. Canonical location is
+            ``<session>/raw_data/session_descriptor.yaml``.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate
+            against (``lick training``, ``run training``, ``mesoscope experiment``, or
+            ``window checking``).
+        descriptor_payload: The complete descriptor payload matching the schema for ``session_type``.
+        overwrite: Determines whether to overwrite an existing file.
 
     Returns:
-        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``, and
-        ``session_type``.
+        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``,
+        and ``session_type``.
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    try:
-        session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return error_response(message=f"Failed to load SessionData: {exception}")
-
-    session_type = (
-        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
-    )
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type][1]
-    file_path = session.session_descriptor_path
+    resolved = _resolve_descriptor_class(session_type=session_type)
+    if isinstance(resolved, dict):
+        return resolved
     response = write_yaml_validated(
-        file_path=file_path,
+        file_path=Path(file_path),
         payload=descriptor_payload,
-        validator_cls=descriptor_class,
+        validator_cls=resolved,
         overwrite=overwrite,
     )
     if response.get("success"):
-        response["descriptor_class"] = descriptor_class.__name__
-        response["session_type"] = session_type.value
+        response["descriptor_class"] = resolved.__name__
+        response["session_type"] = session_type
+    return response
+
+
+@mcp.tool()
+def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]:
+    """Returns the schema for the descriptor dataclass associated with ``session_type``.
+
+    Args:
+        session_type: The ``SessionTypes`` value to describe.
+
+    Returns:
+        A response dict with ``session_type`` (the validated enum value) and ``schema`` (the
+        descriptor dataclass field schema).
+    """
+    resolved = _resolve_descriptor_class(session_type=session_type)
+    if isinstance(resolved, dict):
+        return resolved
+    return ok_response(
+        session_type=session_type,
+        schema=describe_dataclass(cls=resolved),
+    )
+
+
+@mcp.tool()
+def read_session_hardware_state_tool(file_path: str, acquisition_system: str) -> dict[str, Any]:
+    """Loads a hardware-state YAML, parsing it with the dataclass that matches ``acquisition_system``.
+
+    The hardware-state filename is always ``hardware_state.yaml`` — only the parsing class varies, so
+    ``acquisition_system`` must be supplied. Use ``list_supported_acquisition_systems_tool`` to
+    enumerate valid values.
+
+    Args:
+        file_path: Absolute path to the hardware-state YAML. Canonical location is
+            ``<session>/raw_data/hardware_state.yaml``.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state
+            dataclass to use.
+
+    Returns:
+        A response dict with ``data`` (the hardware-state payload), ``hardware_state_class``,
+        ``acquisition_system``, and ``file_path``.
+    """
+    resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    response = read_yaml(file_path=Path(file_path), validator_cls=resolved)
+    if response.get("success"):
+        response["hardware_state_class"] = resolved.__name__
+        response["acquisition_system"] = acquisition_system
     return response
 
 
 @mcp.tool()
 def write_session_hardware_state_tool(
-    session_path: str,
+    file_path: str,
+    acquisition_system: str,
     hardware_state_payload: dict[str, Any],
     *,
     overwrite: bool = True,
 ) -> dict[str, Any]:
-    """Creates or replaces the MesoscopeHardwareState YAML for a session.
+    """Validates ``hardware_state_payload`` against the ``acquisition_system`` schema and writes it to ``file_path``.
+
+    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     Args:
-        session_path: Path to the session root directory.
-        hardware_state_payload: The complete MesoscopeHardwareState payload.
-        overwrite: Determines whether to overwrite an existing hardware state file.
+        file_path: Absolute path to the destination hardware-state YAML. Canonical location is
+            ``<session>/raw_data/hardware_state.yaml``.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state
+            dataclass to validate against.
+        hardware_state_payload: The complete hardware-state payload.
+        overwrite: Determines whether to overwrite an existing file.
+
+    Returns:
+        A response dict with ``file_path``, ``data`` (the validated payload), ``hardware_state_class``,
+        and ``acquisition_system``.
+    """
+    resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    response = write_yaml_validated(
+        file_path=Path(file_path),
+        payload=hardware_state_payload,
+        validator_cls=resolved,
+        overwrite=overwrite,
+    )
+    if response.get("success"):
+        response["hardware_state_class"] = resolved.__name__
+        response["acquisition_system"] = acquisition_system
+    return response
+
+
+@mcp.tool()
+def describe_session_hardware_state_schema_tool(acquisition_system: str = "mesoscope") -> dict[str, Any]:
+    """Returns the schema for the hardware-state dataclass of ``acquisition_system``.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value to describe. Defaults to ``"mesoscope"``.
+
+    Returns:
+        A response dict with ``acquisition_system`` (the validated enum value) and ``schema``
+        (the hardware-state dataclass field schema).
+    """
+    resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    return ok_response(
+        acquisition_system=acquisition_system,
+        schema=describe_dataclass(cls=resolved),
+    )
+
+
+@mcp.tool()
+def read_surgery_data_tool(file_path: str) -> dict[str, Any]:
+    """Loads a per-session surgery-metadata YAML and returns the full SurgeryData payload.
+
+    Surgery metadata is a single monolithic record — callers extract the ``subject``, ``procedure``,
+    ``drugs``, ``implants``, or ``injections`` sections from the returned payload themselves.
+
+    Args:
+        file_path: Absolute path to the surgery-metadata YAML. Canonical location is
+            ``<session>/raw_data/surgery_metadata.yaml``.
+
+    Returns:
+        A response dict with ``file_path`` and ``data`` (the full SurgeryData payload, with
+        ``subject``, ``procedure``, ``drugs``, ``implants``, and ``injections`` sections).
+    """
+    return read_yaml(file_path=Path(file_path), validator_cls=SurgeryData)
+
+
+@mcp.tool()
+def write_surgery_data_tool(
+    file_path: str,
+    surgery_payload: dict[str, Any],
+    *,
+    overwrite: bool = True,
+) -> dict[str, Any]:
+    """Validates ``surgery_payload`` against ``SurgeryData`` and writes it to ``file_path``.
+
+    The payload must include all sections (``subject``, ``procedure``, ``drugs``, ``implants``,
+    ``injections``); surgery metadata is a single monolithic record with no per-section tools.
+
+    Args:
+        file_path: Absolute path to the destination surgery-metadata YAML. Canonical location is
+            ``<session>/raw_data/surgery_metadata.yaml``.
+        surgery_payload: The complete SurgeryData payload.
+        overwrite: Determines whether to overwrite an existing file.
 
     Returns:
         A response dict with ``file_path`` and ``data`` (the validated payload).
     """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    file_path = session_root.joinpath("raw_data", RawDataFiles.HARDWARE_STATE)  # type: ignore[union-attr]
     return write_yaml_validated(
-        file_path=file_path,
-        payload=hardware_state_payload,
-        validator_cls=MesoscopeHardwareState,
+        file_path=Path(file_path),
+        payload=surgery_payload,
+        validator_cls=SurgeryData,
         overwrite=overwrite,
     )
 
 
 @mcp.tool()
-def validate_session_tool(session_path: str) -> dict[str, Any]:
-    """Validates that a session has the expected files for its session_type.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``valid``, ``issues``, ``summary``, and ``session_path``.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return ok_response(valid=False, issues=[error["error"]])
-
-    issues: list[str] = []
-
-    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
-    if not raw_data_dir.is_dir():
-        issues.append(f"Missing raw_data directory: {raw_data_dir}")
-        return ok_response(valid=False, issues=issues, session_path=str(session_root))
-
-    try:
-        session = SessionData.load(session_path=session_root)  # type: ignore[arg-type]
-    except Exception as exception:
-        return ok_response(
-            valid=False,
-            issues=[f"Failed to load SessionData: {exception}"],
-            session_path=str(session_root),
-        )
-
-    session_type = (
-        session.session_type if isinstance(session.session_type, SessionTypes) else SessionTypes(session.session_type)
-    )
-
-    # Verifies that the required descriptor and configuration snapshot files are present.
-    descriptor_path, _ = _find_descriptor_for_session(
-        session_root=session_root,  # type: ignore[arg-type]
-        session_type=session_type,
-    )
-    if descriptor_path is None:
-        issues.append(f"Missing descriptor file for session_type '{session_type.value}'")
-
-    if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        experiment_snapshot = raw_data_dir.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
-        if not experiment_snapshot.exists():
-            issues.append(f"Missing experiment configuration snapshot: {experiment_snapshot}")
-
-    system_snapshot = raw_data_dir.joinpath(RawDataFiles.SYSTEM_CONFIGURATION)
-    if not system_snapshot.exists():
-        issues.append(f"Missing system configuration snapshot: {system_snapshot}")
-
-    incomplete = raw_data_dir.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-
-    summary = {
-        "session_name": session.session_name,
-        "project": session.project_name,
-        "animal": session.animal_id,
-        "session_type": session_type.value,
-        "incomplete": incomplete,
-    }
-    return ok_response(valid=not issues, issues=issues, summary=summary, session_path=str(session_root))
-
-
-@mcp.tool()
-def get_session_status_tool(session_path: str) -> dict[str, Any]:
-    """Returns lifecycle status for a single session.
-
-    Reads the session's ``nk.bin`` marker presence and inspects the processed_data directory to derive a
-    high-level lifecycle state. The status is ``incomplete`` when ``nk.bin`` is still present, ``acquired``
-    when ``nk.bin`` has been removed but no processed data exists, and ``processed`` when the processed_data
-    directory contains files.
-
-    Args:
-        session_path: Path to the session root directory.
-
-    Returns:
-        A response dict with ``status``, ``incomplete``, ``has_processed_data``, and ``session_path``.
-    """
-    session_root, error = _resolve_session_root(session_path=session_path)
-    if error is not None:
-        return error
-    raw_data_dir = session_root.joinpath("raw_data")  # type: ignore[union-attr]
-    if not raw_data_dir.is_dir():
-        return error_response(message=f"raw_data directory not found at {raw_data_dir}")
-    incomplete = raw_data_dir.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-    processed_data_dir = session_root.joinpath("processed_data")  # type: ignore[union-attr]
-    has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
-
-    if incomplete:
-        status = "incomplete"
-    elif has_processed_data:
-        status = "processed"
-    else:
-        status = "acquired"
-
-    return ok_response(
-        status=status,
-        incomplete=incomplete,
-        has_processed_data=has_processed_data,
-        session_path=str(session_root),
-    )
-
-
-@mcp.tool()
-def get_batch_session_status_overview_tool(root_directory: str | None = None) -> dict[str, Any]:
-    """Aggregates session lifecycle status across every session under the data root.
-
-    Args:
-        root_directory: The absolute path to the root data directory to scan.
-
-    Returns:
-        A response dict with ``counts`` (per-status counts), ``sessions`` (per-session status entries),
-        ``total_sessions``, and ``root_directory``.
-    """
-    root, error = resolve_root_directory(root_directory=root_directory)
-    if error is not None:
-        return error
-
-    # Iterates every session marker under the root, deriving lifecycle status for each.
-    counts: dict[str, int] = {"incomplete": 0, "acquired": 0, "processed": 0, "error": 0}
-    sessions: list[dict[str, Any]] = []
-    for marker in sorted(root.rglob(RawDataFiles.SESSION_DATA)):  # type: ignore[union-attr]
-        session_root = session_root_from_marker(marker=marker)
-        try:
-            instance = SessionData.load(session_path=session_root)
-        except Exception as exception:
-            counts["error"] += 1
-            sessions.append({"session_path": str(session_root), "status": "error", "error": str(exception)})
-            continue
-        incomplete = instance.raw_data_path.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-        processed_data_dir = session_root.joinpath("processed_data")
-        has_processed_data = processed_data_dir.is_dir() and any(processed_data_dir.iterdir())
-        if incomplete:
-            status = "incomplete"
-        elif has_processed_data:
-            status = "processed"
-        else:
-            status = "acquired"
-        counts[status] += 1
-        sessions.append(
-            {
-                "session_name": instance.session_name,
-                "project": instance.project_name,
-                "animal": instance.animal_id,
-                "session_type": serialize(value=instance.session_type),
-                "session_path": str(session_root),
-                "status": status,
-            }
-        )
-
-    return ok_response(counts=counts, sessions=sessions, total_sessions=len(sessions), root_directory=str(root))
-
-
-@mcp.tool()
-def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]:
-    """Returns the schema for the descriptor associated with a given session type.
-
-    Args:
-        session_type: The SessionTypes value to describe.
-
-    Returns:
-        A response dict with ``session_type``, ``descriptor_filename``, and ``schema``.
-    """
-    try:
-        session_type_enum = SessionTypes(session_type)
-    except ValueError:
-        valid = ", ".join(member.value for member in SessionTypes)
-        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
-    descriptor_class = DESCRIPTOR_REGISTRY[session_type_enum][1]
-    return ok_response(
-        session_type=session_type_enum.value,
-        descriptor_filename=RawDataFiles.SESSION_DESCRIPTOR.value,
-        schema=describe_dataclass(cls=descriptor_class),
-    )
-
-
-@mcp.tool()
-def describe_session_hardware_state_schema_tool() -> dict[str, Any]:
-    """Returns the schema for MesoscopeHardwareState.
-
-    Returns:
-        A response dict with ``hardware_state_filename`` and ``schema`` (the MesoscopeHardwareState dataclass
-        schema describing every hardware parameter field and its default).
-    """
-    return ok_response(
-        hardware_state_filename=RawDataFiles.HARDWARE_STATE,
-        schema=describe_dataclass(cls=MesoscopeHardwareState),
-    )
-
-
-@mcp.tool()
-def describe_surgery_schema_tool() -> dict[str, Any]:
+def describe_surgery_data_schema_tool() -> dict[str, Any]:
     """Returns the schema for SurgeryData and its nested subclasses.
 
     Returns:
@@ -915,6 +576,363 @@ def describe_surgery_schema_tool() -> dict[str, Any]:
     return ok_response(schema=schema)
 
 
+@dataclass(frozen=True, slots=True)
+class _SessionStatusInfo:
+    """Carries the lifecycle-status signals computed from a loaded ``SessionData`` instance."""
+
+    status: str
+    """The coarse lifecycle status; one of the values in ``_STATUS_KEYS``."""
+    uninitialized: bool
+    """Indicates whether the ``nk.bin`` uninitialized marker is present in the session's raw_data."""
+    incomplete: bool | None
+    """The descriptor's ``incomplete`` field, or None when the session is uninitialized or the descriptor
+    read failed."""
+    has_processed_data: bool
+    """Indicates whether the session's ``processed_data`` directory exists and is non-empty."""
+    error_detail: str | None
+    """Human-readable detail when the descriptor read failed, otherwise None."""
+
+
+def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
+    """Derives lifecycle status for a loaded ``SessionData`` using the canonical two-signal model.
+
+    Combines the ``nk.bin`` uninitialized marker, the descriptor's ``incomplete`` flag, and the
+    processed_data directory population to project a coarse status. Status priority is
+    ``uninitialized > error > incomplete > processed > acquired``.
+
+    Args:
+        instance: A loaded ``SessionData`` instance.
+
+    Returns:
+        A ``_SessionStatusInfo`` carrying the status string, the two boolean signals, the processed_data
+        population flag, and an optional descriptor-read error detail.
+    """
+    uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+    processed_data_directory = instance.processed_data_path
+    has_processed_data = processed_data_directory.is_dir() and any(processed_data_directory.iterdir())
+
+    if uninitialized:
+        return _SessionStatusInfo(
+            status="uninitialized",
+            uninitialized=True,
+            incomplete=None,
+            has_processed_data=has_processed_data,
+            error_detail=None,
+        )
+
+    descriptor_incomplete, descriptor_error = read_descriptor_incomplete(session=instance)
+    if descriptor_incomplete is None:
+        return _SessionStatusInfo(
+            status="error",
+            uninitialized=False,
+            incomplete=None,
+            has_processed_data=has_processed_data,
+            error_detail=descriptor_error,
+        )
+
+    if descriptor_incomplete:
+        status = "incomplete"
+    elif has_processed_data:
+        status = "processed"
+    else:
+        status = "acquired"
+    return _SessionStatusInfo(
+        status=status,
+        uninitialized=False,
+        incomplete=descriptor_incomplete,
+        has_processed_data=has_processed_data,
+        error_detail=None,
+    )
+
+
+def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Groups flat session entries into the ``projects -> animals -> sessions`` hierarchy.
+
+    Error-status entries (whose identity could not be trusted from SessionData) are excluded from
+    aggregation; they remain in the top-level flat ``sessions`` list only. The returned per-project
+    dicts do not include filesystem-derived counts such as ``experiment_count`` or ``dataset_count``;
+    callers obtain those via ``_count_project_artifacts``.
+
+    Args:
+        root: The resolved data root path used to construct each project's reported ``path``.
+        sessions: Flat per-session entries produced by ``get_data_root_overview_tool``.
+
+    Returns:
+        A list of per-project aggregate dicts sorted by project name.
+    """
+    # Buckets sessions under their project and animal by the SessionData identity fields.
+    project_buckets: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for entry in sessions:
+        if entry.get("status") == "error":
+            continue
+        project_name = entry.get("project")
+        animal_id = entry.get("animal")
+        if not isinstance(project_name, str) or not isinstance(animal_id, str):
+            continue
+        if not project_name or not animal_id:
+            continue
+        project_buckets.setdefault(project_name, {}).setdefault(animal_id, []).append(entry)
+
+    projects: list[dict[str, Any]] = []
+    for project_name in sorted(project_buckets):
+        animal_buckets = project_buckets[project_name]
+        project_path = root.joinpath(project_name)
+
+        # Aggregates per-animal summaries and accumulates per-project status and type counts.
+        animals: list[dict[str, Any]] = []
+        project_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
+        sessions_by_type: dict[str, int] = {member.value: 0 for member in SessionTypes}
+        project_session_count = 0
+        for animal_id in sorted(animal_buckets):
+            animal_entries = animal_buckets[animal_id]
+            animal_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
+            session_paths: list[str] = []
+            for animal_entry in animal_entries:
+                status_key = animal_entry["status"]
+                animal_counts[status_key] = animal_counts.get(status_key, 0) + 1
+                project_counts[status_key] = project_counts.get(status_key, 0) + 1
+                session_type_value = animal_entry.get("session_type")
+                if isinstance(session_type_value, str):
+                    sessions_by_type[session_type_value] = sessions_by_type.get(session_type_value, 0) + 1
+                session_paths.append(animal_entry["session_path"])
+            animals.append(
+                {
+                    "id": animal_id,
+                    "session_paths": sorted(session_paths),
+                    "session_count": len(animal_entries),
+                    "counts": animal_counts,
+                }
+            )
+            project_session_count += len(animal_entries)
+
+        projects.append(
+            {
+                "name": project_name,
+                "path": str(project_path),
+                "animals": animals,
+                "session_count": project_session_count,
+                "counts": project_counts,
+                "sessions_by_type": sessions_by_type,
+            }
+        )
+
+    return projects
+
+
+def _count_project_artifacts(project_path: Path) -> tuple[int, int]:
+    """Counts experiment configuration YAMLs and dataset markers under a project directory.
+
+    Args:
+        project_path: The path to the project directory under the data root.
+
+    Returns:
+        A tuple of ``(experiment_count, dataset_count)``. Experiment count is the number of
+        ``.yaml`` files directly under ``<project>/configuration/``; dataset count is the
+        number of ``DATASET_MARKER_FILENAME`` occurrences anywhere under the project.
+    """
+    configuration_directory = project_path.joinpath(CONFIGURATION_DIR)
+    experiment_count = len(list(configuration_directory.glob("*.yaml"))) if configuration_directory.is_dir() else 0
+    dataset_count = len(list(project_path.rglob(DATASET_MARKER_FILENAME))) if project_path.is_dir() else 0
+    return experiment_count, dataset_count
+
+
+def _build_session_report(instance: SessionData, session_root: Path) -> dict[str, Any]:
+    """Produces a per-session inspection report from a loaded ``SessionData`` instance.
+
+    Enumerates every canonical ``raw_data`` file and ``processed_data`` subdirectory exposed by
+    ``SessionData``, checks the required-asset set for the session's type, and attaches the same
+    lifecycle status that ``get_data_root_overview_tool`` computes.
+
+    Args:
+        instance: The loaded ``SessionData`` instance.
+        session_root: The resolved session root directory.
+
+    Returns:
+        A per-session report dict.
+    """
+    session_type = SessionTypes(instance.session_type)
+    status_info = _compute_session_status(instance=instance)
+
+    raw_data_files = _raw_data_inventory(instance=instance)
+    processed_data_subdirs = _processed_data_inventory(instance=instance)
+    required_assets = _required_asset_inventory(instance=instance, session_type=session_type)
+    issues = [
+        f"Missing required {asset['name']} at {asset['path']}" for asset in required_assets if not asset["present"]
+    ]
+
+    report: dict[str, Any] = {
+        "session_path": str(session_root),
+        "identity": {
+            "project": instance.project_name,
+            "animal": instance.animal_id,
+            "session_name": instance.session_name,
+            "session_type": session_type.value,
+            "acquisition_system": serialize(value=instance.acquisition_system),
+            "experiment_name": instance.experiment_name,
+        },
+        "status": status_info.status,
+        "uninitialized": status_info.uninitialized,
+        "incomplete": status_info.incomplete,
+        "has_processed_data": status_info.has_processed_data,
+        "raw_data_files": raw_data_files,
+        "processed_data_subdirs": processed_data_subdirs,
+        "required_assets": required_assets,
+        "issues": issues,
+    }
+    if status_info.error_detail is not None:
+        report["error_detail"] = status_info.error_detail
+    return report
+
+
+def _raw_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
+    """Returns the existence and classification of every canonical ``raw_data`` file."""
+    mapping: list[tuple[str, Path]] = [
+        (RawDataFiles.SESSION_DATA.name, instance.session_data_path),
+        (RawDataFiles.SESSION_DESCRIPTOR.name, instance.session_descriptor_path),
+        (RawDataFiles.SURGERY_METADATA.name, instance.surgery_metadata_path),
+        (RawDataFiles.HARDWARE_STATE.name, instance.hardware_state_path),
+        (RawDataFiles.EXPERIMENT_CONFIGURATION.name, instance.experiment_configuration_path),
+        (RawDataFiles.SYSTEM_CONFIGURATION.name, instance.system_configuration_path),
+        (RawDataFiles.CHECKSUM.name, instance.checksum_path),
+        (RawDataFiles.ZABER_POSITIONS.name, instance.zaber_positions_path),
+        (RawDataFiles.MESOSCOPE_POSITIONS.name, instance.mesoscope_positions_path),
+        (RawDataFiles.WINDOW_SCREENSHOT.name, instance.window_screenshot_path),
+    ]
+    # Also includes the raw_data subdirectories that carry bulk acquisition artifacts.
+    directory_mapping: list[tuple[str, Path]] = [
+        (f"{Directories.CAMERA_DATA.name}_RAW", instance.raw_camera_data_path),
+        (f"{Directories.BEHAVIOR_DATA.name}_RAW", instance.raw_behavior_data_path),
+        (f"{Directories.MICROCONTROLLER_DATA.name}_RAW", instance.raw_microcontroller_data_path),
+        (f"{Directories.MESOSCOPE_DATA.name}_RAW", instance.raw_mesoscope_data_path),
+    ]
+    inventory: list[dict[str, Any]] = []
+    for kind, path in mapping:
+        inventory.append({"name": path.name, "path": str(path), "kind": kind, "exists": path.exists()})
+    for kind, path in directory_mapping:
+        inventory.append({"name": path.name, "path": str(path), "kind": kind, "exists": path.is_dir()})
+    return inventory
+
+
+def _processed_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
+    """Returns per-subdirectory population and tracker presence under ``processed_data``."""
+    mapping: list[tuple[str, Path, Path]] = [
+        (Directories.BEHAVIOR_DATA.name, instance.behavior_data_path, instance.behavior_tracker_path),
+        (Directories.CINDRA.name, instance.cindra_data_path, instance.cindra_single_recording_tracker_path),
+        (Directories.CAMERA_TIMESTAMPS.name, instance.camera_timestamps_path, instance.camera_tracker_path),
+        (Directories.CAMERA_DATA.name, instance.camera_data_path, instance.video_tracker_path),
+        (
+            Directories.MICROCONTROLLER_DATA.name,
+            instance.microcontroller_data_path,
+            instance.microcontroller_tracker_path,
+        ),
+    ]
+    inventory: list[dict[str, Any]] = []
+    for kind, directory_path, tracker_path in mapping:
+        inventory.append(
+            {
+                "name": directory_path.name,
+                "path": str(directory_path),
+                "kind": kind,
+                "exists": directory_path.is_dir(),
+                "tracker_path": str(tracker_path),
+                "tracker_exists": tracker_path.exists(),
+            }
+        )
+    # Reports the cindra multi-recording subdirectory separately because it is a sibling of the
+    # single-recording tracker inside ``cindra/``.
+    inventory.append(
+        {
+            "name": instance.cindra_multi_recording_path.name,
+            "path": str(instance.cindra_multi_recording_path),
+            "kind": Directories.MULTI_RECORDING.name,
+            "exists": instance.cindra_multi_recording_path.is_dir(),
+            "tracker_path": None,
+            "tracker_exists": False,
+        }
+    )
+    return inventory
+
+
+def _required_asset_inventory(instance: SessionData, session_type: SessionTypes) -> list[dict[str, Any]]:
+    """Returns the existence of each asset required for the session's type.
+
+    Every session requires the descriptor and the system configuration snapshot; ``mesoscope
+    experiment`` sessions additionally require the experiment configuration snapshot.
+
+    Args:
+        instance: The loaded ``SessionData`` instance.
+        session_type: The session's validated ``SessionTypes`` value.
+
+    Returns:
+        A list of ``{name, path, present, required_for_session_type}`` dicts.
+    """
+    required: list[tuple[str, Path]] = [
+        (RawDataFiles.SESSION_DESCRIPTOR.value, instance.session_descriptor_path),
+        (RawDataFiles.SYSTEM_CONFIGURATION.value, instance.system_configuration_path),
+    ]
+    if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
+        required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, instance.experiment_configuration_path))
+    return [
+        {
+            "name": name,
+            "path": str(path),
+            "present": path.exists(),
+            "required_for_session_type": session_type.value,
+        }
+        for name, path in required
+    ]
+
+
+def _resolve_descriptor_class(session_type: str) -> type[YamlConfig] | dict[str, Any]:
+    """Resolves a ``session_type`` string to its registered descriptor dataclass.
+
+    Validates the value against the ``SessionTypes`` enum and then looks up the corresponding class
+    in ``DESCRIPTOR_REGISTRY``. Returns an error response dict when the value is not a valid session
+    type.
+
+    Args:
+        session_type: The ``SessionTypes`` value supplied by the caller.
+
+    Returns:
+        The resolved descriptor dataclass on success, or an error response dict on failure. Callers
+        discriminate via ``isinstance(result, dict)``.
+    """
+    try:
+        session_type_enum = SessionTypes(session_type)
+    except ValueError:
+        valid = ", ".join(member.value for member in SessionTypes)
+        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+    return DESCRIPTOR_REGISTRY[session_type_enum]
+
+
+def _resolve_hardware_state_class(acquisition_system: str) -> type[YamlConfig] | dict[str, Any]:
+    """Resolves an ``acquisition_system`` string to its registered hardware-state dataclass.
+
+    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding
+    class in ``HARDWARE_STATE_REGISTRY``. Returns an error response dict when the value is not a
+    valid acquisition system or when no hardware-state class has been registered for that system yet.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value supplied by the caller.
+
+    Returns:
+        The resolved hardware-state dataclass on success, or an error response dict on failure.
+        Callers discriminate via ``isinstance(result, dict)``.
+    """
+    try:
+        acquisition_enum = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+    hardware_state_class = HARDWARE_STATE_REGISTRY.get(acquisition_enum)
+    if hardware_state_class is None:
+        registered = ", ".join(member.value for member in HARDWARE_STATE_REGISTRY)
+        return error_response(
+            message=f"No hardware-state class registered for '{acquisition_system}'. Registered: {registered}"
+        )
+    return hardware_state_class
+
+
 def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any] | None]:
     """Resolves an input session path to its root directory (the parent of ``raw_data``).
 
@@ -930,118 +948,8 @@ def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any
     path = Path(session_path)
     if not path.exists():
         return None, error_response(message=f"Session path does not exist: {path}")
-    if path.joinpath("raw_data").is_dir():
+    if path.joinpath(RAW_DATA_DIRECTORY).is_dir():
         return path, None
-    if path.name == "raw_data" and path.is_dir():
+    if path.name == RAW_DATA_DIRECTORY and path.is_dir():
         return path.parent, None
-    return None, error_response(message=f"Could not locate the raw_data directory under {path}")
-
-
-def _load_session_summary(marker: Path) -> dict[str, Any]:
-    """Loads a SessionData YAML and returns a flat summary dict for use in discovery responses.
-
-    Args:
-        marker: The path to the ``session_data.yaml`` marker file.
-
-    Returns:
-        A flat dict with session identity metadata, paths, and completeness status, or an error dict
-        if the session could not be loaded.
-    """
-    session_root = session_root_from_marker(marker=marker)
-    try:
-        instance: SessionData = SessionData.load(session_path=session_root)
-    except Exception as exception:
-        return {
-            "session_path": str(session_root),
-            "marker": str(marker),
-            "error": f"Failed to load session: {exception}",
-        }
-    incomplete = instance.raw_data_path.joinpath(INCOMPLETE_SESSION_MARKER).exists()
-    return {
-        "session_name": instance.session_name,
-        "project": instance.project_name,
-        "animal": instance.animal_id,
-        "session_type": serialize(value=instance.session_type),
-        "acquisition_system": serialize(value=instance.acquisition_system),
-        "experiment_name": instance.experiment_name,
-        "session_path": str(session_root),
-        "raw_data_path": str(instance.raw_data_path),
-        "processed_data_path": str(instance.processed_data_path),
-        "incomplete": incomplete,
-    }
-
-
-def _find_descriptor_for_session(
-    session_root: Path,
-    session_type: SessionTypes,
-) -> tuple[Path | None, type[YamlConfig]]:
-    """Locates the session-embedded descriptor file and its parsing class for a session.
-
-    The session-embedded descriptor always uses the canonical ``session_descriptor.yaml`` filename regardless
-    of session type; the parsing class is session-type-specific and comes from ``DESCRIPTOR_REGISTRY``.
-
-    Args:
-        session_root: The session root directory containing the ``raw_data`` subdirectory.
-        session_type: The session type whose descriptor class to return.
-
-    Returns:
-        A tuple of the canonical descriptor file path (or None when the file does not exist) and the
-        descriptor dataclass type matching the session's type.
-    """
-    _, descriptor_class = DESCRIPTOR_REGISTRY[session_type]
-    canonical_path = session_root.joinpath("raw_data", RawDataFiles.SESSION_DESCRIPTOR)
-    return canonical_path if canonical_path.exists() else None, descriptor_class
-
-
-def _resolve_surgery_path(
-    subject_id: str,
-    project: str | None = None,
-    root_directory: str | None = None,
-) -> tuple[Path | None, dict[str, Any] | None]:
-    """Locates a cached SurgeryData YAML on disk for the given subject.
-
-    Notes:
-        This is a best-effort filesystem search. The library does not currently mandate a single canonical
-        location for cached surgery data; this helper looks under the configured working directory and the
-        caller-provided data root directory for ``surgery_data/<subject_id>.yaml`` and similar conventional
-        paths. The previous fallback that read the system configuration's root directory was removed when the
-        system configuration moved to the acquisition runtime package.
-
-    Args:
-        subject_id: The unique identifier of the subject whose surgery data to locate.
-        project: Optional project hint that scopes the lookup to a specific project subtree.
-        root_directory: Optional absolute path to the root data directory to scan.
-
-    Returns:
-        A tuple of the resolved Path and an error dict. Exactly one element is non-None.
-    """
-    # Builds a prioritized list of candidate paths under the working and root directories.
-    candidate_paths: list[Path] = []
-    candidate_filenames = (f"{subject_id}.yaml", f"{subject_id}_surgery.yaml", "surgery_data.yaml")
-
-    try:
-        working_directory = get_working_directory()
-        candidate_paths.extend(working_directory.joinpath("surgery_data", filename) for filename in candidate_filenames)
-        candidate_paths.extend(working_directory.joinpath(filename) for filename in candidate_filenames)
-    except OSError, ValueError:
-        pass
-
-    if root_directory is not None:
-        root = Path(root_directory)
-        if project is not None:
-            candidate_paths.extend(root.joinpath(project, "surgery_data", filename) for filename in candidate_filenames)
-            candidate_paths.extend(root.joinpath(project, subject_id, filename) for filename in candidate_filenames)
-        candidate_paths.extend(root.joinpath("surgery_data", filename) for filename in candidate_filenames)
-
-    # Returns the first candidate path that exists on disk.
-    for candidate in candidate_paths:
-        if candidate.exists():
-            return candidate, None
-
-    return None, error_response(
-        message=(
-            f"Could not locate a cached SurgeryData file for subject '{subject_id}'. Searched under the working "
-            f"directory and the provided root directory using conventional paths "
-            f"({', '.join(candidate_filenames)})."
-        ),
-    )
+    return None, error_response(message=f"Could not locate the {RAW_DATA_DIRECTORY} directory under {path}")

@@ -8,6 +8,7 @@ from .runtime_data import (
     MesoscopeExperimentDescriptor,
 )
 from .session_data import (
+    RAW_DATA_DIRECTORY,
     Directories,
     SessionData,
     RawDataFiles,
@@ -31,6 +32,7 @@ from .session_discovery import (
 )
 
 __all__ = [
+    "RAW_DATA_DIRECTORY",
     "Directories",
     "DrugData",
     "ImplantData",

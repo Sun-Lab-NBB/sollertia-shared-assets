@@ -123,30 +123,24 @@ slsa mcp
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `create_experiment_config_tool`                 | Creates an experiment configuration from a task template using sensible defaults               |
-| `create_project_tool`                           | Creates a new project directory and its configuration subdirectory                             |
+| `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults               |
 | `create_scene_tool`                             | Creates a new Unity scene by copying ExperimentTemplate and optionally adding a task prefab    |
 | `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system              |
+| `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
-| `describe_session_hardware_state_schema_tool`   | Returns the schema for MesoscopeHardwareState                                                  |
-| `describe_surgery_schema_tool`                  | Returns the schema for SurgeryData and its nested subclasses                                   |
+| `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                               |
+| `describe_surgery_data_schema_tool`                  | Returns the schema for SurgeryData and its nested subclasses                                   |
 | `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, Segment, TrialStructure, and VREnvironment |
-| `discover_animals_tool`                         | Lists animal subdirectories within a project                                                   |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
-| `discover_projects_tool`                        | Lists all projects accessible to the data acquisition system                                   |
-| `discover_session_descriptors_tool`             | Returns the inventory of descriptor, hardware state, and configuration snapshot files          |
-| `discover_sessions_tool`                        | Recursively discovers all sessions under the data root                                         |
-| `discover_subjects_tool`                        | Discovers subjects by scanning project directories on disk                                     |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
 | `generate_task_prefab_tool`                     | Generates a Task prefab in Unity from a YAML task template                                     |
+| `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy from SessionData and per-session lifecycle status   |
 | `get_platform_environment_status_tool`          | Reports the status of the working directory, templates directory, and Google credentials       |
-| `get_batch_session_status_overview_tool`        | Aggregates session lifecycle status across every session under the data root                   |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
-| `get_project_overview_tool`                     | Returns aggregate counts for animals, sessions, experiments, and datasets                      |
-| `get_session_status_tool`                       | Returns lifecycle status for a single session                                                  |
 | `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab           |
+| `inspect_sessions_tool`                         | Produces a detailed health and inventory report for one or more sessions                       |
 | `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
 | `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
 | `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
@@ -154,18 +148,12 @@ slsa mcp
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
 | `list_unity_assets_tool`                        | Lists Unity assets of a given type within a search path                                        |
 | `open_scene_tool`                               | Opens a Unity scene in the Editor                                                              |
-| `read_experiment_configuration_tool`            | Loads the experiment configuration YAML for a project                                          |
+| `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)         |
 | `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                     |
-| `read_session_data_tool`                        | Loads the SessionData YAML for a session                                                       |
+| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema (file-path based)                    |
 | `read_session_descriptor_tool`                  | Detects the appropriate descriptor class and loads the descriptor YAML                         |
-| `read_session_experiment_configuration_tool`    | Loads the per-session snapshot of the experiment configuration                                 |
-| `read_session_hardware_state_tool`              | Loads the MesoscopeHardwareState YAML for a session                                            |
-| `read_subject_drugs_tool`                       | Loads the DrugData payload for a subject from the cached SurgeryData YAML                      |
-| `read_subject_implants_tool`                    | Loads the list of ImplantData for a subject from the cached SurgeryData YAML                   |
-| `read_subject_injections_tool`                  | Loads the list of InjectionData for a subject from the cached SurgeryData YAML                 |
-| `read_subject_procedure_tool`                   | Loads the ProcedureData payload for a subject from the cached SurgeryData YAML                 |
-| `read_subject_surgery_tool`                     | Loads the full SurgeryData payload for a subject                                               |
-| `read_subject_tool`                             | Loads SubjectData for a subject from the cached SurgeryData YAML                               |
+| `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system     |
+| `read_surgery_data_tool`                     | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                      |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
@@ -174,11 +162,11 @@ slsa mcp
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                            |
 | `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                       |
 | `validate_prefab_against_template_tool`         | Validates that Unity prefab zone positions match the template configuration                    |
-| `validate_session_tool`                         | Validates that a session has the expected files for its session type                           |
 | `validate_template_tool`                        | Validates a TaskTemplate against its schema and cross-reference constraints                    |
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                             |
+| `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema         |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
-| `write_session_hardware_state_tool`             | Creates or replaces the MesoscopeHardwareState YAML for a session                              |
+| `write_session_hardware_state_tool`             | Creates or replaces a hardware-state YAML for a session using the class for the given acquisition system |
 | `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                  |
 
 ***Note,*** tools that interact with Unity (`create_scene_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`,

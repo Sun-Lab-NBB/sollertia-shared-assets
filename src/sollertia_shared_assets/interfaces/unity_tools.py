@@ -1,7 +1,7 @@
 """Provides MCP tools for interacting with the Unity Editor via the McpBridge HTTP relay.
 
 All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be
-running. Tools register on the shared ``mcp`` instance from ``mcp_instance``.
+running with the plugin active.
 """
 
 from __future__ import annotations
@@ -71,7 +71,8 @@ def validate_prefab_against_template_tool(template_name: str) -> dict[str, Any]:
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
-        template_name: The template filename without extension (e.g., ``SSO_Merging``).
+        template_name: The template filename without extension (e.g., ``SSO_Merging``). Must exist in the
+            Unity project's ``Assets/InfiniteCorridorTask/Configurations/`` directory.
 
     Returns:
         A response dict with ``template_name`` and ``segments`` (list of per-segment validation results
@@ -94,9 +95,14 @@ def list_unity_assets_tool(
         search_path: The project-relative directory to search. Defaults to ``Assets/InfiniteCorridorTask``.
 
     Returns:
-        A response dict with ``type``, ``search_path``, ``assets`` (list of project-relative paths), and ``count``.
+        A response dict with ``asset_type``, ``search_path``, ``assets`` (list of project-relative paths),
+        and ``count``.
     """
-    return _unity_relay(tool="list_unity_assets", arguments={"type": asset_type, "path": search_path})
+    response = _unity_relay(tool="list_unity_assets", arguments={"type": asset_type, "path": search_path})
+    # Renames the Unity-side ``type`` key to ``asset_type`` so callers see a single uniform name.
+    if "type" in response:
+        response["asset_type"] = response.pop("type")
+    return response
 
 
 @mcp.tool()
@@ -129,7 +135,8 @@ def open_scene_tool(scene_path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def create_scene_tool(scene_name: str, task_prefab_path: str | None = None) -> dict[str, Any]:
-    """Creates a new Unity scene by copying ExperimentTemplate.unity and optionally adding a task prefab.
+    """Creates a new Unity scene by copying ``Assets/Scenes/ExperimentTemplate.unity`` and optionally adding
+    a task prefab.
 
     The new scene is saved to ``Assets/Scenes/<scene_name>.unity``. If a task prefab path is provided, the
     prefab is instantiated in the scene. Requires the Unity Editor to be running with the McpBridge plugin
@@ -196,7 +203,8 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable.
     """
     # Constructs the JSON-encoded HTTP POST request for the Unity bridge.
-    payload = json.dumps({"tool": tool, "args": arguments or {}}).encode("utf-8")
+    relay_arguments = arguments if arguments is not None else {}
+    payload = json.dumps({"tool": tool, "args": relay_arguments}).encode("utf-8")
     request = urllib.request.Request(  # noqa: S310 - hardcoded localhost URL for the Unity Editor bridge.
         url=_UNITY_BRIDGE_URL,
         data=payload,
