@@ -123,7 +123,7 @@ slsa mcp
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `create_experiment_config_tool`                 | Creates an experiment configuration from a task template using sensible defaults               |
+| `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults               |
 | `create_scene_tool`                             | Creates a new Unity scene by copying ExperimentTemplate and optionally adding a task prefab    |
 | `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system              |
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |

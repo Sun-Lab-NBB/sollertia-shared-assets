@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
+    EXPERIMENT_CONFIGURATION_REGISTRY,
     mcp,
     read_yaml,
     serialize,
@@ -33,11 +37,11 @@ from ..configuration import (
     AcquisitionSystems,
     MesoscopeExperimentConfiguration,
     get_working_directory,
-    set_working_directory as _set_working_directory,
+    set_working_directory,
     get_google_credentials_path,
-    set_google_credentials_path as _set_google_credentials_path,
+    set_google_credentials_path,
     get_task_templates_directory,
-    set_task_templates_directory as _set_task_templates_directory,
+    set_task_templates_directory,
     create_experiment_configuration,
     populate_default_experiment_states,
 )
@@ -46,7 +50,7 @@ _TRIAL_CLASSES: dict[str, type[BaseTrial]] = {
     "WaterRewardTrial": WaterRewardTrial,
     "GasPuffTrial": GasPuffTrial,
 }
-"""Maps trial class names to their dataclass implementations."""
+"""Maps trial class names to their ``BaseTrial`` subclasses."""
 
 
 @mcp.tool()
@@ -115,7 +119,7 @@ def set_working_directory_tool(directory: str) -> dict[str, Any]:
     """
     try:
         path = Path(directory)
-        _set_working_directory(path=path)
+        set_working_directory(path=path)
     except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(working_directory=str(path))
@@ -147,15 +151,15 @@ def set_google_credentials_tool(credentials_path: str) -> dict[str, Any]:
     """
     try:
         path = Path(credentials_path)
-        _set_google_credentials_path(path=path)
-    except (FileNotFoundError, ValueError) as exception:
+        set_google_credentials_path(path=path)
+    except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(google_credentials_path=str(path))
 
 
 @mcp.tool()
 def read_task_templates_directory_tool() -> dict[str, Any]:
-    """Returns the configured path to the sollertia-unity-tasks templates directory.
+    """Returns the configured path to the sollertia-unity-tasks task templates directory.
 
     Returns:
         A response dict with ``task_templates_directory`` containing the path.
@@ -172,15 +176,15 @@ def set_task_templates_directory_tool(directory: str) -> dict[str, Any]:
     """Sets the path to the sollertia-unity-tasks task templates directory.
 
     Args:
-        directory: The absolute path to the templates directory.
+        directory: The absolute path to the task templates directory.
 
     Returns:
         A response dict with ``task_templates_directory`` containing the configured path.
     """
     try:
         path = Path(directory)
-        _set_task_templates_directory(path=path)
-    except (FileNotFoundError, ValueError) as exception:
+        set_task_templates_directory(path=path)
+    except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(task_templates_directory=str(path))
 
@@ -190,8 +194,11 @@ def discover_templates_tool() -> dict[str, Any]:
     """Lists all task templates in the configured templates directory.
 
     Returns:
-        A response dict with ``templates`` (list of template summary dicts including cue, segment, and trial
-        counts) and ``total_templates``.
+        A response dict with ``templates`` (a list of per-template summary dicts), ``total_templates``,
+        and ``templates_directory`` (the resolved templates directory path). Each summary dict carries
+        ``name`` (the template filename stem), ``path`` (the absolute YAML path), and on a successful
+        load also ``cue_count``, ``segment_count``, ``trial_count``, and ``cue_offset_cm``. Templates
+        that fail to load instead carry an ``error`` field describing the failure.
     """
     try:
         templates_directory = get_task_templates_directory()
@@ -276,8 +283,9 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
         file_path: Absolute path to the template YAML file.
 
     Returns:
-        A response dict with ``valid`` and either ``summary`` (cue, segment, and trial counts plus the
-        cue offset) or ``issues`` (a list of validation error messages).
+        A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``cue_count``,
+        ``segment_count``, ``trial_count``, and ``cue_offset_cm``) or ``issues`` (a list of validation
+        error messages).
     """
     template_path = Path(file_path)
     if not template_path.exists():
@@ -330,7 +338,10 @@ def discover_experiments_tool(
         project: When provided, restricts the search to a single project.
 
     Returns:
-        A response dict with ``experiments`` (list of experiment summary dicts) and ``total_experiments``.
+        A response dict with ``experiments`` (a list of per-experiment summary dicts) and
+        ``total_experiments``. Each summary dict carries ``project`` (the project directory name),
+        ``experiment`` (the experiment configuration filename stem), and ``path`` (the absolute YAML
+        path).
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -380,7 +391,8 @@ def read_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
             per-project source path or the per-session frozen snapshot path.
 
     Returns:
-        A response dict with ``data`` containing the full experiment configuration payload.
+        A response dict with ``file_path`` and ``data`` containing the full experiment configuration
+        payload.
     """
     return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeExperimentConfiguration)
 
@@ -417,7 +429,7 @@ def write_experiment_configuration_tool(
 
 
 @mcp.tool()
-def create_experiment_config_tool(
+def create_experiment_configuration_tool(
     file_path: str,
     template_path: str,
     state_count: int = 1,
@@ -489,7 +501,9 @@ def validate_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
         file_path: Absolute path to the experiment configuration YAML file.
 
     Returns:
-        A response dict with ``valid`` and either ``summary`` or ``issues``.
+        A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``cue_count``,
+        ``segment_count``, ``trial_count``, ``state_count``, and ``unity_scene_name``) or ``issues``
+        (a list of validation error messages).
     """
     configuration_path = Path(file_path)
     if not configuration_path.exists():
@@ -516,15 +530,15 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
         acquisition_system: The AcquisitionSystems value to describe. Defaults to ``"mesoscope"``.
 
     Returns:
-        A response dict with ``schema`` containing the experiment configuration schema and ``nested_classes``
-        mapping each nested dataclass name (including the supported trial classes) to its individual schema.
+        A response dict with ``acquisition_system`` (the validated enum value), ``schema`` (the
+        experiment configuration schema for the resolved acquisition system), and ``nested_classes``
+        mapping each nested dataclass name (including the supported trial classes) to its individual
+        schema.
     """
-    try:
-        AcquisitionSystems(acquisition_system)
-    except ValueError:
-        valid = ", ".join(member.value for member in AcquisitionSystems)
-        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
-    schema = describe_dataclass(cls=MesoscopeExperimentConfiguration)
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    schema = describe_dataclass(cls=resolved)
     schema["nested_classes"] = {
         "Cue": describe_dataclass(cls=Cue),
         "Segment": describe_dataclass(cls=Segment),
@@ -533,7 +547,7 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
         "WaterRewardTrial": describe_dataclass(cls=WaterRewardTrial),
         "GasPuffTrial": describe_dataclass(cls=GasPuffTrial),
     }
-    return ok_response(schema=schema)
+    return ok_response(acquisition_system=acquisition_system, schema=schema)
 
 
 @mcp.tool()
@@ -565,7 +579,7 @@ def list_supported_acquisition_systems_tool() -> dict[str, Any]:
         A response dict with ``acquisition_systems`` (a list of dicts containing ``value`` and ``name`` for
         each supported acquisition system).
     """
-    entries = [{"value": member.value, "name": member.name} for member in AcquisitionSystems]
+    entries: list[dict[str, Any]] = [{"value": member.value, "name": member.name} for member in AcquisitionSystems]
     return ok_response(acquisition_systems=entries)
 
 
@@ -577,7 +591,7 @@ def list_supported_trial_types_tool() -> dict[str, Any]:
         A response dict with ``trial_types`` (a list of dicts containing ``class_name`` and ``schema`` for
         each supported trial class).
     """
-    entries = [
+    entries: list[dict[str, Any]] = [
         {"class_name": class_name, "schema": describe_dataclass(cls=trial_class)}
         for class_name, trial_class in _TRIAL_CLASSES.items()
     ]
@@ -592,5 +606,36 @@ def list_supported_trigger_types_tool() -> dict[str, Any]:
         A response dict with ``trigger_types`` (a list of dicts containing ``value`` and ``name`` for each
         supported trigger type).
     """
-    entries = [{"value": member.value, "name": member.name} for member in TriggerType]
+    entries: list[dict[str, Any]] = [{"value": member.value, "name": member.name} for member in TriggerType]
     return ok_response(trigger_types=entries)
+
+
+def _resolve_experiment_configuration_class(acquisition_system: str) -> type[YamlConfig] | dict[str, Any]:
+    """Resolves an ``acquisition_system`` string to its registered experiment configuration dataclass.
+
+    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding
+    class in ``EXPERIMENT_CONFIGURATION_REGISTRY``. Returns an error response dict when the value is
+    not a valid acquisition system or when no experiment configuration class has been registered for
+    that system yet.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value supplied by the caller.
+
+    Returns:
+        The resolved experiment configuration dataclass on success, or an error response dict on
+        failure. Callers discriminate via ``isinstance(result, dict)``.
+    """
+    try:
+        acquisition_enum = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+    experiment_configuration_class = EXPERIMENT_CONFIGURATION_REGISTRY.get(acquisition_enum)
+    if experiment_configuration_class is None:
+        registered = ", ".join(member.value for member in EXPERIMENT_CONFIGURATION_REGISTRY)
+        return error_response(
+            message=(
+                f"No experiment configuration class registered for '{acquisition_system}'. Registered: {registered}"
+            )
+        )
+    return experiment_configuration_class
