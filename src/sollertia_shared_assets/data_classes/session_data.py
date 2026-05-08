@@ -57,17 +57,19 @@ class Directories(StrEnum):
     """Behavior data directory. Contains raw DataLogger NPZ archives under ``raw_data`` and processed behavior feather
     files under ``processed_data``."""
     CAMERA_DATA = "camera_data"
-    """Camera data directory. Contains raw video files under ``raw_data`` and video processing pipeline outputs under
+    """Camera data directory. Stores the raw camera recordings under ``raw_data`` and the outputs of the
+    sollertia-forgery video-processing pipeline (DeepLabCut pose estimation followed by re-packaging) under
     ``processed_data``."""
     CAMERA_TIMESTAMPS = "camera_timestamps"
-    """Camera timestamps directory under ``processed_data``. Stores the ataraxis-video-system processed camera
-    timestamp feather files."""
+    """Camera timestamps directory under ``processed_data``. Stores the per-frame timing data extracted by the
+    ataraxis-video-system log-processing pipeline."""
     MICROCONTROLLER_DATA = "microcontroller_data"
-    """Microcontroller data directory. Contains raw microcontroller logs under ``raw_data`` and processed
-    microcontroller event feathers under ``processed_data``."""
+    """Microcontroller data directory under ``processed_data``. Stores the extracted microcontroller data produced by
+    the ataraxis-communication-interface log-processing pipeline. Microcontroller raw data is bundled into the
+    DataLogger archives under ``raw_data/behavior_data`` rather than living in a dedicated raw-side directory."""
     CINDRA = "cindra"
     """Cindra output directory under ``processed_data``. The root of cindra's single-recording and multi-recording
-    outputs. Cindra is reusable by any photometry-data-generating acquisition system, not Mesoscope-VR-specific."""
+    outputs. Cindra is reusable by any photometry-data-generating acquisition system."""
     MULTI_RECORDING = "multi_recording"
     """Multi-recording subdirectory inside cindra's output directory. Each child is a dataset-named directory holding
     cindra's multi-day analysis output."""
@@ -79,29 +81,28 @@ class ProcessingTrackers(StrEnum):
     """
 
     CHECKSUM = "checksum_processing_tracker.yaml"
-    """Tracker for the checksum verification pipeline; lives at the root of ``raw_data/``."""
+    """Tracker for the checksum verification pipeline."""
     BEHAVIOR = "behavior_processing_tracker.yaml"
-    """Tracker for the behavior processing pipeline; lives inside ``processed_data/behavior_data/``."""
+    """Tracker for the behavior processing pipeline."""
     CAMERA = "camera_processing_tracker.yaml"
-    """Tracker for the ataraxis-video-system camera timestamp processing pipeline; lives inside
-    ``processed_data/camera_timestamps/``."""
+    """Tracker for the ataraxis-video-system camera timestamp processing pipeline."""
     VIDEO = "video_processing_tracker.yaml"
-    """Tracker for the forthcoming video processing pipeline; lives inside ``processed_data/camera_data/``."""
+    """Tracker for the sollertia-forgery video processing pipeline (re-packaging of DeepLabCut outputs)."""
     MICROCONTROLLER = "microcontroller_processing_tracker.yaml"
-    """Tracker for the ataraxis-communication-interface microcontroller log processing pipeline; lives inside
-    ``processed_data/microcontroller_data/``."""
+    """Tracker for the ataraxis-communication-interface microcontroller log processing pipeline."""
     CINDRA_SINGLE_RECORDING = "single_recording_tracker.yaml"
-    """Tracker for cindra's single-recording pipeline. Lives at the root of ``processed_data/cindra/``."""
+    """Tracker for cindra's single-recording pipeline."""
     CINDRA_MULTI_RECORDING = "multi_recording_tracker.yaml"
-    """Tracker for cindra's multi-recording pipeline. Lives inside each dataset-named subdirectory of
-    ``processed_data/cindra/multi_recording/``."""
+    """Tracker for cindra's multi-recording pipeline."""
     FORGING = "forging_tracker.yaml"
-    """Tracker for the dataset-forging pipeline; lives at the root of each dataset directory."""
+    """Tracker for the sollertia-forgery dataset-forging pipeline."""
+    ANALYSIS = "analysis_tracker.yaml"
+    """Tracker for the sollertia-forgery analysis pipeline."""
     MANIFEST = "manifest_processing_tracker.yaml"
-    """Tracker for the project manifest generation pipeline; lives at the project root alongside the manifest feather
-    file."""
+    """Tracker for the project manifest generation pipeline."""
     TRANSFER = "transfer_processing_tracker.yaml"
-    """Tracker for batch session transfer and deletion jobs; location is specified by the caller."""
+    """Tracker for batch session transfer and deletion jobs. Location is specified by the caller, since transfer jobs
+    are not bound to a single session or dataset."""
 
 
 class SessionTypes(StrEnum):
@@ -127,10 +128,9 @@ class MesoscopeRawDataFiles(StrEnum):
     """
 
     ZABER_POSITIONS = "zaber_positions.yaml"
-    """The Zaber motor position snapshot YAML written at session start by the Mesoscope-VR acquisition runtime."""
+    """The Zaber motor position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
     MESOSCOPE_POSITIONS = "mesoscope_positions.yaml"
-    """The Mesoscope objective position snapshot YAML written at session start by the Mesoscope-VR acquisition
-    runtime."""
+    """The Mesoscope objective position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
     WINDOW_SCREENSHOT = "window_screenshot.png"
     """The cranial imaging window screenshot captured at session start by the Mesoscope-VR acquisition runtime."""
 
@@ -155,35 +155,37 @@ class RawData:
     """
 
     session_data_path: Path
-    """The path to the session marker YAML serialized from SessionData."""
+    """Stores the metadata that identifies the session and resolves the on-disk locations of all of its assets."""
     session_descriptor_path: Path
-    """The path to the session-embedded descriptor YAML. The parsing class varies by session type and is dispatched via
-    DESCRIPTOR_REGISTRY."""
+    """Stores the task parameters and outcome metadata captured during acquisition. The concrete descriptor class is
+    determined by the session's session_type and is dispatched via DESCRIPTOR_REGISTRY."""
     surgery_metadata_path: Path
-    """The path to the per-animal surgery metadata YAML cached at acquisition time."""
+    """Stores a frozen snapshot of the animal's surgical history (procedures, drugs, implants, injections) as it stood
+    at the moment the session was acquired."""
     hardware_state_path: Path
-    """The path to the hardware state snapshot YAML. The parsing class varies by acquisition system and is dispatched
-    via HARDWARE_STATE_REGISTRY."""
+    """Records the configuration of every active hardware module on the acquisition system, used to interpret the raw
+    data during downstream processing. The concrete parsing class is determined by the session's acquisition_system
+    and is dispatched via HARDWARE_STATE_REGISTRY."""
     system_configuration_path: Path
-    """The path to the system configuration YAML copied into the session by the acquisition runtime. The parsing class
-    varies by acquisition system and is owned by sollertia-experiment."""
+    """Preserves the acquisition-system-level configuration in effect when the session was acquired. The concrete
+    parsing class is determined by the session's acquisition_system and is owned by sollertia-experiment."""
     experiment_configuration_path: Path
-    """The path to the experiment configuration YAML. Only populated for experiment sessions; callers should check
-    .exists() before reading. The parsing class varies by acquisition system and is dispatched via
-    EXPERIMENT_CONFIGURATION_REGISTRY."""
+    """Stores the experiment configuration in effect when the session was acquired. Only populated for experiment
+    sessions; callers should check .exists() before reading. The concrete parsing class is determined by the session's
+    acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     checksum_path: Path
-    """The path to the ataraxis data integrity checksum file for the session's raw_data directory."""
+    """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
+    accidental modification of raw assets after acquisition."""
     checksum_tracker_path: Path
-    """The path to the checksum-pipeline ProcessingTracker YAML at the root of raw_data."""
+    """Tracks the outcome of integrity checks performed by the checksum verification pipeline."""
     nk_path: Path
-    """The path to the 'uninitialized session' marker file. Present while the acquisition runtime is still creating
-    snapshots and initializing instruments. Removed by mark_runtime_initialized()."""
+    """Marks the session as uninitialized while the acquisition runtime is still creating snapshots and initializing
+    instruments. Removed by mark_runtime_initialized() once the session is ready to begin acquisition."""
     behavior_data_path: Path
-    """The path to the directory of raw DataLogger NPZ archives produced during acquisition."""
+    """Holds the raw behavior data captured during acquisition, including the raw messages emitted by every
+    microcontroller managed by ataraxis-communication-interface."""
     camera_data_path: Path
-    """The path to the directory of raw video files produced by the acquisition cameras."""
-    microcontroller_data_path: Path
-    """The path to the directory of raw microcontroller log files."""
+    """Holds the raw camera recordings captured during acquisition."""
 
     @classmethod
     def build(cls, root: Path) -> RawData:
@@ -207,7 +209,6 @@ class RawData:
             nk_path=root.joinpath(RawDataFiles.NK_MARKER),
             behavior_data_path=root.joinpath(Directories.BEHAVIOR_DATA),
             camera_data_path=root.joinpath(Directories.CAMERA_DATA),
-            microcontroller_data_path=root.joinpath(Directories.MICROCONTROLLER_DATA),
         )
 
 
@@ -222,29 +223,37 @@ class ProcessedData:
     """
 
     behavior_data_path: Path
-    """The path to the directory of processed behavior feathers produced by sollertia-forgery."""
+    """Holds the extracted behavior data produced by the sollertia-forgery behavior-processing pipeline."""
     behavior_tracker_path: Path
-    """The path to the behavior-pipeline ProcessingTracker YAML inside the behavior_data directory."""
+    """Tracks the outcome of behavior-data extraction performed by the sollertia-forgery behavior-processing
+    pipeline."""
     camera_timestamps_path: Path
-    """The path to the directory of ataraxis-video-system processed camera-timestamp feathers."""
+    """Holds the per-frame camera timing data extracted by the ataraxis-video-system log-processing pipeline, used to
+    align the camera recordings with the rest of the session's data."""
     camera_tracker_path: Path
-    """The path to the camera-pipeline ProcessingTracker YAML inside the camera_timestamps directory."""
-    camera_data_path: Path
-    """The path to the directory of processed video files produced by the forthcoming video processing pipeline. Not
-    yet populated by the current pipeline."""
+    """Tracks the outcome of camera-timestamp extraction performed by the ataraxis-video-system log-processing
+    pipeline."""
+    video_data_path: Path
+    """Holds the DeepLabCut pose-estimation output re-packaged by the sollertia-forgery video-processing pipeline."""
     video_tracker_path: Path
-    """The path to the video-pipeline ProcessingTracker YAML inside the camera_data directory."""
+    """Tracks the outcome of DeepLabCut processing and re-packaging performed by the sollertia-forgery video-processing
+    pipeline."""
     microcontroller_data_path: Path
-    """The path to the directory of processed microcontroller event feathers."""
+    """Holds the extracted microcontroller data produced by the ataraxis-communication-interface log-processing
+    pipeline."""
     microcontroller_tracker_path: Path
-    """The path to the microcontroller-pipeline ProcessingTracker YAML inside the microcontroller_data directory."""
+    """Tracks the outcome of microcontroller-event extraction performed by the ataraxis-communication-interface
+    log-processing pipeline."""
     cindra_data_path: Path
-    """The path to the cindra output directory; the root of cindra's single-recording and multi-recording outputs."""
+    """Acts as the root for both single-recording and multi-recording cindra outputs. Cindra is reusable by any
+    photometry-data-generating acquisition system on the Sollertia platform, which is why these fields live on the
+    generic ProcessedData rather than on an acquisition-system-specific dataclass."""
     cindra_single_recording_tracker_path: Path
-    """The path to cindra's single-recording ProcessingTracker YAML at the root of the cindra directory."""
+    """Tracks the outcome of single-recording neural imaging analysis performed by cindra's single-recording
+    pipeline."""
     cindra_multi_recording_path: Path
-    """The path to cindra's multi-recording subdirectory. Each child is a dataset-named directory holding cindra's
-    multi-day analysis output."""
+    """Acts as the root for cindra's multi-recording analysis outputs. Each child holds the multi-day analysis output
+    produced by cindra's multi-recording pipeline for a particular dataset that this session participates in."""
 
     @classmethod
     def build(cls, root: Path) -> ProcessedData:
@@ -258,7 +267,7 @@ class ProcessedData:
         """
         behavior_data_path = root.joinpath(Directories.BEHAVIOR_DATA)
         camera_timestamps_path = root.joinpath(Directories.CAMERA_TIMESTAMPS)
-        camera_data_path = root.joinpath(Directories.CAMERA_DATA)
+        video_data_path = root.joinpath(Directories.CAMERA_DATA)
         microcontroller_data_path = root.joinpath(Directories.MICROCONTROLLER_DATA)
         cindra_data_path = root.joinpath(Directories.CINDRA)
         return cls(
@@ -266,8 +275,8 @@ class ProcessedData:
             behavior_tracker_path=behavior_data_path.joinpath(ProcessingTrackers.BEHAVIOR),
             camera_timestamps_path=camera_timestamps_path,
             camera_tracker_path=camera_timestamps_path.joinpath(ProcessingTrackers.CAMERA),
-            camera_data_path=camera_data_path,
-            video_tracker_path=camera_data_path.joinpath(ProcessingTrackers.VIDEO),
+            video_data_path=video_data_path,
+            video_tracker_path=video_data_path.joinpath(ProcessingTrackers.VIDEO),
             microcontroller_data_path=microcontroller_data_path,
             microcontroller_tracker_path=microcontroller_data_path.joinpath(ProcessingTrackers.MICROCONTROLLER),
             cindra_data_path=cindra_data_path,
@@ -287,14 +296,18 @@ class MesoscopeRawData:
     """
 
     zaber_positions_path: Path
-    """The path to the session's Zaber motor position snapshot YAML."""
+    """Captures the states of the Zaber motorized stages used by the Mesoscope-VR system at the start of the
+    session."""
     mesoscope_positions_path: Path
-    """The path to the session's Mesoscope objective position snapshot YAML."""
+    """Records the 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window
+    during the session, allowing the same imaging field of view to be recovered in follow-up sessions."""
     window_screenshot_path: Path
-    """The path to the session's cranial imaging window screenshot PNG."""
+    """Provides a visual reference of the cranial imaging window taken at the start of the session, used for
+    downstream registration and quality assessment."""
     mesoscope_data_path: Path
-    """The path to the session's persistent Mesoscope data directory holding the LERC-compressed TIFF stacks and
-    acquisition metadata."""
+    """Holds the compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata
+    produced by sollertia-experiment's preprocessing, which serves as the input to cindra's neural imaging analysis
+    pipelines."""
 
     @classmethod
     def build(cls, root: Path) -> MesoscopeRawData:

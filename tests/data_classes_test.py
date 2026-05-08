@@ -507,7 +507,6 @@ def test_session_data_raw_data_directory_paths() -> None:
 
     assert session.raw_data.camera_data_path == Path("/tmp/raw") / Directories.CAMERA_DATA
     assert session.raw_data.behavior_data_path == Path("/tmp/raw") / Directories.BEHAVIOR_DATA
-    assert session.raw_data.microcontroller_data_path == Path("/tmp/raw") / Directories.MICROCONTROLLER_DATA
 
 
 def test_session_data_processed_data_directory_paths() -> None:
@@ -517,7 +516,7 @@ def test_session_data_processed_data_directory_paths() -> None:
     assert session.processed_data.behavior_data_path == Path("/tmp/proc") / Directories.BEHAVIOR_DATA
     assert session.processed_data.cindra_data_path == Path("/tmp/proc") / Directories.CINDRA
     assert session.processed_data.camera_timestamps_path == Path("/tmp/proc") / Directories.CAMERA_TIMESTAMPS
-    assert session.processed_data.camera_data_path == Path("/tmp/proc") / Directories.CAMERA_DATA
+    assert session.processed_data.video_data_path == Path("/tmp/proc") / Directories.CAMERA_DATA
     assert session.processed_data.microcontroller_data_path == Path("/tmp/proc") / Directories.MICROCONTROLLER_DATA
 
 
@@ -527,9 +526,8 @@ def test_directories_enum_disambiguation() -> None:
     """
     session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
 
-    assert session.raw_data.camera_data_path != session.processed_data.camera_data_path
+    assert session.raw_data.camera_data_path != session.processed_data.video_data_path
     assert session.raw_data.behavior_data_path != session.processed_data.behavior_data_path
-    assert session.raw_data.microcontroller_data_path != session.processed_data.microcontroller_data_path
 
 
 def test_session_data_processing_tracker_paths() -> None:
@@ -539,7 +537,7 @@ def test_session_data_processing_tracker_paths() -> None:
     processed = session.processed_data
     assert processed.behavior_tracker_path == processed.behavior_data_path / ProcessingTrackers.BEHAVIOR
     assert processed.camera_tracker_path == processed.camera_timestamps_path / ProcessingTrackers.CAMERA
-    assert processed.video_tracker_path == processed.camera_data_path / ProcessingTrackers.VIDEO
+    assert processed.video_tracker_path == processed.video_data_path / ProcessingTrackers.VIDEO
     assert (
         processed.microcontroller_tracker_path
         == processed.microcontroller_data_path / ProcessingTrackers.MICROCONTROLLER
