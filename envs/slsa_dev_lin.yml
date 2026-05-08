@@ -117,7 +117,7 @@ dependencies:
     - polars-runtime-32==1.40.1
     - pycparser==3.0
     - pydantic==2.13.4
-    - pydantic-settings==2.14.0
+    - pydantic-settings==2.14.1
     - pydantic_core==2.46.4
     - pyelftools==0.32
     - pyproject_hooks==1.2.0
@@ -155,7 +155,8 @@ dependencies:
     - tqdm==4.67.3
     - trove-classifiers==2026.5.7.17
     - twine==6.2.0
-    - types-python-dateutil==2.9.0.20260408
+    - types-PyYAML==6.0.12.20260508
+    - types-python-dateutil==2.9.0.20260508
     - typing-inspection==0.4.2
     - urllib3==2.7.0
     - uvicorn==0.46.0

@@ -8,7 +8,7 @@ from ataraxis_data_structures import YamlConfig
 
 
 @dataclass(slots=True)
-class SubjectData:  # pragma: no cover
+class SubjectData:
     """Stores information about the subject of the surgical intervention."""
 
     id: int
@@ -32,7 +32,7 @@ class SubjectData:  # pragma: no cover
 
 
 @dataclass(slots=True)
-class ProcedureData:  # pragma: no cover
+class ProcedureData:
     """Stores general information about the surgical intervention."""
 
     surgery_start_us: int
@@ -55,7 +55,7 @@ class ProcedureData:  # pragma: no cover
 
 
 @dataclass(slots=True)
-class DrugData:  # pragma: no cover
+class DrugData:
     """Stores information about all medical substances (drugs) administered to the subject before, during, and
     immediately after the surgical intervention.
     """
@@ -79,7 +79,7 @@ class DrugData:  # pragma: no cover
 
 
 @dataclass(slots=True)
-class ImplantData:  # pragma: no cover
+class ImplantData:
     """Stores information about a single implantation procedure performed during the surgical intervention.
 
     Multiple ImplantData instances can be used at the same time if the surgery involved multiple implantation
@@ -101,7 +101,7 @@ class ImplantData:  # pragma: no cover
 
 
 @dataclass(slots=True)
-class InjectionData:  # pragma: no cover
+class InjectionData:
     """Stores information about a single injection performed during the surgical intervention.
 
     Multiple InjectionData instances can be used at the same time if the surgery involved multiple injections.
@@ -124,7 +124,7 @@ class InjectionData:  # pragma: no cover
 
 
 @dataclass
-class SurgeryData(YamlConfig):  # pragma: no cover
+class SurgeryData(YamlConfig):
     """Stores information about a surgical intervention performed on an animal before data acquisition session(s)."""
 
     subject: SubjectData

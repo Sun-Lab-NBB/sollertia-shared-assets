@@ -1,22 +1,25 @@
-"""Contains tests for classes and methods provided by the data_classes module."""
+"""Contains tests for the SessionData class and related dataclasses provided by the
+``data_classes.session_data`` module.
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
-import platformdirs
 
 from sollertia_shared_assets.data_classes import (
-    Directories,
-    MesoscopeRawData,
-    MesoscopeRawDataFiles,
-    MesoscopeDirectories,
-    RawData,
-    RawDataFiles,
-    ProcessedData,
-    SessionData,
-    SessionTypes,
-    ProcessingTrackers,
     SYSTEM_RAW_DATA_REGISTRY,
+    RawData,
+    Directories,
+    SessionData,
+    RawDataFiles,
+    SessionTypes,
+    ProcessedData,
+    MesoscopeRawData,
+    ProcessingTrackers,
+    MesoscopeDirectories,
+    MesoscopeRawDataFiles,
 )
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
@@ -24,16 +27,68 @@ from sollertia_shared_assets.configuration import (
     set_working_directory,
 )
 
+_DEFAULT_PYTHON_VERSION = "3.14.4"
+"""Canonical Python version string for SessionData fixtures; matches SessionData.python_version default."""
+
+_DEFAULT_EXPERIMENT_VERSION = "5.0.0"
+"""Canonical sollertia-experiment version string for SessionData fixtures; matches the dataclass default."""
+
+_SENTINEL_RAW_PATH = Path("/sentinel/raw")
+"""Placeholder raw_data root used by path-resolution tests; never touched on disk."""
+
+_SENTINEL_PROCESSED_PATH = Path("/sentinel/processed")
+"""Placeholder processed_data root used by path-resolution tests; never touched on disk."""
+
 
 @pytest.fixture
 def sample_session_hierarchy(tmp_path: Path) -> Path:
-    """Creates a sample session directory hierarchy for testing."""
-    # Builds the session hierarchy: root/project/animal/session/raw_data.
+    """Creates a sample session directory hierarchy and returns the session root."""
     root = tmp_path / "data"
     session_path = root / "test_project" / "test_animal" / "2024-01-15-12-30-45-123456" / "raw_data"
     session_path.mkdir(parents=True)
 
     return session_path.parent
+
+
+def _write_session_marker(
+    session_root: Path,
+    *,
+    session_type: SessionTypes = SessionTypes.LICK_TRAINING,
+    acquisition_system: AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR,
+    experiment_name: str | None = None,
+) -> SessionData:
+    """Writes a ``session_data.yaml`` marker via ``SessionData.save`` and returns the constructed instance."""
+    raw_data_path = session_root / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name=session_root.name,
+        session_type=session_type,
+        acquisition_system=acquisition_system,
+        experiment_name=experiment_name,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        raw_data_path=raw_data_path,
+    )
+    session.save()
+    return session
+
+
+def _make_session_with_paths(raw: Path, processed: Path) -> SessionData:
+    """Builds a SessionData instance with explicit roots and the runtime sub-dataclasses populated."""
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.LICK_TRAINING,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        raw_data_path=raw,
+        processed_data_path=processed,
+    )
+    session._build_sub_dataclasses()
+    return session
 
 
 def test_session_types_values() -> None:
@@ -59,8 +114,8 @@ def test_session_data_default_path_fields() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
 
     assert isinstance(session_data.raw_data_path, Path)
@@ -69,17 +124,9 @@ def test_session_data_default_path_fields() -> None:
     assert session_data.processed_data_path == Path()
 
 
-def test_session_data_create_requires_valid_session_type(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_session_data_create_requires_valid_session_type(clean_working_directory: Path) -> None:
     """Verifies that create() raises error for invalid session types."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Creates the project directory.
+    set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
     with pytest.raises(ValueError, match=r"must be one of the SessionTypes"):
@@ -87,23 +134,16 @@ def test_session_data_create_requires_valid_session_type(
             project_name="test_project",
             animal_id="test_animal",
             session_type="invalid_session_type",
-            python_version="3.11.13",
-            sollertia_experiment_version="3.0.0",
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
             root_directory=clean_working_directory,
         )
 
 
-def test_session_data_create_requires_valid_acquisition_system(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_session_data_create_requires_valid_acquisition_system(clean_working_directory: Path) -> None:
     """Verifies that create() raises error for invalid acquisition systems."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
+    set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
     with pytest.raises(ValueError, match=r"must be one of the AcquisitionSystems"):
@@ -111,67 +151,49 @@ def test_session_data_create_requires_valid_acquisition_system(
             project_name="test_project",
             animal_id="test_animal",
             session_type=SessionTypes.LICK_TRAINING,
-            python_version="3.11.13",
-            sollertia_experiment_version="3.0.0",
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system="not_a_real_system",
             root_directory=clean_working_directory,
         )
 
 
-def test_session_data_create_generates_session_directory(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_session_data_create_generates_session_directory(clean_working_directory: Path) -> None:
     """Verifies that create() generates the session directory structure."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Creates the project directory.
+    set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
         project_name="test_project",
         animal_id="test_animal",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         root_directory=clean_working_directory,
     )
 
-    # Verifies that the session directory and its raw_data subdirectory were created.
     session_path = session_data.raw_data_path.parent
     assert session_path.exists()
     assert session_data.raw_data_path.exists()
 
 
-def test_session_data_create_saves_session_data_yaml(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verifies that create() saves the session_data.yaml file."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Creates the project directory.
+def test_session_data_create_saves_session_data_yaml(clean_working_directory: Path) -> None:
+    """Verifies that create() saves the session_data.yaml file with the expected metadata."""
+    set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
         project_name="test_project",
         animal_id="test_animal",
         session_type=SessionTypes.RUN_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         root_directory=clean_working_directory,
     )
 
-    # Verifies that session_data.yaml exists and contains the expected metadata.
-    session_data_yaml = session_data.raw_data_path.joinpath("session_data.yaml")
+    session_data_yaml = session_data.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
     assert session_data_yaml.exists()
 
     content = session_data_yaml.read_text()
@@ -179,48 +201,27 @@ def test_session_data_create_saves_session_data_yaml(
     assert "test_animal" in content
 
 
-def test_session_data_create_marks_with_nk_file(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_session_data_create_marks_with_nk_file(clean_working_directory: Path) -> None:
     """Verifies that create() creates the nk.bin marker file."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Creates the project directory.
+    set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
         project_name="test_project",
         animal_id="test_animal",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         root_directory=clean_working_directory,
     )
 
-    # Verifies that the nk.bin marker file was created.
-    assert session_data.raw_data_path.joinpath("nk.bin").exists()
+    assert session_data.raw_data_path.joinpath(RawDataFiles.NK_MARKER).exists()
 
 
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy: Path) -> None:
     """Verifies that load() finds and loads session_data.yaml."""
-    session_data_path = sample_session_hierarchy / "raw_data" / "session_data.yaml"
-    session_data_content = """
-project_name: test_project
-animal_id: test_animal
-session_name: 2024-01-15-12-30-45-123456
-session_type: lick training
-acquisition_system: mesoscope
-python_version: "3.11.13"
-sollertia_experiment_version: "3.0.0"
-raw_data: null
-processed_data: null
-"""
-    session_data_path.write_text(session_data_content)
+    _write_session_marker(session_root=sample_session_hierarchy)
 
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
@@ -231,7 +232,6 @@ processed_data: null
 
 def test_session_data_load_raises_error_no_session_data_file(tmp_path: Path) -> None:
     """Verifies that load() raises error when session_data.yaml is missing."""
-    # Creates an empty session directory without a session_data.yaml file.
     session_path = tmp_path / "empty_session" / "raw_data"
     session_path.mkdir(parents=True)
 
@@ -255,19 +255,7 @@ def test_session_data_load_raises_error_multiple_session_data_files(tmp_path: Pa
 
 def test_session_data_load_resolves_all_paths(sample_session_hierarchy: Path) -> None:
     """Verifies that load() resolves the raw_data and processed_data paths."""
-    session_data_path = sample_session_hierarchy / "raw_data" / "session_data.yaml"
-    session_data_content = """
-project_name: test_project
-animal_id: test_animal
-session_name: 2024-01-15-12-30-45-123456
-session_type: mesoscope experiment
-acquisition_system: mesoscope
-python_version: "3.11.13"
-sollertia_experiment_version: "3.0.0"
-raw_data: null
-processed_data: null
-"""
-    session_data_path.write_text(session_data_content)
+    _write_session_marker(session_root=sample_session_hierarchy, session_type=SessionTypes.MESOSCOPE_EXPERIMENT)
 
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
@@ -277,23 +265,11 @@ processed_data: null
 
 def test_session_data_mark_runtime_initialized_removes_nk_file(sample_session_hierarchy: Path) -> None:
     """Verifies that mark_runtime_initialized() removes the nk.bin file."""
-    session_data_path = sample_session_hierarchy / "raw_data" / "session_data.yaml"
-    session_data_content = """
-project_name: test_project
-animal_id: test_animal
-session_name: 2024-01-15-12-30-45-123456
-session_type: run training
-acquisition_system: mesoscope
-python_version: "3.11.13"
-sollertia_experiment_version: "3.0.0"
-raw_data: null
-processed_data: null
-"""
-    session_data_path.write_text(session_data_content)
+    _write_session_marker(session_root=sample_session_hierarchy, session_type=SessionTypes.RUN_TRAINING)
 
     loaded_session = SessionData.load(session_path=sample_session_hierarchy)
 
-    nk_path = loaded_session.raw_data_path.joinpath("nk.bin")
+    nk_path = loaded_session.raw_data_path.joinpath(RawDataFiles.NK_MARKER)
     nk_path.touch()
     assert nk_path.exists()
 
@@ -304,22 +280,12 @@ processed_data: null
 
 def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy: Path) -> None:
     """Verifies that save() converts SessionTypes and AcquisitionSystems to strings."""
-    raw_data_path = sample_session_hierarchy / "raw_data"
-    raw_data_path.mkdir(parents=True, exist_ok=True)
-
-    session_data = SessionData(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_name="2024-01-15-12-30-45-123456",
+    session = _write_session_marker(
+        session_root=sample_session_hierarchy,
         session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
-        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
-        raw_data_path=raw_data_path,
     )
-    session_data.save()
 
-    content = session_data.raw_data_path.joinpath("session_data.yaml").read_text()
+    content = session.raw_data_path.joinpath(RawDataFiles.SESSION_DATA).read_text()
     assert "session_type: mesoscope experiment" in content
     assert "acquisition_system: mesoscope" in content
 
@@ -328,36 +294,18 @@ def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path
     """Verifies that save() serializes the raw and processed data root paths as YAML scalars and writes the marker
     file at ``raw_data_path / session_data.yaml``.
     """
-    raw_data_path = sample_session_hierarchy / "raw_data"
-    raw_data_path.mkdir(parents=True, exist_ok=True)
+    session = _write_session_marker(session_root=sample_session_hierarchy, session_type=SessionTypes.RUN_TRAINING)
 
-    session_data = SessionData(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_name="2024-01-15-12-30-45-123456",
-        session_type=SessionTypes.RUN_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
-        raw_data_path=raw_data_path,
-    )
-    session_data.save()
-
-    marker_path = raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
+    marker_path = session.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
     assert marker_path.exists()
     content = marker_path.read_text()
-    assert f"raw_data_path: {raw_data_path.as_posix()}" in content
+    assert f"raw_data_path: {session.raw_data_path.as_posix()}" in content
     assert "processed_data_path: ." in content
 
 
-def test_session_data_create_raises_error_if_project_does_not_exist(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_session_data_create_raises_error_if_project_does_not_exist(clean_working_directory: Path) -> None:
     """Verifies that create() raises FileNotFoundError when the project does not exist."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
+    set_working_directory(path=clean_working_directory)
 
     # Intentionally omits project-directory creation to trigger the FileNotFoundError path.
 
@@ -366,8 +314,8 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
             project_name="nonexistent_project",
             animal_id="test_animal",
             session_type=SessionTypes.LICK_TRAINING,
-            python_version="3.11.13",
-            sollertia_experiment_version="3.0.0",
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
             root_directory=clean_working_directory,
         )
@@ -380,15 +328,10 @@ def test_session_data_create_raises_error_if_project_does_not_exist(
 def test_session_data_create_copies_experiment_configuration(
     clean_working_directory: Path,
     sample_experiment_config: MesoscopeExperimentConfiguration,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() copies experiment configuration when experiment_name is provided."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    set_working_directory(path=clean_working_directory)
 
-    set_working_directory(clean_working_directory)
-
-    # Creates the project directory and writes the experiment configuration file.
     project_path = clean_working_directory / "test_project"
     project_path.mkdir()
     configuration_path = project_path / "configuration"
@@ -402,45 +345,35 @@ def test_session_data_create_copies_experiment_configuration(
         animal_id="test_animal",
         session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
         experiment_name="test_experiment",
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         root_directory=clean_working_directory,
     )
 
-    # Verifies that the experiment configuration was copied into the session directory.
-    session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
+    session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
     assert session_experiment_config.exists()
 
     content = session_experiment_config.read_text()
     assert "TestScene" in content
 
 
-def test_session_data_create_without_experiment_name_skips_experiment_config(
-    clean_working_directory: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_session_data_create_without_experiment_name_skips_experiment_config(clean_working_directory: Path) -> None:
     """Verifies that create() without experiment_name does not copy experiment configuration."""
-    app_dir = clean_working_directory.parent / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
-
-    set_working_directory(clean_working_directory)
-
-    # Creates the project directory.
+    set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
         project_name="test_project",
         animal_id="test_animal",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         root_directory=clean_working_directory,
     )
 
-    # Verifies that no experiment configuration file was written.
-    session_experiment_config = session_data.raw_data_path / "experiment_configuration.yaml"
+    session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
     assert not session_experiment_config.exists()
 
 
@@ -451,81 +384,70 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type="lick training",
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
 
     assert session_data.session_type == SessionTypes.LICK_TRAINING
 
 
-def _make_session(raw: Path, processed: Path) -> SessionData:
-    """Builds a SessionData instance with explicit roots and the runtime sub-dataclasses populated."""
-    session = SessionData(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_name="2024-01-15-12-30-45-123456",
-        session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
-        raw_data_path=raw,
-        processed_data_path=processed,
-    )
-    session._build_sub_dataclasses()
-    return session
-
-
 def test_session_data_raw_data_file_paths() -> None:
     """Verifies that every generic raw-data file path resolves to raw_data_path / <RawDataFiles member>."""
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
-    assert session.raw_data.session_data_path == Path("/tmp/raw") / RawDataFiles.SESSION_DATA
-    assert session.raw_data.session_descriptor_path == Path("/tmp/raw") / RawDataFiles.SESSION_DESCRIPTOR
-    assert session.raw_data.surgery_metadata_path == Path("/tmp/raw") / RawDataFiles.SURGERY_METADATA
-    assert session.raw_data.hardware_state_path == Path("/tmp/raw") / RawDataFiles.HARDWARE_STATE
-    assert session.raw_data.experiment_configuration_path == Path("/tmp/raw") / RawDataFiles.EXPERIMENT_CONFIGURATION
-    assert session.raw_data.system_configuration_path == Path("/tmp/raw") / RawDataFiles.SYSTEM_CONFIGURATION
-    assert session.raw_data.checksum_path == Path("/tmp/raw") / RawDataFiles.CHECKSUM
-    assert session.raw_data.checksum_tracker_path == Path("/tmp/raw") / ProcessingTrackers.CHECKSUM
-    assert session.raw_data.nk_path == Path("/tmp/raw") / RawDataFiles.NK_MARKER
+    assert session.raw_data.session_data_path == _SENTINEL_RAW_PATH / RawDataFiles.SESSION_DATA
+    assert session.raw_data.session_descriptor_path == _SENTINEL_RAW_PATH / RawDataFiles.SESSION_DESCRIPTOR
+    assert session.raw_data.surgery_metadata_path == _SENTINEL_RAW_PATH / RawDataFiles.SURGERY_METADATA
+    assert session.raw_data.hardware_state_path == _SENTINEL_RAW_PATH / RawDataFiles.HARDWARE_STATE
+    assert session.raw_data.experiment_configuration_path == _SENTINEL_RAW_PATH / RawDataFiles.EXPERIMENT_CONFIGURATION
+    assert session.raw_data.system_configuration_path == _SENTINEL_RAW_PATH / RawDataFiles.SYSTEM_CONFIGURATION
+    assert session.raw_data.checksum_path == _SENTINEL_RAW_PATH / RawDataFiles.CHECKSUM
+    assert session.raw_data.checksum_tracker_path == _SENTINEL_RAW_PATH / ProcessingTrackers.CHECKSUM
+    assert session.raw_data.nk_path == _SENTINEL_RAW_PATH / RawDataFiles.NK_MARKER
 
 
 def test_session_data_system_raw_data_file_paths() -> None:
     """Verifies that every Mesoscope-VR-specific raw-data file path resolves under raw_data_path."""
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     assert isinstance(session.system_raw_data, MesoscopeRawData)
-    assert session.system_raw_data.zaber_positions_path == Path("/tmp/raw") / MesoscopeRawDataFiles.ZABER_POSITIONS
+    assert session.system_raw_data.zaber_positions_path == _SENTINEL_RAW_PATH / MesoscopeRawDataFiles.ZABER_POSITIONS
     assert (
-        session.system_raw_data.mesoscope_positions_path == Path("/tmp/raw") / MesoscopeRawDataFiles.MESOSCOPE_POSITIONS
+        session.system_raw_data.mesoscope_positions_path
+        == _SENTINEL_RAW_PATH / MesoscopeRawDataFiles.MESOSCOPE_POSITIONS
     )
-    assert session.system_raw_data.window_screenshot_path == Path("/tmp/raw") / MesoscopeRawDataFiles.WINDOW_SCREENSHOT
-    assert session.system_raw_data.mesoscope_data_path == Path("/tmp/raw") / MesoscopeDirectories.MESOSCOPE_DATA
+    assert (
+        session.system_raw_data.window_screenshot_path == _SENTINEL_RAW_PATH / MesoscopeRawDataFiles.WINDOW_SCREENSHOT
+    )
+    assert session.system_raw_data.mesoscope_data_path == _SENTINEL_RAW_PATH / MesoscopeDirectories.MESOSCOPE_DATA
 
 
 def test_session_data_raw_data_directory_paths() -> None:
     """Verifies that raw-data directory paths resolve to raw_data_path / <Directories member>."""
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
-    assert session.raw_data.camera_data_path == Path("/tmp/raw") / Directories.CAMERA_DATA
-    assert session.raw_data.behavior_data_path == Path("/tmp/raw") / Directories.BEHAVIOR_DATA
+    assert session.raw_data.camera_data_path == _SENTINEL_RAW_PATH / Directories.CAMERA_DATA
+    assert session.raw_data.behavior_data_path == _SENTINEL_RAW_PATH / Directories.BEHAVIOR_DATA
 
 
 def test_session_data_processed_data_directory_paths() -> None:
     """Verifies that processed-data directory paths resolve to processed_data_path / <Directories member>."""
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
-    assert session.processed_data.behavior_data_path == Path("/tmp/proc") / Directories.BEHAVIOR_DATA
-    assert session.processed_data.cindra_data_path == Path("/tmp/proc") / Directories.CINDRA
-    assert session.processed_data.camera_timestamps_path == Path("/tmp/proc") / Directories.CAMERA_TIMESTAMPS
-    assert session.processed_data.video_data_path == Path("/tmp/proc") / Directories.CAMERA_DATA
-    assert session.processed_data.microcontroller_data_path == Path("/tmp/proc") / Directories.MICROCONTROLLER_DATA
+    assert session.processed_data.behavior_data_path == _SENTINEL_PROCESSED_PATH / Directories.BEHAVIOR_DATA
+    assert session.processed_data.cindra_data_path == _SENTINEL_PROCESSED_PATH / Directories.CINDRA
+    assert session.processed_data.camera_timestamps_path == _SENTINEL_PROCESSED_PATH / Directories.CAMERA_TIMESTAMPS
+    assert session.processed_data.video_data_path == _SENTINEL_PROCESSED_PATH / Directories.CAMERA_DATA
+    assert (
+        session.processed_data.microcontroller_data_path == _SENTINEL_PROCESSED_PATH / Directories.MICROCONTROLLER_DATA
+    )
 
 
 def test_directories_enum_disambiguation() -> None:
     """Verifies that raw-side and processed-side fields sharing a Directories value resolve to distinct paths
     anchored on the correct parent.
     """
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     assert session.raw_data.camera_data_path != session.processed_data.video_data_path
     assert session.raw_data.behavior_data_path != session.processed_data.behavior_data_path
@@ -533,7 +455,7 @@ def test_directories_enum_disambiguation() -> None:
 
 def test_session_data_processing_tracker_paths() -> None:
     """Verifies that each processing-tracker path resolves to the expected subdirectory + filename."""
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     processed = session.processed_data
     assert processed.behavior_tracker_path == processed.behavior_data_path / ProcessingTrackers.BEHAVIOR
@@ -557,8 +479,8 @@ def test_session_data_paths_on_default_instance() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
     session._build_sub_dataclasses()
 
@@ -579,8 +501,8 @@ def test_session_data_sub_dataclass_attributes_unset_without_build() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
 
     with pytest.raises(AttributeError):
@@ -591,7 +513,7 @@ def test_session_data_sub_dataclass_attributes_unset_without_build() -> None:
         _ = session.system_raw_data
 
 
-def test_session_data_build_sub_dataclasses_unsupported_system_raises(
+def test_session_data_build_sub_dataclasses_unsupported_system_raises_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that _build_sub_dataclasses raises ValueError when the acquisition system is not registered."""
@@ -607,8 +529,8 @@ def test_session_data_build_sub_dataclasses_unsupported_system_raises(
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
-        python_version="3.11.13",
-        sollertia_experiment_version="3.0.0",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
 
     with pytest.raises(ValueError, match=r"not supported by the Sollertia platform"):
@@ -623,7 +545,7 @@ def test_system_raw_data_registry_includes_mesoscope_vr() -> None:
 
 def test_session_data_build_sub_dataclasses_returns_typed_instances() -> None:
     """Verifies that _build_sub_dataclasses populates the three sub-dataclass attributes with their concrete types."""
-    session = _make_session(raw=Path("/tmp/raw"), processed=Path("/tmp/proc"))
+    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     assert isinstance(session.raw_data, RawData)
     assert isinstance(session.processed_data, ProcessedData)

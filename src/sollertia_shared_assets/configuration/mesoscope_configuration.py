@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
-from .vr_configuration import Cue, Segment, VREnvironment  # noqa: TC001 - YamlConfig resolves these at runtime.
+from .vr_configuration import (
+    Cue,
+    Segment,
+    VREnvironment,
+    _validate_vr_assets,
+)
 from .experiment_configuration import (  # noqa: TC001 - YamlConfig resolves these at runtime.
     GasPuffTrial,
     ExperimentState,
@@ -79,36 +84,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     def __post_init__(self) -> None:
         """Validates experiment configuration and populates derived trial fields."""
-        # Ensures cue codes are unique.
-        codes = [cue.code for cue in self.cues]
-        if len(codes) != len(set(codes)):
-            duplicate_codes = {code for code in codes if codes.count(code) > 1}
-            message = (
-                f"Unable to initialize MesoscopeExperimentConfiguration. The cue codes must each be unique, but "
-                f"got duplicate codes {duplicate_codes}."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Ensures cue names are unique.
-        names = [cue.name for cue in self.cues]
-        if len(names) != len(set(names)):
-            duplicate_names = {name for name in names if names.count(name) > 1}
-            message = (
-                f"Unable to initialize MesoscopeExperimentConfiguration. The cue names must each be unique, but "
-                f"got duplicate names {duplicate_names}."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Ensures segment cue sequences reference valid cues.
-        cue_names = {cue.name for cue in self.cues}
-        for segment in self.segments:
-            for cue_name in segment.cue_sequence:
-                if cue_name not in cue_names:
-                    message = (
-                        f"Unable to initialize MesoscopeExperimentConfiguration. Segment '{segment.name}' "
-                        f"references unknown cue '{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
-                    )
-                    console.error(message=message, error=ValueError)
+        _validate_vr_assets(owner="MesoscopeExperimentConfiguration", cues=self.cues, segments=self.segments)
 
         # Populates the derived trial fields and validates them.
         segment_names = {segment.name for segment in self.segments}

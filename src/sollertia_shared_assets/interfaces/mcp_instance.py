@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 import uuid
 from typing import TYPE_CHECKING, Any, get_type_hints
 from pathlib import Path
 import contextlib
 from dataclasses import MISSING, fields, is_dataclass
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 from mcp.server.fastmcp import FastMCP
+from ataraxis_base_utilities import console
 
 from ..data_classes import (
     SYSTEM_RAW_DATA_REGISTRY,
@@ -75,11 +76,15 @@ def _assert_registry_coverage() -> None:
         RuntimeError: If any registry is missing entries for known enum members. The error message names the
             offending registry and the missing members so extenders can immediately locate the unwired touch point.
     """
-    coverage_checks: tuple[tuple[str, set, set], ...] = (
-        ("DESCRIPTOR_REGISTRY", set(SessionTypes), set(DESCRIPTOR_REGISTRY)),
-        ("HARDWARE_STATE_REGISTRY", set(AcquisitionSystems), set(HARDWARE_STATE_REGISTRY)),
-        ("EXPERIMENT_CONFIGURATION_REGISTRY", set(AcquisitionSystems), set(EXPERIMENT_CONFIGURATION_REGISTRY)),
-        ("SYSTEM_RAW_DATA_REGISTRY", set(AcquisitionSystems), set(SYSTEM_RAW_DATA_REGISTRY)),
+    coverage_checks: tuple[tuple[str, frozenset[StrEnum], frozenset[StrEnum]], ...] = (
+        ("DESCRIPTOR_REGISTRY", frozenset(SessionTypes), frozenset(DESCRIPTOR_REGISTRY)),
+        ("HARDWARE_STATE_REGISTRY", frozenset(AcquisitionSystems), frozenset(HARDWARE_STATE_REGISTRY)),
+        (
+            "EXPERIMENT_CONFIGURATION_REGISTRY",
+            frozenset(AcquisitionSystems),
+            frozenset(EXPERIMENT_CONFIGURATION_REGISTRY),
+        ),
+        ("SYSTEM_RAW_DATA_REGISTRY", frozenset(AcquisitionSystems), frozenset(SYSTEM_RAW_DATA_REGISTRY)),
     )
     for registry_name, expected, actual in coverage_checks:
         missing = expected - actual
@@ -90,7 +95,7 @@ def _assert_registry_coverage() -> None:
                 f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' "
                 f"sections for the full extension touch list."
             )
-            raise RuntimeError(message)
+            console.error(message=message, error=RuntimeError)
 
 
 _assert_registry_coverage()

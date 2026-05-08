@@ -51,9 +51,17 @@ ___
 
 ## Dependencies
 
-For users, all library dependencies are installed automatically by all supported installation
-methods. For developers, see the [Developers](#developers) section for information on installing
-additional development dependencies.
+- [Python](https://www.python.org/downloads/) **3.14** (the only currently supported interpreter version).
+- An optional 
+  [Google service account credentials JSON file](https://cloud.google.com/iam/docs/service-account-overview),
+  required only when downstream Sollertia libraries fetch subject metadata or water-restriction logs from Google Sheets.
+- An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
+  [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), required only by the MCP tools that
+  generate task prefabs, manage scenes, and control Play Mode.
+
+For users, all Python library dependencies are installed automatically by all supported installation methods. For
+developers, see the [Developers](#developers) section for information on installing additional development
+dependencies.
 
 ___
 

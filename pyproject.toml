@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "8.0.0rc7"
+version = "8.0.0"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -28,11 +28,13 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     # Intended audience and project topic
     "Intended Audience :: Developers",
-    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
     # Supported Python Versions
     "Programming Language :: Python :: 3.14",
     # Supported Operating Systems
-    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
     # Typing
     "Typing :: Typed",
 ]
@@ -85,6 +87,7 @@ dev = [
 
     # Type stubs
     "types-python-dateutil>=2,<3",
+    "types-pyyaml>=6,<7",
 ]
 
 # Specifies files that should not be included in the source-code distribution but are also not
@@ -149,6 +152,16 @@ convention = "google"
     "F401", # Imported but unused
     "F403", # Wildcard imports
 ]
+"**/tests/**/*.py" = [
+    "ANN",     # Type annotations are not required in tests
+    "D",       # Docstring enforcement is relaxed in tests
+    "INP001",  # Tests use implicit namespace packages
+    "PLR2004", # Magic values are common in test assertions
+    "PT006",   # Parametrize argument-name style is a project choice
+    "S101",    # Assert statements are how pytest tests verify behavior
+    "SLF001",  # Private member access is needed for testing internals
+    "T201",    # Print statements are allowed in tests
+]
 
 [tool.ruff.lint.isort]
 case-sensitive = true              # Takes case into account when sorting imports
@@ -159,17 +172,36 @@ length-sort = true                 # Places shorter imports first
 
 # MyPy configuration section.
 [tool.mypy]
-disallow_untyped_defs = true # Enforces function annotation
-warn_unused_ignores = true   # Warns against using 'type: ignore' for packages that have type stubs available.
+# Strict mode settings (equivalent to --strict)
+warn_unused_configs = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict_equality = true
+
+# Extra checks (equivalent to --extra-checks)
+extra_checks = true
+
+# Pretty output (equivalent to --pretty)
+pretty = true
+
 exclude = [
     "sollertia-shared-assets-\\d+", # Ignores temporary folder created by setuptools when building the sdist
-    "venv.*/",               # Ignores virtual environments
-    "build/",                # Ignores the sdist directory
-    "dist/",                 # Ignores the wheel directory
-    "docs/",                 # Ignores the sphinx / doxygen directory
-    "stubs/",                # Ignores stubs directory (stubgen output target)
-    "recipe/",               # Ignores recipe directory (grayskull output target)
-    "tests/",                # Ignores the test directory.
+    "venv.*/",                      # Ignores virtual environments
+    "build/",                       # Ignores the sdist directory
+    "dist/",                        # Ignores the wheel directory
+    "docs/",                        # Ignores the sphinx / doxygen directory
+    "stubs/",                       # Ignores stubs directory (stubgen output target)
+    "recipe/",                      # Ignores recipe directory (grayskull output target)
+    "tests/",                       # Ignores the test directory.
 ]
 
 # This is used by the 'test' tox tasks to aggregate coverage data produced during pytest runtimes.

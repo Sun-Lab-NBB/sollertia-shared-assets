@@ -6,6 +6,7 @@ from .vr_configuration import (
     Cue as Cue,
     Segment as Segment,
     VREnvironment as VREnvironment,
+    _validate_vr_assets as _validate_vr_assets,
 )
 from .experiment_configuration import (
     GasPuffTrial as GasPuffTrial,

@@ -8,7 +8,7 @@ from ataraxis_data_structures import YamlConfig
 
 
 @dataclass
-class MesoscopeHardwareState(YamlConfig):  # pragma: no cover
+class MesoscopeHardwareState(YamlConfig):
     """Stores configuration parameters (states) of the Mesoscope-VR system hardware modules used during training or
     experiment runtimes.
 
@@ -52,7 +52,7 @@ class MesoscopeHardwareState(YamlConfig):  # pragma: no cover
 
 
 @dataclass
-class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
+class LickTrainingDescriptor(YamlConfig):
     """Stores the task and outcome information specific to lick training sessions that use the Mesoscope-VR system."""
 
     experimenter: str
@@ -94,7 +94,7 @@ class LickTrainingDescriptor(YamlConfig):  # pragma: no cover
 
 
 @dataclass
-class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
+class RunTrainingDescriptor(YamlConfig):
     """Stores the task and outcome information specific to run training sessions that use the Mesoscope-VR system."""
 
     experimenter: str
@@ -153,7 +153,7 @@ class RunTrainingDescriptor(YamlConfig):  # pragma: no cover
 
 
 @dataclass
-class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
+class MesoscopeExperimentDescriptor(YamlConfig):
     """Stores the task and outcome information specific to experiment sessions that use the Mesoscope-VR system."""
 
     experimenter: str
@@ -182,7 +182,7 @@ class MesoscopeExperimentDescriptor(YamlConfig):  # pragma: no cover
 
 
 @dataclass
-class WindowCheckingDescriptor(YamlConfig):  # pragma: no cover
+class WindowCheckingDescriptor(YamlConfig):
     """Stores the outcome information specific to window checking sessions that use the Mesoscope-VR system."""
 
     experimenter: str

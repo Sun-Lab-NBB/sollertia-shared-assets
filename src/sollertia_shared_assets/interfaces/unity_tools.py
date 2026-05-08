@@ -277,7 +277,7 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
     # Sends the request and parses the JSON response, handling connectivity and decode errors.
     try:
         with urllib.request.urlopen(url=request, timeout=30) as response:  # noqa: S310 - same localhost URL.
-            return json.loads(response.read().decode("utf-8"))
+            parsed = json.loads(response.read().decode("utf-8"))
     except urllib.error.URLError:
         return error_response(
             message=(
@@ -287,3 +287,8 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         )
     except json.JSONDecodeError:
         return error_response(message="Unity bridge returned invalid JSON.")
+
+    # The bridge contract guarantees a JSON object, but verify the shape so the typed return holds.
+    if not isinstance(parsed, dict):
+        return error_response(message="Unity bridge returned a non-object JSON payload.")
+    return parsed

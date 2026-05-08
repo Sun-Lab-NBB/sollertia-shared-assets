@@ -201,36 +201,7 @@ class TaskTemplate(YamlConfig):
 
     def __post_init__(self) -> None:
         """Validates task template configuration."""
-        # Ensures cue codes are unique.
-        codes = [cue.code for cue in self.cues]
-        if len(codes) != len(set(codes)):
-            duplicate_codes = {code for code in codes if codes.count(code) > 1}
-            message = (
-                f"Unable to initialize TaskTemplate. The cue codes must each be unique, but got duplicate codes "
-                f"{duplicate_codes}."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Ensures cue names are unique.
-        names = [cue.name for cue in self.cues]
-        if len(names) != len(set(names)):
-            duplicate_names = {name for name in names if names.count(name) > 1}
-            message = (
-                f"Unable to initialize TaskTemplate. The cue names must each be unique, but got duplicate names "
-                f"{duplicate_names}."
-            )
-            console.error(message=message, error=ValueError)
-
-        # Ensures segment cue sequences reference valid cues.
-        cue_names = {cue.name for cue in self.cues}
-        for segment in self.segments:
-            for cue_name in segment.cue_sequence:
-                if cue_name not in cue_names:
-                    message = (
-                        f"Unable to initialize TaskTemplate. Segment '{segment.name}' references unknown cue "
-                        f"'{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
-                    )
-                    console.error(message=message, error=ValueError)
+        _validate_vr_assets(owner="TaskTemplate", cues=self.cues, segments=self.segments)
 
         # Validates trial structure segment references and trigger types.
         segment_names = {segment.name for segment in self.segments}
@@ -314,3 +285,46 @@ class TaskTemplate(YamlConfig):
                 f"{trial_structure.stimulus_location_cm}."
             )
             console.error(message=message, error=ValueError)
+
+
+def _validate_vr_assets(*, owner: str, cues: list[Cue], segments: list[Segment]) -> None:
+    """Validates the cue and segment invariants shared by every Virtual Reality asset payload.
+
+    Checks that each cue carries a unique uint8 code, each cue carries a unique name, and every cue
+    referenced by any segment's ``cue_sequence`` is defined in ``cues``. Used by ``TaskTemplate`` and
+    by every system-specific experiment configuration class to avoid reimplementing the same checks.
+
+    Args:
+        owner: The class name to embed in error messages so the caller's identity is preserved when
+            validation fails.
+        cues: The list of Cue instances to validate for unique codes and names.
+        segments: The list of Segment instances whose ``cue_sequence`` members must be defined in
+            ``cues``.
+    """
+    codes = [cue.code for cue in cues]
+    if len(codes) != len(set(codes)):
+        duplicate_codes = {code for code in codes if codes.count(code) > 1}
+        message = (
+            f"Unable to initialize {owner}. The cue codes must each be unique, but got duplicate codes "
+            f"{duplicate_codes}."
+        )
+        console.error(message=message, error=ValueError)
+
+    names = [cue.name for cue in cues]
+    if len(names) != len(set(names)):
+        duplicate_names = {name for name in names if names.count(name) > 1}
+        message = (
+            f"Unable to initialize {owner}. The cue names must each be unique, but got duplicate names "
+            f"{duplicate_names}."
+        )
+        console.error(message=message, error=ValueError)
+
+    cue_names = {cue.name for cue in cues}
+    for segment in segments:
+        for cue_name in segment.cue_sequence:
+            if cue_name not in cue_names:
+                message = (
+                    f"Unable to initialize {owner}. Segment '{segment.name}' references unknown cue "
+                    f"'{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
+                )
+                console.error(message=message, error=ValueError)
