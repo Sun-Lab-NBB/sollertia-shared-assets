@@ -9,11 +9,18 @@ from .runtime_data import (
 )
 from .session_data import (
     RAW_DATA_DIRECTORY,
+    PROCESSED_DATA_DIRECTORY,
+    SYSTEM_RAW_DATA_REGISTRY,
+    RawData,
     Directories,
     SessionData,
     RawDataFiles,
     SessionTypes,
+    ProcessedData,
+    MesoscopeRawData,
     ProcessingTrackers,
+    MesoscopeDirectories,
+    MesoscopeRawDataFiles,
 )
 from .surgery_data import (
     DrugData,
@@ -32,16 +39,23 @@ from .session_discovery import (
 )
 
 __all__ = [
+    "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
+    "SYSTEM_RAW_DATA_REGISTRY",
     "Directories",
     "DrugData",
     "ImplantData",
     "InjectionData",
     "LickTrainingDescriptor",
+    "MesoscopeDirectories",
     "MesoscopeExperimentDescriptor",
     "MesoscopeHardwareState",
+    "MesoscopeRawData",
+    "MesoscopeRawDataFiles",
     "ProcedureData",
+    "ProcessedData",
     "ProcessingTrackers",
+    "RawData",
     "RawDataFiles",
     "RunTrainingDescriptor",
     "SessionData",

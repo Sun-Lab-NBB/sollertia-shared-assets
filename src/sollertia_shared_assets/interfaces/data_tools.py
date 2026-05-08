@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import fields, dataclass
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
@@ -14,7 +14,6 @@ from .mcp_instance import (
     DESCRIPTOR_REGISTRY,
     DATASET_MARKER_FILENAME,
     HARDWARE_STATE_REGISTRY,
-    UNINITIALIZED_SESSION_MARKER,
     mcp,
     read_yaml,
     serialize,
@@ -28,7 +27,6 @@ from .mcp_instance import (
 from ..data_classes import (
     RAW_DATA_DIRECTORY,
     DrugData,
-    Directories,
     ImplantData,
     SessionData,
     SubjectData,
@@ -37,6 +35,7 @@ from ..data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
+    ProcessingTrackers,
     filter_sessions,
     session_root_from_marker,
 )
@@ -337,6 +336,44 @@ def describe_session_data_schema_tool() -> dict[str, Any]:
 
 
 @mcp.tool()
+def list_processing_trackers_tool() -> dict[str, Any]:
+    """Enumerates the ProcessingTracker filenames written by each data-integrity and processing pipeline on the
+    Sollertia platform.
+
+    Returns:
+        A response dict with ``processing_trackers`` (a list of dicts containing ``name``, ``filename``, and
+        ``description`` for each tracker member).
+    """
+    descriptions: dict[ProcessingTrackers, str] = {
+        ProcessingTrackers.CHECKSUM: "Tracks the outcome of integrity checks performed by the checksum verification "
+        "pipeline.",
+        ProcessingTrackers.BEHAVIOR: "Tracks the outcome of behavior-data extraction performed by the "
+        "sollertia-forgery behavior-processing pipeline.",
+        ProcessingTrackers.CAMERA: "Tracks the outcome of camera-timestamp extraction performed by the "
+        "ataraxis-video-system log-processing pipeline.",
+        ProcessingTrackers.VIDEO: "Tracks the outcome of DeepLabCut processing and re-packaging performed by the "
+        "sollertia-forgery video-processing pipeline.",
+        ProcessingTrackers.MICROCONTROLLER: "Tracks the outcome of microcontroller-event extraction performed by "
+        "the ataraxis-communication-interface log-processing pipeline.",
+        ProcessingTrackers.CINDRA_SINGLE_RECORDING: "Tracks the outcome of single-recording neural imaging analysis "
+        "performed by cindra's single-recording pipeline.",
+        ProcessingTrackers.CINDRA_MULTI_RECORDING: "Tracks the outcome of multi-recording neural imaging analysis "
+        "performed by cindra's multi-recording pipeline.",
+        ProcessingTrackers.FORGING: "Tracks the outcome of dataset forging performed by the sollertia-forgery "
+        "dataset-forging pipeline.",
+        ProcessingTrackers.ANALYSIS: "Tracks the outcome of dataset analysis performed by the sollertia-forgery "
+        "analysis pipeline.",
+        ProcessingTrackers.MANIFEST: "Tracks the outcome of project manifest generation.",
+        ProcessingTrackers.TRANSFER: "Tracks the outcome of batch session transfer and deletion jobs.",
+    }
+    entries: list[dict[str, Any]] = [
+        {"name": member.name, "filename": member.value, "description": descriptions[member]}
+        for member in ProcessingTrackers
+    ]
+    return ok_response(processing_trackers=entries)
+
+
+@mcp.tool()
 def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str, Any]:
     """Loads a session descriptor YAML, parsing it with the dataclass that matches ``session_type``.
 
@@ -607,7 +644,7 @@ def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
         A ``_SessionStatusInfo`` carrying the status string, the two boolean signals, the processed_data
         population flag, and an optional descriptor-read error detail.
     """
-    uninitialized = instance.raw_data_path.joinpath(UNINITIALIZED_SESSION_MARKER).exists()
+    uninitialized = instance.raw_data.nk_path.exists()
     processed_data_directory = instance.processed_data_path
     has_processed_data = processed_data_directory.is_dir() and any(processed_data_directory.iterdir())
 
@@ -785,79 +822,84 @@ def _build_session_report(instance: SessionData, session_root: Path) -> dict[str
 
 
 def _raw_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
-    """Returns the existence and classification of every canonical ``raw_data`` file."""
-    mapping: list[tuple[str, Path]] = [
-        (RawDataFiles.SESSION_DATA.name, instance.session_data_path),
-        (RawDataFiles.SESSION_DESCRIPTOR.name, instance.session_descriptor_path),
-        (RawDataFiles.SURGERY_METADATA.name, instance.surgery_metadata_path),
-        (RawDataFiles.HARDWARE_STATE.name, instance.hardware_state_path),
-        (RawDataFiles.EXPERIMENT_CONFIGURATION.name, instance.experiment_configuration_path),
-        (RawDataFiles.SYSTEM_CONFIGURATION.name, instance.system_configuration_path),
-        (RawDataFiles.CHECKSUM.name, instance.checksum_path),
-        (RawDataFiles.ZABER_POSITIONS.name, instance.zaber_positions_path),
-        (RawDataFiles.MESOSCOPE_POSITIONS.name, instance.mesoscope_positions_path),
-        (RawDataFiles.WINDOW_SCREENSHOT.name, instance.window_screenshot_path),
-    ]
-    # Also includes the raw_data subdirectories that carry bulk acquisition artifacts.
-    directory_mapping: list[tuple[str, Path]] = [
-        (f"{Directories.CAMERA_DATA.name}_RAW", instance.raw_camera_data_path),
-        (f"{Directories.BEHAVIOR_DATA.name}_RAW", instance.raw_behavior_data_path),
-        (f"{Directories.MICROCONTROLLER_DATA.name}_RAW", instance.raw_microcontroller_data_path),
-        (f"{Directories.MESOSCOPE_DATA.name}_RAW", instance.raw_mesoscope_data_path),
-    ]
+    """Returns the existence and classification of every canonical asset under the session's ``raw_data`` directory.
+
+    Iterates ``dataclasses.fields()`` over ``instance.raw_data`` (generic raw assets) and
+    ``instance.system_raw_data`` (acquisition-system-specific raw assets) so that new fields and new system
+    extensions are picked up automatically without per-class hardcoding here.
+
+    Args:
+        instance: A loaded ``SessionData`` instance with sub-dataclass attributes populated by
+            ``_build_sub_dataclasses``.
+
+    Returns:
+        A list of ``{field, path, scope, kind, exists}`` dicts. ``scope`` is ``"generic"`` for fields read off
+        ``raw_data`` and ``"system"`` for fields read off ``system_raw_data``. ``kind`` is ``"file"`` for paths
+        that carry a filename suffix and ``"directory"`` otherwise.
+    """
     inventory: list[dict[str, Any]] = []
-    for kind, path in mapping:
-        inventory.append({"name": path.name, "path": str(path), "kind": kind, "exists": path.exists()})
-    for kind, path in directory_mapping:
-        inventory.append({"name": path.name, "path": str(path), "kind": kind, "exists": path.is_dir()})
+    for field_definition in fields(instance.raw_data):
+        path = getattr(instance.raw_data, field_definition.name)
+        inventory.append(_inventory_entry(scope="generic", field_name=field_definition.name, path=path))
+    for field_definition in fields(instance.system_raw_data):
+        path = getattr(instance.system_raw_data, field_definition.name)
+        inventory.append(_inventory_entry(scope="system", field_name=field_definition.name, path=path))
     return inventory
 
 
 def _processed_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
-    """Returns per-subdirectory population and tracker presence under ``processed_data``."""
-    mapping: list[tuple[str, Path, Path]] = [
-        (Directories.BEHAVIOR_DATA.name, instance.behavior_data_path, instance.behavior_tracker_path),
-        (Directories.CINDRA.name, instance.cindra_data_path, instance.cindra_single_recording_tracker_path),
-        (Directories.CAMERA_TIMESTAMPS.name, instance.camera_timestamps_path, instance.camera_tracker_path),
-        (Directories.CAMERA_DATA.name, instance.camera_data_path, instance.video_tracker_path),
-        (
-            Directories.MICROCONTROLLER_DATA.name,
-            instance.microcontroller_data_path,
-            instance.microcontroller_tracker_path,
-        ),
-    ]
-    inventory: list[dict[str, Any]] = []
-    for kind, directory_path, tracker_path in mapping:
-        inventory.append(
-            {
-                "name": directory_path.name,
-                "path": str(directory_path),
-                "kind": kind,
-                "exists": directory_path.is_dir(),
-                "tracker_path": str(tracker_path),
-                "tracker_exists": tracker_path.exists(),
-            }
+    """Returns the existence and classification of every canonical asset under the session's ``processed_data``
+    directory.
+
+    Iterates ``dataclasses.fields()`` over ``instance.processed_data`` so that new processed-data fields are
+    picked up automatically without per-pipeline hardcoding here.
+
+    Args:
+        instance: A loaded ``SessionData`` instance with sub-dataclass attributes populated by
+            ``_build_sub_dataclasses``.
+
+    Returns:
+        A list of ``{field, path, scope, kind, exists}`` dicts. ``scope`` is always ``"generic"``. ``kind`` is
+        ``"file"`` for paths that carry a filename suffix and ``"directory"`` otherwise.
+    """
+    return [
+        _inventory_entry(
+            scope="generic",
+            field_name=field_definition.name,
+            path=getattr(instance.processed_data, field_definition.name),
         )
-    # Reports the cindra multi-recording subdirectory separately because it is a sibling of the
-    # single-recording tracker inside ``cindra/``.
-    inventory.append(
-        {
-            "name": instance.cindra_multi_recording_path.name,
-            "path": str(instance.cindra_multi_recording_path),
-            "kind": Directories.MULTI_RECORDING.name,
-            "exists": instance.cindra_multi_recording_path.is_dir(),
-            "tracker_path": None,
-            "tracker_exists": False,
-        }
-    )
-    return inventory
+        for field_definition in fields(instance.processed_data)
+    ]
+
+
+def _inventory_entry(scope: str, field_name: str, path: Path) -> dict[str, Any]:
+    """Builds one inventory entry for a sub-dataclass path field.
+
+    Args:
+        scope: Either ``"generic"`` (read off the system-agnostic sub-dataclass) or ``"system"`` (read off the
+            acquisition-system-specific extension sub-dataclass).
+        field_name: The name of the dataclass field (e.g., ``"session_descriptor_path"``).
+        path: The resolved path value held in the field.
+
+    Returns:
+        A dict with ``field``, ``path``, ``scope``, ``kind``, and ``exists`` keys. The ``kind`` is derived from
+        the path's suffix: paths with a non-empty suffix are reported as files, others as directories.
+    """
+    is_file = bool(path.suffix)
+    return {
+        "field": field_name,
+        "path": str(path),
+        "scope": scope,
+        "kind": "file" if is_file else "directory",
+        "exists": path.is_file() if is_file else path.is_dir(),
+    }
 
 
 def _required_asset_inventory(instance: SessionData, session_type: SessionTypes) -> list[dict[str, Any]]:
     """Returns the existence of each asset required for the session's type.
 
-    Every session requires the descriptor and the system configuration snapshot; ``mesoscope
-    experiment`` sessions additionally require the experiment configuration snapshot.
+    Every session requires the descriptor and the system configuration snapshot; ``mesoscope experiment``
+    sessions additionally require the experiment configuration snapshot.
 
     Args:
         instance: The loaded ``SessionData`` instance.
@@ -867,11 +909,11 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
         A list of ``{name, path, present, required_for_session_type}`` dicts.
     """
     required: list[tuple[str, Path]] = [
-        (RawDataFiles.SESSION_DESCRIPTOR.value, instance.session_descriptor_path),
-        (RawDataFiles.SYSTEM_CONFIGURATION.value, instance.system_configuration_path),
+        (RawDataFiles.SESSION_DESCRIPTOR.value, instance.raw_data.session_descriptor_path),
+        (RawDataFiles.SYSTEM_CONFIGURATION.value, instance.raw_data.system_configuration_path),
     ]
     if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, instance.experiment_configuration_path))
+        required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, instance.raw_data.experiment_configuration_path))
     return [
         {
             "name": name,

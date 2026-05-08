@@ -13,7 +13,9 @@ import yaml  # type: ignore[import-untyped]
 from mcp.server.fastmcp import FastMCP
 
 from ..data_classes import (
+    SYSTEM_RAW_DATA_REGISTRY,
     SessionData,
+    RawDataFiles,
     SessionTypes,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
 DATASET_MARKER_FILENAME: str = "dataset.yaml"
 """Marker filename used to identify dataset directories during recursive discovery walks."""
 
-UNINITIALIZED_SESSION_MARKER: str = "nk.bin"
+UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
 """Marker file present in ``raw_data`` while a session is **uninitialized** — the acquisition runtime has
 not yet finished creating hardware / experiment snapshots or initializing instruments. A session with this
 marker holds no data of value and is a valid target for purging (treat it as trash). The acquisition
@@ -63,6 +65,36 @@ EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = 
 """Maps each acquisition system to its experiment configuration dataclass. Future acquisition
 systems register here so that the configuration schema, read, and write tools can dispatch to the
 correct dataclass without hard-coding any single system."""
+
+
+def _assert_registry_coverage() -> None:
+    """Verifies at import time that every ``SessionTypes`` and ``AcquisitionSystems`` member has an entry in each
+    dispatch registry.
+
+    Raises:
+        RuntimeError: If any registry is missing entries for known enum members. The error message names the
+            offending registry and the missing members so extenders can immediately locate the unwired touch point.
+    """
+    coverage_checks: tuple[tuple[str, set, set], ...] = (
+        ("DESCRIPTOR_REGISTRY", set(SessionTypes), set(DESCRIPTOR_REGISTRY)),
+        ("HARDWARE_STATE_REGISTRY", set(AcquisitionSystems), set(HARDWARE_STATE_REGISTRY)),
+        ("EXPERIMENT_CONFIGURATION_REGISTRY", set(AcquisitionSystems), set(EXPERIMENT_CONFIGURATION_REGISTRY)),
+        ("SYSTEM_RAW_DATA_REGISTRY", set(AcquisitionSystems), set(SYSTEM_RAW_DATA_REGISTRY)),
+    )
+    for registry_name, expected, actual in coverage_checks:
+        missing = expected - actual
+        if missing:
+            missing_names = ", ".join(sorted(member.name for member in missing))
+            message = (
+                f"{registry_name} is missing entries for {missing_names}. Every enum member must have a registered "
+                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' "
+                f"sections for the full extension touch list."
+            )
+            raise RuntimeError(message)
+
+
+_assert_registry_coverage()
+
 
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 """The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
@@ -292,7 +324,7 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
         ``incomplete`` is None and ``error_message`` describes the failure.
     """
     descriptor_class = DESCRIPTOR_REGISTRY[SessionTypes(session.session_type)]
-    descriptor_path = session.session_descriptor_path
+    descriptor_path = session.raw_data.session_descriptor_path
     if not descriptor_path.exists():
         return None, f"Descriptor file not found at {descriptor_path}"
     try:
