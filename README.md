@@ -26,8 +26,8 @@ The library stores dataclasses used to save data acquired with the Sollertia pla
 state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
 configuration and an MCP server with tools for agentic configuration management, session operations, and Unity Editor
 integration. A subset of the MCP tools relay commands to a running Unity Editor instance via the McpBridge plugin from
-[sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), enabling agents to generate task prefabs,
-manage scenes, and control Play Mode.
+[sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks). This subset enables agents to generate
+task prefabs, manage scenes, and control Play Mode.
 
 ___
 
@@ -120,6 +120,9 @@ Start the MCP server using the CLI:
 slsa mcp
 ```
 
+The server defaults to the `stdio` transport. Use the `-t/--transport` flag to select one of `stdio`, `sse`, or
+`streamable-http`.
+
 #### Available Tools
 
 | Tool                                            | Description                                                                                    |
@@ -130,18 +133,20 @@ slsa mcp
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
 | `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                               |
-| `describe_surgery_data_schema_tool`                  | Returns the schema for SurgeryData and its nested subclasses                                   |
+| `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                   |
 | `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, Segment, TrialStructure, and VREnvironment |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
+| `filter_sessions_tool`                          | Filters discovered session entries by date range and animal- or session-name criteria          |
 | `generate_task_prefab_tool`                     | Generates a Task prefab in Unity from a YAML task template                                     |
-| `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy from SessionData and per-session lifecycle status   |
+| `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy from SessionData and per-session lifecycle status  |
 | `get_platform_environment_status_tool`          | Reports the status of the working directory, templates directory, and Google credentials       |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
 | `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab           |
 | `inspect_sessions_tool`                         | Produces a detailed health and inventory report for one or more sessions                       |
+| `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                  |
 | `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
 | `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
 | `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
@@ -154,7 +159,7 @@ slsa mcp
 | `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema (file-path based)                    |
 | `read_session_descriptor_tool`                  | Detects the appropriate descriptor class and loads the descriptor YAML                         |
 | `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system     |
-| `read_surgery_data_tool`                     | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
+| `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                      |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
@@ -167,7 +172,8 @@ slsa mcp
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                             |
 | `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema         |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
-| `write_session_hardware_state_tool`             | Creates or replaces a hardware-state YAML for a session using the class for the given acquisition system |
+| `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass     |
+| `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData           |
 | `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                  |
 
 ***Note,*** tools that interact with Unity (`create_scene_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`,
@@ -300,9 +306,9 @@ acquisition.
 
 An acquisition system identifies a hardware platform that can produce a session (e.g., the Mesoscope-VR system).
 Each system contributes its own hardware-state snapshot, experiment-configuration schema, and a system-specific raw
-data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing/builder classes
+data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
 by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
-`SYSTEM_RAW_DATA_REGISTRY`. A fourth registry (`_experiment_config_factory_registry`) dispatches `TaskTemplate`-to-
+`SYSTEM_RAW_DATA_REGISTRY`. A fourth registry, `_experiment_config_factory_registry`, dispatches `TaskTemplate`-to-
 configuration factories. System-level hardware and software configuration classes live in the acquisition runtime
 package (sollertia-experiment), not in this library.
 
@@ -357,8 +363,10 @@ Three registries need entries for the new system:
 In `configuration/configuration_utilities.py`:
 
 1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class.
-2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) that builds the new experiment
-   configuration dataclass from a `TaskTemplate` and the converted trial structures dictionary.
+2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) with the signature
+   `(template: TaskTemplate, unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
+   cue_offset_cm: float)` that returns the new experiment configuration dataclass. Use
+   `_create_mesoscope_experiment_config` as reference.
 3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key.
 
 **Step 7: Update downstream libraries**

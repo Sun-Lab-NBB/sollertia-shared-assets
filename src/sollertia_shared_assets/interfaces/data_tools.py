@@ -35,8 +35,8 @@ from ..data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
-    filter_sessions,
     ProcessingTrackers,
+    filter_sessions,
     session_root_from_marker,
 )
 from ..configuration import AcquisitionSystems

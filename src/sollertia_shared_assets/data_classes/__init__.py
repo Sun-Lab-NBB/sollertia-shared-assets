@@ -10,6 +10,7 @@ from .runtime_data import (
 from .session_data import (
     RAW_DATA_DIRECTORY,
     PROCESSED_DATA_DIRECTORY,
+    SYSTEM_RAW_DATA_REGISTRY,
     RawData,
     Directories,
     SessionData,
@@ -20,7 +21,6 @@ from .session_data import (
     ProcessingTrackers,
     MesoscopeDirectories,
     MesoscopeRawDataFiles,
-    SYSTEM_RAW_DATA_REGISTRY,
 )
 from .surgery_data import (
     DrugData,

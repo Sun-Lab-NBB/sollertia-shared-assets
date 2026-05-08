@@ -13,6 +13,7 @@ import yaml  # type: ignore[import-untyped]
 from mcp.server.fastmcp import FastMCP
 
 from ..data_classes import (
+    SYSTEM_RAW_DATA_REGISTRY,
     SessionData,
     RawDataFiles,
     SessionTypes,
@@ -20,7 +21,6 @@ from ..data_classes import (
     LickTrainingDescriptor,
     MesoscopeHardwareState,
     WindowCheckingDescriptor,
-    SYSTEM_RAW_DATA_REGISTRY,
     MesoscopeExperimentDescriptor,
 )
 from ..configuration import AcquisitionSystems, MesoscopeExperimentConfiguration
