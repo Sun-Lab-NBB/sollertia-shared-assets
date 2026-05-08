@@ -57,39 +57,60 @@ _TRIAL_CLASSES: dict[str, type[BaseTrial]] = {
 def get_platform_environment_status_tool() -> dict[str, Any]:
     """Returns a health report for the Sollertia platform configuration components owned by this package.
 
-    Combines working directory, templates directory, and Google credentials status into a single report. System
-    configuration mount checks are not included here — those live with the acquisition runtime package
-    (sl-experiment).
+    Combines working directory, templates directory, and Google credentials status into a single report. Only
+    the working directory is required for ``slsa mcp`` to function; the task templates directory is needed only
+    when authoring task templates or experiment configurations, and Google credentials are needed only by hosts
+    that fetch subject metadata or water-restriction logs from Google Sheets. ``overall_ok`` reflects the
+    required components only — optional components contribute ``configured`` and ``ok`` per-component but do
+    not gate the aggregate. System configuration mount checks are not included here — those live with the
+    acquisition runtime package (sl-experiment).
 
     Returns:
-        A response dict with ``overall_ok`` (the aggregate health flag) and ``components`` mapping each
-        environment component name to its individual status report.
+        A response dict with ``overall_ok`` (the aggregate health flag, computed from required components only)
+        and ``components`` mapping each environment component name to a dict carrying ``required``,
+        ``configured``, ``ok``, and either ``path`` (when configured) or ``error`` (when not).
     """
     report: dict[str, Any] = {}
 
     try:
         working_directory = get_working_directory()
-        report["working_directory"] = {"configured": True, "path": str(working_directory), "ok": True}
+        report["working_directory"] = {"required": True, "configured": True, "path": str(working_directory), "ok": True}
     except FileNotFoundError as exception:
-        report["working_directory"] = {"configured": False, "error": str(exception), "ok": False}
+        report["working_directory"] = {"required": True, "configured": False, "error": str(exception), "ok": False}
 
     try:
         templates_directory = get_task_templates_directory()
         report["task_templates_directory"] = {
+            "required": False,
             "configured": True,
             "path": str(templates_directory),
             "ok": True,
         }
     except FileNotFoundError as exception:
-        report["task_templates_directory"] = {"configured": False, "error": str(exception), "ok": False}
+        report["task_templates_directory"] = {
+            "required": False,
+            "configured": False,
+            "error": str(exception),
+            "ok": False,
+        }
 
     try:
         google_credentials = get_google_credentials_path()
-        report["google_credentials"] = {"configured": True, "path": str(google_credentials), "ok": True}
+        report["google_credentials"] = {
+            "required": False,
+            "configured": True,
+            "path": str(google_credentials),
+            "ok": True,
+        }
     except FileNotFoundError as exception:
-        report["google_credentials"] = {"configured": False, "error": str(exception), "ok": False}
+        report["google_credentials"] = {
+            "required": False,
+            "configured": False,
+            "error": str(exception),
+            "ok": False,
+        }
 
-    overall_ok = all(component.get("ok", False) for component in report.values())
+    overall_ok = all(component["ok"] for component in report.values() if component["required"])
     return ok_response(overall_ok=overall_ok, components=report)
 
 
