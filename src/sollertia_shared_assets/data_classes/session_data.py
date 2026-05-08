@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 import shutil
+from typing import Any, Protocol
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -327,7 +328,15 @@ class MesoscopeRawData:
         )
 
 
-SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type] = {
+class _SystemRawDataBuilder(Protocol):
+    """Structural type for system-specific raw data dataclasses registered in ``SYSTEM_RAW_DATA_REGISTRY``."""
+
+    @classmethod
+    def build(cls, root: Path) -> Any:  # noqa: ANN401
+        ...  # pragma: no cover
+
+
+SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
 }
 """Maps each acquisition system to the dataclass that captures its system-specific raw assets. The registered
@@ -394,14 +403,14 @@ class SessionData(YamlConfig):
         """
         self.raw_data = RawData.build(root=self.raw_data_path)
         self.processed_data = ProcessedData.build(root=self.processed_data_path)
-        builder_cls = SYSTEM_RAW_DATA_REGISTRY.get(self.acquisition_system)
+        builder_cls = SYSTEM_RAW_DATA_REGISTRY.get(AcquisitionSystems(self.acquisition_system))
         if builder_cls is None:
             message = (
                 f"Unable to build the system-specific raw data sub-dataclass for the SessionData instance. The "
                 f"acquisition system '{self.acquisition_system}' is not supported by the Sollertia platform."
             )
             console.error(message=message, error=ValueError)
-            return
+            return  # pragma: no cover
         self.system_raw_data = builder_cls.build(root=self.raw_data_path)
 
     @classmethod

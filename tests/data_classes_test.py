@@ -16,6 +16,7 @@ from sollertia_shared_assets.data_classes import (
     SessionData,
     SessionTypes,
     ProcessingTrackers,
+    SYSTEM_RAW_DATA_REGISTRY,
 )
 from sollertia_shared_assets.configuration import (
     AcquisitionSystems,
@@ -588,6 +589,36 @@ def test_session_data_sub_dataclass_attributes_unset_without_build() -> None:
         _ = session.processed_data
     with pytest.raises(AttributeError):
         _ = session.system_raw_data
+
+
+def test_session_data_build_sub_dataclasses_unsupported_system_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that _build_sub_dataclasses raises ValueError when the acquisition system is not registered."""
+    # Empties the registry so the lookup falls into the defensive error branch even though the
+    # acquisition_system value is a valid AcquisitionSystems member.
+    monkeypatch.setattr(
+        "sollertia_shared_assets.data_classes.session_data.SYSTEM_RAW_DATA_REGISTRY",
+        {},
+    )
+
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.LICK_TRAINING,
+        python_version="3.11.13",
+        sollertia_experiment_version="3.0.0",
+    )
+
+    with pytest.raises(ValueError, match=r"not supported by the Sollertia platform"):
+        session._build_sub_dataclasses()
+
+
+def test_system_raw_data_registry_includes_mesoscope_vr() -> None:
+    """Verifies that the registry exposes the expected acquisition systems."""
+    assert AcquisitionSystems.MESOSCOPE_VR in SYSTEM_RAW_DATA_REGISTRY
+    assert SYSTEM_RAW_DATA_REGISTRY[AcquisitionSystems.MESOSCOPE_VR] is MesoscopeRawData
 
 
 def test_session_data_build_sub_dataclasses_returns_typed_instances() -> None:
