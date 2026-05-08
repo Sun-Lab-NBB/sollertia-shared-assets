@@ -40,6 +40,7 @@ ___
   - [MCP Server](#mcp-server)
 - [API Documentation](#api-documentation)
 - [Developers](#developers)
+  - [Adding New Session Types](#adding-new-session-types)
   - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
 - [Versioning](#versioning)
 - [Authors](#authors)
@@ -251,44 +252,119 @@ Run any environment using `tox -e ENVIRONMENT`. For example, `tox -e lint`.
 being merged. To expedite the task's runtime, use the `tox --parallel` command to run some tasks
 in parallel.
 
-### Adding New Acquisition Systems
+### Adding New Session Types
 
-This library owns the shared vocabulary that identifies acquisition systems (the `AcquisitionSystems` enum) and the
-experiment configuration factory registry used to build per-system experiment configuration dataclasses from a
-`TaskTemplate`. System-level hardware and software configuration classes live in the acquisition runtime package
-(sollertia-experiment), not in this library. The following steps outline how to add support for a new acquisition
-system.
+A session type identifies the high-level activity performed during acquisition (e.g., training, experiment,
+window-checking). Each type has its own descriptor dataclass that captures the type-specific task parameters and
+outcome metadata, persisted as `session_descriptor.yaml` inside the session's `raw_data` directory. The descriptor
+filename is flat across all types — only the parsing class varies, and is dispatched via `DESCRIPTOR_REGISTRY`.
 
-**Step 1: Add the system to the AcquisitionSystems enum**
+**Step 1: Extend the SessionTypes enum**
 
-In `configuration/configuration_utilities.py`, add a new entry to the `AcquisitionSystems` enum:
+In `data_classes/session_data.py`, add a new member to `SessionTypes`:
 
 ```python
-from enum import StrEnum
+class SessionTypes(StrEnum):
+    LICK_TRAINING = "lick training"
+    RUN_TRAINING = "run training"
+    MESOSCOPE_EXPERIMENT = "mesoscope experiment"
+    WINDOW_CHECKING = "window checking"
+    NEW_TYPE = "new type"  # Add new session type here
+```
+
+**Step 2: Add the descriptor dataclass**
+
+In `data_classes/runtime_data.py`, add a `<Type>Descriptor` dataclass inheriting from `YamlConfig` that captures
+the task parameters and outcome metadata for the new session type. Use `LickTrainingDescriptor` or
+`RunTrainingDescriptor` as reference. Export the new class from `data_classes/__init__.py`.
+
+**Step 3: Register the descriptor**
+
+In `interfaces/mcp_instance.py`:
+
+1. Import the new descriptor class.
+2. Register it in `DESCRIPTOR_REGISTRY` under the new `SessionTypes` key.
+
+**Step 4: Update required-asset checks (if applicable)**
+
+If the new session type requires assets beyond the universal `session_descriptor.yaml` and `system_configuration.yaml`
+(for example, an experiment configuration), extend `_required_asset_inventory` in `interfaces/data_tools.py` to add
+the relevant `if session_type == SessionTypes.NEW_TYPE` branch.
+
+**Step 5: Update downstream libraries**
+
+Coordinate with sollertia-experiment, which is the package that actually creates sessions of the new type during
+acquisition.
+
+### Adding New Acquisition Systems
+
+An acquisition system identifies a hardware platform that can produce a session (e.g., the Mesoscope-VR system).
+Each system contributes its own hardware-state snapshot, experiment-configuration schema, and a system-specific raw
+data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing/builder classes
+by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
+`SYSTEM_RAW_DATA_REGISTRY`. A fourth registry (`_experiment_config_factory_registry`) dispatches `TaskTemplate`-to-
+configuration factories. System-level hardware and software configuration classes live in the acquisition runtime
+package (sollertia-experiment), not in this library.
+
+**Step 1: Extend the AcquisitionSystems enum**
+
+In `configuration/configuration_utilities.py`, add a new member to `AcquisitionSystems`:
+
+```python
 class AcquisitionSystems(StrEnum):
     MESOSCOPE_VR = "mesoscope"
     NEW_SYSTEM = "new_system"  # Add new system here
 ```
 
-**Step 2: Create the experiment configuration module**
+**Step 2: Add the hardware-state dataclass**
 
-Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing an experiment configuration
+In `data_classes/runtime_data.py`, add a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records
+the configuration of every active hardware module on the new system. Use `MesoscopeHardwareState` as reference.
+Export the new class from `data_classes/__init__.py`.
+
+**Step 3: Add the experiment-configuration module**
+
+Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a `<System>ExperimentConfiguration`
 dataclass inheriting from `YamlConfig` that captures the runtime experiment parameters for the new system. Use
-`MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as a reference.
+`MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference. Export the new class from
+`configuration/__init__.py`.
 
-**Step 3: Update the factory registry**
+**Step 4: Add the system-specific raw-data dataclass**
+
+In `data_classes/session_data.py`:
+
+1. (Optional) Add `<System>RawDataFiles` and/or `<System>Directories` `StrEnum` classes that enumerate any canonical
+   filenames or subdirectories unique to the new system's `raw_data`. Use `MesoscopeRawDataFiles` /
+   `MesoscopeDirectories` as reference.
+2. Add a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all system-specific raw assets
+   and exposes a `build(root: Path) -> Self` classmethod that resolves every field against the session's `raw_data`
+   directory. Use `MesoscopeRawData` as reference.
+3. Export the new class(es) from `data_classes/__init__.py`.
+
+**Step 5: Register the dispatch classes**
+
+Three registries need entries for the new system:
+
+1. In `interfaces/mcp_instance.py`, import `<System>HardwareState` and add it to `HARDWARE_STATE_REGISTRY`.
+2. In `interfaces/mcp_instance.py`, import `<System>ExperimentConfiguration` and add it to
+   `EXPERIMENT_CONFIGURATION_REGISTRY`.
+3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
+   this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
+   new system into session loading.
+
+**Step 6: Add the TaskTemplate-to-configuration factory**
 
 In `configuration/configuration_utilities.py`:
 
-1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class
+1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class.
 2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) that builds the new experiment
-   configuration dataclass from a `TaskTemplate` and the converted trial structures dictionary
-3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key
+   configuration dataclass from a `TaskTemplate` and the converted trial structures dictionary.
+3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key.
 
-**Step 4: Update downstream libraries**
+**Step 7: Update downstream libraries**
 
-Coordinate changes with sollertia-experiment (which owns the system-level hardware/software configuration classes and
-the acquisition runtime) and sollertia-forgery (data processing) as needed.
+Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
+acquisition runtime) and sollertia-forgery (data processing) as needed.
 
 ### AI-Assisted Development
 

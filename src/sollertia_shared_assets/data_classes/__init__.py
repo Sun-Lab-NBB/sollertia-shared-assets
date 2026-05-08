@@ -20,6 +20,7 @@ from .session_data import (
     ProcessingTrackers,
     MesoscopeDirectories,
     MesoscopeRawDataFiles,
+    SYSTEM_RAW_DATA_REGISTRY,
 )
 from .surgery_data import (
     DrugData,
@@ -40,6 +41,7 @@ from .session_discovery import (
 __all__ = [
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
+    "SYSTEM_RAW_DATA_REGISTRY",
     "Directories",
     "DrugData",
     "ImplantData",

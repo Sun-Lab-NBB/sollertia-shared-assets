@@ -625,5 +625,6 @@ def test_processing_trackers_enum_is_string_enum() -> None:
     assert ProcessingTrackers.CINDRA_MULTI_RECORDING == "multi_recording_tracker.yaml"
     assert ProcessingTrackers.VIDEO == "video_processing_tracker.yaml"
     assert ProcessingTrackers.FORGING == "forging_tracker.yaml"
+    assert ProcessingTrackers.ANALYSIS == "analysis_tracker.yaml"
     assert ProcessingTrackers.MANIFEST == "manifest_processing_tracker.yaml"
     assert ProcessingTrackers.TRANSFER == "transfer_processing_tracker.yaml"

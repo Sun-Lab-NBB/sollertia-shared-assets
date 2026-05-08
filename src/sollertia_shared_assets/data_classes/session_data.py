@@ -327,6 +327,16 @@ class MesoscopeRawData:
         )
 
 
+SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
+}
+"""Maps each acquisition system to the dataclass that captures its system-specific raw assets. The registered
+class must expose a ``build(root: Path) -> Self`` classmethod that resolves all system-specific paths under the
+session's ``raw_data`` directory. ``SessionData._build_sub_dataclasses`` consults this registry to dispatch the
+``system_raw_data`` sub-dataclass without per-system branching, so future acquisition systems register their
+``<System>RawData`` builder here."""
+
+
 @dataclass
 class SessionData(YamlConfig):
     """Defines the structure and the metadata of a data acquisition session.
@@ -384,14 +394,15 @@ class SessionData(YamlConfig):
         """
         self.raw_data = RawData.build(root=self.raw_data_path)
         self.processed_data = ProcessedData.build(root=self.processed_data_path)
-        if self.acquisition_system == AcquisitionSystems.MESOSCOPE_VR:
-            self.system_raw_data = MesoscopeRawData.build(root=self.raw_data_path)
-        else:
+        builder_cls = SYSTEM_RAW_DATA_REGISTRY.get(self.acquisition_system)
+        if builder_cls is None:
             message = (
                 f"Unable to build the system-specific raw data sub-dataclass for the SessionData instance. The "
                 f"acquisition system '{self.acquisition_system}' is not supported by the Sollertia platform."
             )
             console.error(message=message, error=ValueError)
+            return
+        self.system_raw_data = builder_cls.build(root=self.raw_data_path)
 
     @classmethod
     def create(

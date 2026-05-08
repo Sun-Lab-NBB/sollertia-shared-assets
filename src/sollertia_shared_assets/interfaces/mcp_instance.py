@@ -20,6 +20,7 @@ from ..data_classes import (
     LickTrainingDescriptor,
     MesoscopeHardwareState,
     WindowCheckingDescriptor,
+    SYSTEM_RAW_DATA_REGISTRY,
     MesoscopeExperimentDescriptor,
 )
 from ..configuration import AcquisitionSystems, MesoscopeExperimentConfiguration
@@ -64,6 +65,36 @@ EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = 
 """Maps each acquisition system to its experiment configuration dataclass. Future acquisition
 systems register here so that the configuration schema, read, and write tools can dispatch to the
 correct dataclass without hard-coding any single system."""
+
+
+def _assert_registry_coverage() -> None:
+    """Verifies at import time that every ``SessionTypes`` and ``AcquisitionSystems`` member has an entry in each
+    dispatch registry.
+
+    Raises:
+        RuntimeError: If any registry is missing entries for known enum members. The error message names the
+            offending registry and the missing members so extenders can immediately locate the unwired touch point.
+    """
+    coverage_checks: tuple[tuple[str, set, set], ...] = (
+        ("DESCRIPTOR_REGISTRY", set(SessionTypes), set(DESCRIPTOR_REGISTRY)),
+        ("HARDWARE_STATE_REGISTRY", set(AcquisitionSystems), set(HARDWARE_STATE_REGISTRY)),
+        ("EXPERIMENT_CONFIGURATION_REGISTRY", set(AcquisitionSystems), set(EXPERIMENT_CONFIGURATION_REGISTRY)),
+        ("SYSTEM_RAW_DATA_REGISTRY", set(AcquisitionSystems), set(SYSTEM_RAW_DATA_REGISTRY)),
+    )
+    for registry_name, expected, actual in coverage_checks:
+        missing = expected - actual
+        if missing:
+            missing_names = ", ".join(sorted(member.name for member in missing))
+            message = (
+                f"{registry_name} is missing entries for {missing_names}. Every enum member must have a registered "
+                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' "
+                f"sections for the full extension touch list."
+            )
+            raise RuntimeError(message)
+
+
+_assert_registry_coverage()
+
 
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 """The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
