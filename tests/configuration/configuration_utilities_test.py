@@ -12,7 +12,6 @@ import platformdirs
 
 from sollertia_shared_assets.configuration import (
     Cue,
-    Segment,
     TriggerType,
     GasPuffTrial,
     TaskTemplate,
@@ -37,7 +36,6 @@ if TYPE_CHECKING:
 
 def _create_base_task_template(
     cues: list[Cue] | None = None,
-    segments: list[Segment] | None = None,
     trial_structures: dict[str, TrialStructure] | None = None,
 ) -> TaskTemplate:
     """Builds a TaskTemplate populated with defaults suitable for tests."""
@@ -46,12 +44,10 @@ def _create_base_task_template(
             Cue(name="A", code=1, length_cm=50.0),
             Cue(name="B", code=2, length_cm=50.0),
         ]
-    if segments is None:
-        segments = [Segment(name="Seg_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
     if trial_structures is None:
         trial_structures = {
             "trial1": TrialStructure(
-                segment_name="Seg_ab",
+                cue_sequence=["A", "B"],
                 stimulus_trigger_zone_start_cm=80.0,
                 stimulus_trigger_zone_end_cm=100.0,
                 stimulus_location_cm=90.0,
@@ -61,15 +57,14 @@ def _create_base_task_template(
         }
     return TaskTemplate(
         cues=cues,
-        segments=segments,
-        trial_structures=trial_structures,
         vr_environment=VREnvironment(
             corridor_spacing_cm=100.0,
             segments_per_corridor=3,
             padding_prefab_name="Padding",
             cm_per_unity_unit=10.0,
+            cue_offset_cm=0.0,
         ),
-        cue_offset_cm=0.0,
+        trial_structures=trial_structures,
     )
 
 
@@ -343,7 +338,6 @@ def test_create_experiment_configuration_mesoscope_vr() -> None:
 
     assert isinstance(config, MesoscopeExperimentConfiguration)
     assert config.unity_scene_name == "TestScene"
-    assert len(config.cues) == 2
     assert len(config.trial_structures) == 1
     trial = config.trial_structures["trial1"]
     assert isinstance(trial, WaterRewardTrial)
@@ -352,32 +346,17 @@ def test_create_experiment_configuration_mesoscope_vr() -> None:
 
 def test_create_experiment_configuration_with_occupancy_trial() -> None:
     """Verifies that create_experiment_configuration handles occupancy (gas puff) trials."""
-    cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=2, length_cm=50.0),
-    ]
-    segments = [Segment(name="Seg_ab", cue_sequence=["A", "B"], transition_probabilities=None)]
-    trial_structures = {
-        "occ_trial": TrialStructure(
-            segment_name="Seg_ab",
-            stimulus_trigger_zone_start_cm=80.0,
-            stimulus_trigger_zone_end_cm=100.0,
-            stimulus_location_cm=90.0,
-            show_stimulus_collision_boundary=False,
-            trigger_type=TriggerType.OCCUPANCY,
-        ),
-    }
-    template = TaskTemplate(
-        cues=cues,
-        segments=segments,
-        trial_structures=trial_structures,
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="P",
-            cm_per_unity_unit=10.0,
-        ),
-        cue_offset_cm=5.0,
+    template = _create_base_task_template(
+        trial_structures={
+            "occ_trial": TrialStructure(
+                cue_sequence=["A", "B"],
+                stimulus_trigger_zone_start_cm=80.0,
+                stimulus_trigger_zone_end_cm=100.0,
+                stimulus_location_cm=90.0,
+                show_stimulus_collision_boundary=False,
+                trigger_type=TriggerType.OCCUPANCY,
+            ),
+        }
     )
 
     config = create_experiment_configuration(
@@ -393,7 +372,6 @@ def test_create_experiment_configuration_with_occupancy_trial() -> None:
     assert isinstance(trial, GasPuffTrial)
     assert trial.puff_duration_ms == 200
     assert trial.occupancy_duration_ms == 2000
-    assert config.cue_offset_cm == 5.0
 
 
 def test_create_experiment_configuration_invalid_system_raises_error() -> None:
@@ -410,31 +388,9 @@ def test_create_experiment_configuration_invalid_system_raises_error() -> None:
 
 def test_populate_default_experiment_states_with_water_reward() -> None:
     """Verifies that populate_default_experiment_states adds states with water reward guidance."""
-    cues = [
-        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
-        Cue(name="B", code=2, length_cm=50.0, texture="Cue 001 - 4x1.png"),
-        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
-        Cue(name="D", code=4, length_cm=50.0, texture="Cue 002 - 4x1.png"),
-    ]
-    segments = [Segment(name="TestSegment", cue_sequence=["A", "B", "C", "D"], transition_probabilities=None)]
-    trial = WaterRewardTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        show_stimulus_collision_boundary=False,
-    )
     config = MesoscopeExperimentConfiguration(
-        cues=cues,
-        segments=segments,
-        trial_structures={"test_trial": trial},
+        trial_structures={"test_trial": WaterRewardTrial()},
         experiment_states={},
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-        ),
         unity_scene_name="TestScene",
     )
 
@@ -454,31 +410,9 @@ def test_populate_default_experiment_states_with_water_reward() -> None:
 
 def test_populate_default_experiment_states_with_gas_puff() -> None:
     """Verifies that populate_default_experiment_states adds states with gas puff guidance."""
-    cues = [
-        Cue(name="A", code=1, length_cm=50.0, texture="Cue 016 - 4x1.png"),
-        Cue(name="B", code=2, length_cm=50.0, texture="Cue 001 - 4x1.png"),
-        Cue(name="C", code=3, length_cm=50.0, texture="Cue 008 - 2x1 repeat.png"),
-        Cue(name="D", code=4, length_cm=50.0, texture="Cue 002 - 4x1.png"),
-    ]
-    segments = [Segment(name="TestSegment", cue_sequence=["A", "B", "C", "D"], transition_probabilities=None)]
-    trial = GasPuffTrial(
-        segment_name="TestSegment",
-        stimulus_trigger_zone_start_cm=180.0,
-        stimulus_trigger_zone_end_cm=200.0,
-        stimulus_location_cm=190.0,
-        show_stimulus_collision_boundary=False,
-    )
     config = MesoscopeExperimentConfiguration(
-        cues=cues,
-        segments=segments,
-        trial_structures={"test_trial": trial},
+        trial_structures={"test_trial": GasPuffTrial()},
         experiment_states={},
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-        ),
         unity_scene_name="TestScene",
     )
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from enum import StrEnum
 from pathlib import Path
 from collections.abc import Callable
@@ -28,7 +27,7 @@ class AcquisitionSystems(StrEnum):
 
 
 type ExperimentConfigFactory = Callable[
-    [TaskTemplate, str, dict[str, WaterRewardTrial | GasPuffTrial], float],
+    [str, dict[str, WaterRewardTrial | GasPuffTrial]],
     MesoscopeExperimentConfiguration,
 ]
 """Type alias for experiment configuration factory functions."""
@@ -119,7 +118,7 @@ def create_experiment_configuration(
     """Creates an experiment configuration for the specified acquisition system from a TaskTemplate.
 
     Args:
-        template: The TaskTemplate containing the VR structure (cues, segments, trial zones) of the experiment.
+        template: The TaskTemplate containing the VR structure (cues, trial zones) of the experiment.
         system: The data acquisition system for which to create the configuration.
         unity_scene_name: The Unity scene name for the experiment. Must match the template's scene file name.
         default_reward_size_ul: Water reward volume in microliters for lick-type trials.
@@ -144,26 +143,14 @@ def create_experiment_configuration(
         console.error(message=message, error=ValueError)
 
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial] = {}
-    for trial_name, base_trial in template.trial_structures.items():
-        if base_trial.trigger_type == TriggerType.LICK:
+    for trial_name, trial_structure in template.trial_structures.items():
+        if trial_structure.trigger_type == TriggerType.LICK:
             trial_structures[trial_name] = WaterRewardTrial(
-                segment_name=base_trial.segment_name,
-                stimulus_trigger_zone_start_cm=base_trial.stimulus_trigger_zone_start_cm,
-                stimulus_trigger_zone_end_cm=base_trial.stimulus_trigger_zone_end_cm,
-                stimulus_location_cm=base_trial.stimulus_location_cm,
-                show_stimulus_collision_boundary=base_trial.show_stimulus_collision_boundary,
-                trigger_type=base_trial.trigger_type,
                 reward_size_ul=default_reward_size_ul,
                 reward_tone_duration_ms=default_reward_tone_duration_ms,
             )
-        elif base_trial.trigger_type == TriggerType.OCCUPANCY:
+        elif trial_structure.trigger_type == TriggerType.OCCUPANCY:
             trial_structures[trial_name] = GasPuffTrial(
-                segment_name=base_trial.segment_name,
-                stimulus_trigger_zone_start_cm=base_trial.stimulus_trigger_zone_start_cm,
-                stimulus_trigger_zone_end_cm=base_trial.stimulus_trigger_zone_end_cm,
-                stimulus_location_cm=base_trial.stimulus_location_cm,
-                show_stimulus_collision_boundary=base_trial.show_stimulus_collision_boundary,
-                trigger_type=base_trial.trigger_type,
                 puff_duration_ms=default_puff_duration_ms,
                 occupancy_duration_ms=default_occupancy_duration_ms,
             )
@@ -171,10 +158,8 @@ def create_experiment_configuration(
     # The Callable type alias does not carry parameter names, so the factory must be called with positional arguments.
     factory = _experiment_config_factory_registry[system_str]
     return factory(
-        template,
         unity_scene_name,
         trial_structures,
-        template.cue_offset_cm,
     )
 
 
@@ -360,30 +345,22 @@ def get_task_templates_directory() -> Path:
 
 
 def _create_mesoscope_experiment_config(
-    template: TaskTemplate,
     unity_scene_name: str,
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
-    cue_offset_cm: float,
 ) -> MesoscopeExperimentConfiguration:
-    """Creates a Mesoscope-VR experiment configuration from a TaskTemplate.
+    """Creates a Mesoscope-VR experiment configuration.
 
     Args:
-        template: The TaskTemplate containing the VR structure.
         unity_scene_name: The Unity scene name for the experiment.
         trial_structures: The converted trial structures dictionary.
-        cue_offset_cm: The cue offset in centimeters.
 
     Returns:
         The initialized MesoscopeExperimentConfiguration instance.
     """
     return MesoscopeExperimentConfiguration(
-        cues=deepcopy(template.cues),
-        segments=deepcopy(template.segments),
         trial_structures=trial_structures,
         experiment_states={},
-        vr_environment=deepcopy(template.vr_environment),
         unity_scene_name=unity_scene_name,
-        cue_offset_cm=cue_offset_cm,
     )
 
 

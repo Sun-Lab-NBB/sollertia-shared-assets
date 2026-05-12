@@ -142,7 +142,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                      |
 | `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                                |
 | `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                    |
-| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, Segment, TrialStructure, and VREnvironment  |
+| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment           |
 | `delete_unity_asset_tool`                       | Deletes a Unity asset within the InfiniteCorridorTask or Scenes roots and refreshes assets      |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                           |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                  |
@@ -375,9 +375,8 @@ In `configuration/configuration_utilities.py`:
 
 1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class.
 2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) with the signature
-   `(template: TaskTemplate, unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
-   cue_offset_cm: float)` that returns the new experiment configuration dataclass. Use
-   `_create_mesoscope_experiment_config` as reference.
+   `(unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial])` that returns the new
+   experiment configuration dataclass. Use `_create_mesoscope_experiment_config` as reference.
 3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key.
 
 **Step 7: Update downstream libraries**

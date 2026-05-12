@@ -1,8 +1,6 @@
 """Provides VR environment configuration classes for Unity task templates and experiment configurations.
 
 These classes define the schema for task template YAML files that Unity uses for prefab generation and runtime.
-System-agnostic and system-specific configuration classes in this library inherit from these base classes to add
-experiment-specific parameters.
 """
 
 from __future__ import annotations
@@ -17,7 +15,7 @@ _UINT8_MAX: int = 255
 """Maximum value for uint8 cue codes."""
 
 _PROBABILITY_SUM_TOLERANCE: float = 0.001
-"""Tolerance for validating that segment transition probabilities sum to 1.0."""
+"""Tolerance for validating that trial transition probabilities sum to 1.0."""
 
 
 class TriggerType(StrEnum):
@@ -41,13 +39,12 @@ class Cue:
     """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
 
     Notes:
-        Each cue has a unique name (used in the Unity segment (prefab) definitions) and a unique uint8 code (used during
-        MQTT communication and analysis). Cues are not loaded as individual prefabs - they are baked into segment
-        prefabs.
+        Each cue has a unique name (used in trial cue sequences) and a unique uint8 code (used during MQTT
+        communication and analysis). Cues are not loaded as individual prefabs - they are baked into segment prefabs.
     """
 
     name: str
-    """The visual identifier for the cue (e.g., 'A', 'B', 'Gray'). Used to reference the cue in segment definitions."""
+    """The visual identifier for the cue (e.g., 'A', 'B', 'Gray'). Used to reference the cue in trial cue sequences."""
     code: int
     """The unique uint8 code (0-255) that identifies the cue during MQTT communication and data analysis."""
     length_cm: float
@@ -74,42 +71,6 @@ class Cue:
 
 
 @dataclass(slots=True)
-class Segment:
-    """Defines a visual segment (sequence of cues) used in the experiment task's Virtual Reality (VR) environment.
-
-    Notes:
-        Segments are the building blocks of the infinite corridor, each containing a sequence of visual cues
-        and optional transition probabilities for segment-to-segment transitions.
-    """
-
-    name: str
-    """The unique identifier of the segment's Unity prefab file."""
-    cue_sequence: list[str]
-    """The ordered sequence of cue names that comprise this segment."""
-    transition_probabilities: list[float] | None
-    """Transition probabilities to other segments that make up the task's corridor environment. If provided, must sum
-    to 1.0. Set to null in the YAML file if not used."""
-
-    def __post_init__(self) -> None:
-        """Validates segment definition parameters."""
-        if not self.cue_sequence:
-            message = (
-                f"Unable to initialize Segment '{self.name}'. The cue_sequence must contain at least one cue, but "
-                f"got an empty sequence."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.transition_probabilities:
-            probability_sum = sum(self.transition_probabilities)
-            if abs(probability_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
-                message = (
-                    f"Unable to initialize Segment '{self.name}'. The transition_probabilities must sum to 1.0, but "
-                    f"got {probability_sum}."
-                )
-                console.error(message=message, error=ValueError)
-
-
-@dataclass(slots=True)
 class VREnvironment:
     """Defines the Unity Virtual Reality (VR) corridor system configuration.
 
@@ -126,6 +87,9 @@ class VREnvironment:
     """The name of the Unity prefab used for corridor padding."""
     cm_per_unity_unit: float
     """The conversion factor from centimeters to Unity units."""
+    cue_offset_cm: float
+    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
+    sequence origin, in centimeters."""
 
 
 @dataclass(slots=True)
@@ -133,16 +97,16 @@ class TrialStructure:
     """Defines the spatial configuration of a trial structure for Unity prefabs.
 
     Notes:
-        This base class contains only the spatial data needed by Unity for prefab generation and runtime zone
-        configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) are added by subclasses
-        in mesoscope_configuration.py.
+        This class contains only the spatial data needed by Unity for prefab generation and runtime zone
+        configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) live on the matching
+        experiment-side trial classes in mesoscope_configuration.py and are joined back by trial name.
 
         The trigger_type field specifies the stimulus trigger zone behavior and determines which experiment trial
         class (WaterRewardTrial or GasPuffTrial) is created when loading this template for experiment configuration.
     """
 
-    segment_name: str
-    """The name of the Unity Segment this trial structure is based on."""
+    cue_sequence: list[str]
+    """The ordered sequence of cue names that comprise the trial's segment."""
     stimulus_trigger_zone_start_cm: float
     """The position of the trial stimulus trigger zone starting boundary, in centimeters."""
     stimulus_trigger_zone_end_cm: float
@@ -154,6 +118,28 @@ class TrialStructure:
     the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
     trigger_type: str | TriggerType
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
+    transitions: dict[str, float] | None = None
+    """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
+    other trial names defined on the same TaskTemplate. If provided, values must sum to 1.0. Set to null in the YAML
+    file if not used."""
+
+    def __post_init__(self) -> None:
+        """Validates trial structure definition parameters."""
+        if not self.cue_sequence:
+            message = (
+                "Unable to initialize TrialStructure. The cue_sequence must contain at least one cue, but got an "
+                "empty sequence."
+            )
+            console.error(message=message, error=ValueError)
+
+        if self.transitions:
+            probability_sum = sum(self.transitions.values())
+            if abs(probability_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
+                message = (
+                    f"Unable to initialize TrialStructure. The transitions must sum to 1.0, but got "
+                    f"{probability_sum}."
+                )
+                console.error(message=message, error=ValueError)
 
 
 @dataclass
@@ -162,8 +148,8 @@ class TaskTemplate(YamlConfig):
 
     Notes:
         Task templates contain only the data Unity needs for prefab generation and runtime. Experiment-specific
-        parameters (rewards, guidance, experiment states) are not included here — those are added by system-specific
-        experiment configuration classes that use the full trial structure classes inheriting from TrialStructure.
+        parameters (rewards, guidance, experiment states) are not included here — those live on the matching
+        experiment-side trial classes (WaterRewardTrial, GasPuffTrial) and are joined by trial name.
 
         This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-unity-tasks
         project.
@@ -171,48 +157,54 @@ class TaskTemplate(YamlConfig):
 
     cues: list[Cue]
     """Defines the Virtual Reality environment wall cues used in the task."""
-    segments: list[Segment]
-    """Defines the Virtual Reality environment segments (sequences of wall cues) for the Unity corridor system."""
-    trial_structures: dict[str, TrialStructure]
-    """Defines the spatial configuration for each trial type. Keys are trial names (e.g., 'ABC')."""
     vr_environment: VREnvironment
     """Defines the Virtual Reality corridor configuration."""
-    cue_offset_cm: float
-    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
-    sequence origin, in centimeters."""
-
-    @property
-    def _cue_by_name(self) -> dict[str, Cue]:
-        """Returns the mapping of cue names to their Cue class instances for all VR cues used in the template."""
-        return {cue.name: cue for cue in self.cues}
-
-    @property
-    def _segment_by_name(self) -> dict[str, Segment]:
-        """Returns the mapping of segment names to their Segment class instances for all VR segments used in the
-        template.
-        """
-        return {segment.name: segment for segment in self.segments}
-
-    def _get_segment_length_cm(self, segment_name: str) -> float:
-        """Returns the total length of the VR segment in centimeters."""
-        segment = self._segment_by_name[segment_name]
-        cue_map = self._cue_by_name
-        return sum(cue_map[cue_name].length_cm for cue_name in segment.cue_sequence)
+    trial_structures: dict[str, TrialStructure]
+    """Defines the spatial configuration for each trial type. Keys are trial names (e.g., 'ABC')."""
 
     def __post_init__(self) -> None:
         """Validates task template configuration."""
-        _validate_vr_assets(owner="TaskTemplate", cues=self.cues, segments=self.segments)
+        # Validates cue catalog uniqueness.
+        codes = [cue.code for cue in self.cues]
+        if len(codes) != len(set(codes)):
+            duplicate_codes = {code for code in codes if codes.count(code) > 1}
+            message = (
+                f"Unable to initialize TaskTemplate. The cue codes must each be unique, but got duplicate codes "
+                f"{duplicate_codes}."
+            )
+            console.error(message=message, error=ValueError)
 
-        # Validates trial structure segment references and trigger types.
-        segment_names = {segment.name for segment in self.segments}
+        names = [cue.name for cue in self.cues]
+        if len(names) != len(set(names)):
+            duplicate_names = {name for name in names if names.count(name) > 1}
+            message = (
+                f"Unable to initialize TaskTemplate. The cue names must each be unique, but got duplicate names "
+                f"{duplicate_names}."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Validates per-trial cue references, transition targets, trigger types, and zone positions.
+        cue_names = set(names)
+        defined_trial_names = set(self.trial_structures.keys())
         valid_trigger_types = {trigger_type.value for trigger_type in TriggerType}
         for trial_name, trial_structure in self.trial_structures.items():
-            if trial_structure.segment_name not in segment_names:
-                message = (
-                    f"Unable to initialize TaskTemplate. Trial structure '{trial_name}' references unknown segment "
-                    f"'{trial_structure.segment_name}'. Available segments: {', '.join(sorted(segment_names))}."
-                )
-                console.error(message=message, error=ValueError)
+            for cue_name in trial_structure.cue_sequence:
+                if cue_name not in cue_names:
+                    message = (
+                        f"Unable to initialize TaskTemplate. Trial structure '{trial_name}' references unknown cue "
+                        f"'{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
+                    )
+                    console.error(message=message, error=ValueError)
+
+            if trial_structure.transitions:
+                for target_name in trial_structure.transitions:
+                    if target_name not in defined_trial_names:
+                        message = (
+                            f"Unable to initialize TaskTemplate. Trial structure '{trial_name}' has a transition "
+                            f"to unknown trial '{target_name}'. Available trials: "
+                            f"{', '.join(sorted(defined_trial_names))}."
+                        )
+                        console.error(message=message, error=ValueError)
 
             # Validates trigger_type values. Accepts both TriggerType enum and string values for YAML compatibility.
             trigger_value = (
@@ -227,22 +219,44 @@ class TaskTemplate(YamlConfig):
                 )
                 console.error(message=message, error=ValueError)
 
-            # Validates zone positions are within segment bounds.
-            segment_length = self._get_segment_length_cm(segment_name=trial_structure.segment_name)
+            # Validates zone positions are within the trial's segment bounds.
+            trial_length_cm = self._get_trial_length_cm(trial_name=trial_name)
             self._validate_zone_positions(
                 trial_name=trial_name,
                 trial_structure=trial_structure,
-                segment_length=segment_length,
+                trial_length_cm=trial_length_cm,
             )
 
+    @property
+    def _cue_by_name(self) -> dict[str, Cue]:
+        """Returns the mapping of cue names to their Cue class instances for all VR cues used in the template."""
+        return {cue.name: cue for cue in self.cues}
+
+    @property
+    def _cue_name_to_code(self) -> dict[str, int]:
+        """Returns the mapping of cue names to their unique identifier codes for all VR cues used in the template."""
+        return {cue.name: cue.code for cue in self.cues}
+
+    def _get_trial_length_cm(self, trial_name: str) -> float:
+        """Returns the total length of the VR trial's segment in centimeters."""
+        trial = self.trial_structures[trial_name]
+        cue_map = self._cue_by_name
+        return sum(cue_map[cue_name].length_cm for cue_name in trial.cue_sequence)
+
+    def _get_trial_cue_codes(self, trial_name: str) -> list[int]:
+        """Returns the sequence of cue codes for the specified trial's cue sequence."""
+        trial = self.trial_structures[trial_name]
+        cue_name_to_code = self._cue_name_to_code
+        return [cue_name_to_code[name] for name in trial.cue_sequence]
+
     @staticmethod
-    def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, segment_length: float) -> None:
-        """Validates that zone positions are within the segment bounds.
+    def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, trial_length_cm: float) -> None:
+        """Validates that zone positions are within the trial's segment bounds.
 
         Args:
             trial_name: The name of the trial structure being validated.
             trial_structure: The trial structure to validate.
-            segment_length: The total length of the segment in centimeters.
+            trial_length_cm: The total length of the trial's segment in centimeters.
         """
         if trial_structure.stimulus_trigger_zone_end_cm < trial_structure.stimulus_trigger_zone_start_cm:
             message = (
@@ -253,26 +267,26 @@ class TaskTemplate(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
-        if not 0 <= trial_structure.stimulus_trigger_zone_start_cm <= segment_length:
+        if not 0 <= trial_structure.stimulus_trigger_zone_start_cm <= trial_length_cm:
             message = (
                 f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_trigger_zone_start_cm "
-                f"must be within the segment length (0 to {segment_length} cm), but got "
+                f"must be within the trial length (0 to {trial_length_cm} cm), but got "
                 f"{trial_structure.stimulus_trigger_zone_start_cm}."
             )
             console.error(message=message, error=ValueError)
 
-        if not 0 <= trial_structure.stimulus_trigger_zone_end_cm <= segment_length:
+        if not 0 <= trial_structure.stimulus_trigger_zone_end_cm <= trial_length_cm:
             message = (
                 f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_trigger_zone_end_cm must "
-                f"be within the segment length (0 to {segment_length} cm), but got "
+                f"be within the trial length (0 to {trial_length_cm} cm), but got "
                 f"{trial_structure.stimulus_trigger_zone_end_cm}."
             )
             console.error(message=message, error=ValueError)
 
-        if not 0 <= trial_structure.stimulus_location_cm <= segment_length:
+        if not 0 <= trial_structure.stimulus_location_cm <= trial_length_cm:
             message = (
                 f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_location_cm must be "
-                f"within the segment length (0 to {segment_length} cm), but got "
+                f"within the trial length (0 to {trial_length_cm} cm), but got "
                 f"{trial_structure.stimulus_location_cm}."
             )
             console.error(message=message, error=ValueError)
@@ -285,46 +299,3 @@ class TaskTemplate(YamlConfig):
                 f"{trial_structure.stimulus_location_cm}."
             )
             console.error(message=message, error=ValueError)
-
-
-def _validate_vr_assets(*, owner: str, cues: list[Cue], segments: list[Segment]) -> None:
-    """Validates the cue and segment invariants shared by every Virtual Reality asset payload.
-
-    Checks that each cue carries a unique uint8 code, each cue carries a unique name, and every cue
-    referenced by any segment's ``cue_sequence`` is defined in ``cues``. Used by ``TaskTemplate`` and
-    by every system-specific experiment configuration class to avoid reimplementing the same checks.
-
-    Args:
-        owner: The class name to embed in error messages so the caller's identity is preserved when
-            validation fails.
-        cues: The list of Cue instances to validate for unique codes and names.
-        segments: The list of Segment instances whose ``cue_sequence`` members must be defined in
-            ``cues``.
-    """
-    codes = [cue.code for cue in cues]
-    if len(codes) != len(set(codes)):
-        duplicate_codes = {code for code in codes if codes.count(code) > 1}
-        message = (
-            f"Unable to initialize {owner}. The cue codes must each be unique, but got duplicate codes "
-            f"{duplicate_codes}."
-        )
-        console.error(message=message, error=ValueError)
-
-    names = [cue.name for cue in cues]
-    if len(names) != len(set(names)):
-        duplicate_names = {name for name in names if names.count(name) > 1}
-        message = (
-            f"Unable to initialize {owner}. The cue names must each be unique, but got duplicate names "
-            f"{duplicate_names}."
-        )
-        console.error(message=message, error=ValueError)
-
-    cue_names = {cue.name for cue in cues}
-    for segment in segments:
-        for cue_name in segment.cue_sequence:
-            if cue_name not in cue_names:
-                message = (
-                    f"Unable to initialize {owner}. Segment '{segment.name}' references unknown cue "
-                    f"'{cue_name}'. Available cues: {', '.join(sorted(cue_names))}."
-                )
-                console.error(message=message, error=ValueError)
