@@ -199,6 +199,42 @@ def test_task_template_trial_references_unknown_cue_raises_error() -> None:
         _create_base_task_template(cues=cues, trial_structures=trial_structures)
 
 
+def test_task_template_invalid_trial_name_raises_error() -> None:
+    """Verifies that a trial name with characters outside [A-Za-z0-9_] raises ValueError.
+
+    Trial names are embedded verbatim in Unity-side ``<template>_<trial>.prefab`` segment filenames,
+    so any character that is unsafe in a filesystem path must be rejected at template load.
+    """
+    trial_structures = {
+        "bad name!": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    with pytest.raises(ValueError, match=r"Trial name.*invalid"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_task_template_valid_trial_name_with_underscores_and_digits() -> None:
+    """Verifies that trial names containing letters, digits, and underscores are accepted."""
+    trial_structures = {
+        "ABC_123": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.LICK,
+        ),
+    }
+    template = _create_base_task_template(trial_structures=trial_structures)
+    assert "ABC_123" in template.trial_structures
+
+
 def test_task_template_transition_references_unknown_trial_raises_error() -> None:
     """Verifies that a transition to an unknown trial raises ValueError."""
     trial_structures = {

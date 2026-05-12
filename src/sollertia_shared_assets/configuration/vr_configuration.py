@@ -5,6 +5,7 @@ These classes define the schema for task template YAML files that Unity uses for
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from dataclasses import dataclass
 
@@ -16,6 +17,15 @@ _UINT8_MAX: int = 255
 
 _PROBABILITY_SUM_TOLERANCE: float = 0.001
 """Tolerance for validating that trial transition probabilities sum to 1.0."""
+
+_TRIAL_NAME_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
+"""Matches trial names that are safe to embed in Unity segment prefab filenames.
+
+Restricts trial names to ASCII letters, digits, and underscores so the ``TemplateName_TrialName``
+segment naming scheme used by ``sollertia-unity-tasks`` cannot be corrupted by path separators,
+whitespace, or punctuation introduced in a template. Mirrors the equivalent check on the Unity
+side in ``ConfigLoader.cs``.
+"""
 
 
 class TriggerType(StrEnum):
@@ -188,6 +198,17 @@ class TaskTemplate(YamlConfig):
         defined_trial_names = set(self.trial_structures.keys())
         valid_trigger_types = {trigger_type.value for trigger_type in TriggerType}
         for trial_name, trial_structure in self.trial_structures.items():
+            # Trial names are embedded verbatim in Unity segment prefab filenames as
+            # ``TemplateName_TrialName.prefab``, so operator-controlled punctuation, whitespace, or path
+            # separators would corrupt the generated filesystem layout. Rejects them at template load.
+            if not _TRIAL_NAME_PATTERN.match(trial_name):
+                message = (
+                    f"Unable to initialize TaskTemplate. Trial name '{trial_name}' is invalid. Trial names "
+                    "must contain only ASCII letters, digits, and underscores (used in generated segment "
+                    "prefab filenames on the Unity side)."
+                )
+                console.error(message=message, error=ValueError)
+
             for cue_name in trial_structure.cue_sequence:
                 if cue_name not in cue_names:
                     message = (

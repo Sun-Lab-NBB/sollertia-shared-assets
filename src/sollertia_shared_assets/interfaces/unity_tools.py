@@ -25,9 +25,11 @@ def generate_task_prefab_tool(template_name: str, save_path: str | None = None) 
     """Generates a Task prefab in Unity from a YAML task template.
 
     Delegates to the Unity Editor's CreateTask pipeline, which builds cue prefabs, segment prefabs, and the
-    full corridor hierarchy from the template. Existing cue and segment prefabs are reused as-is — to force
-    regeneration after editing the YAML, delete the affected prefabs via ``delete_unity_asset_tool`` first.
-    Requires the Unity Editor to be running with the McpBridge plugin active.
+    full corridor hierarchy from the template. Segment prefabs are named ``<template_name>_<trial_name>.prefab``
+    and are always regenerated on each call so trial-parameter edits never leave stale segment geometry on
+    disk. Cue prefabs and materials are keyed by ``Cue_<name>_<length>cm`` and shared across every template
+    that declares a matching cue; they are reused when present and only built when missing. Requires the
+    Unity Editor to be running with the McpBridge plugin active.
 
     Args:
         template_name: The template filename without extension (e.g., ``SSO_Merging``). Must exist in the
@@ -52,7 +54,7 @@ def inspect_prefab_tool(prefab_path: str) -> dict[str, Any]:
 
     Args:
         prefab_path: The project-relative path to the prefab (e.g.,
-            ``Assets/InfiniteCorridorTask/Prefabs/Segment_abc_40cm.prefab``).
+            ``Assets/InfiniteCorridorTask/Prefabs/SSO_Merging_ABC.prefab``).
 
     Returns:
         A response dict with ``prefab_path`` and ``hierarchy`` (recursive GameObject tree with transforms,
