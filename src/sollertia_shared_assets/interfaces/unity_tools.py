@@ -28,8 +28,17 @@ def generate_task_prefab_tool(template_name: str, save_path: str | None = None) 
     full corridor hierarchy from the template. Segment prefabs are named ``<template_name>_<trial_name>.prefab``
     and are always regenerated on each call so trial-parameter edits never leave stale segment geometry on
     disk. Cue prefabs and materials are keyed by ``Cue_<name>_<length>cm`` and shared across every template
-    that declares a matching cue; they are reused when present and only built when missing. Requires the
-    Unity Editor to be running with the McpBridge plugin active.
+    that declares a matching cue; they are reused when present and only built when missing.
+
+    Before any mutation, ``CreateFromTemplate`` runs a cross-template cue-texture preflight that scans every
+    YAML under ``Assets/InfiniteCorridorTask/Configurations/`` and aborts the call when two templates declare
+    a cue with the same ``(name, length_cm)`` identity but different textures. The shared-cue keying scheme
+    makes such conflicts silently corrupt downstream prefabs, so the preflight failure surfaces as an
+    ``error:`` response with the offending template pair(s) listed before any cue or segment is touched.
+    Templates outside ``Configurations/`` are not visible to the MCP surface and are rejected by the Editor
+    menu as well.
+
+    Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
         template_name: The template filename without extension (e.g., ``SSO_Merging``). Must exist in the
@@ -67,11 +76,11 @@ def inspect_prefab_tool(prefab_path: str) -> dict[str, Any]:
 def validate_prefab_against_template_tool(template_name: str) -> dict[str, Any]:
     """Validates that Unity prefabs match the YAML template's cue inventory, segment geometry, and zones.
 
-    For each cue defined in the template, checks whether the cue prefab exists on disk. For each segment
-    referenced by the template, checks whether the segment prefab exists. Compares the prefab's child
-    cue ordering against the template's ``cue_sequence``. Compares the prefab's measured z-axis length
-    against the cue-sum length. When the segment has a trial structure, also compares the
-    StimulusTriggerZone position and size against the trial's expected values.
+    For each cue defined in the template, checks whether the cue prefab exists on disk. For each trial
+    declared in the template's ``trial_structures``, checks whether the matching segment prefab exists
+    (named ``<template_name>_<trial_name>.prefab``), compares the prefab's child cue ordering against the
+    trial's ``cue_sequence``, compares the measured Z-axis length against the cue-sum length, and compares
+    the StimulusTriggerZone position and size against the trial's expected zone values.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
@@ -80,8 +89,9 @@ def validate_prefab_against_template_tool(template_name: str) -> dict[str, Any]:
             Unity project's ``Assets/InfiniteCorridorTask/Configurations/`` directory.
 
     Returns:
-        A response dict with ``template_name``, ``cue_prefabs`` (per-cue prefab existence), and
-        ``segments`` (per-segment validation including cue ordering, segment length, and zone positions).
+        A response dict with ``template_name``, ``cue_prefabs`` (per-cue prefab existence), and ``trials``
+        (per-trial validation including segment prefab existence, cue ordering, segment length, and zone
+        positions).
     """
     return _unity_relay(tool="validate_prefab_against_template", arguments={"template_name": template_name})
 
