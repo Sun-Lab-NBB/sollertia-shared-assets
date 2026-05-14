@@ -266,6 +266,93 @@ def get_play_state_tool() -> dict[str, Any]:
     return _unity_relay(tool="get_play_state")
 
 
+@mcp.tool()
+def read_task_parameters_tool() -> dict[str, Any]:
+    """Reads every field exposed by the Task Parameters Unity Editor window.
+
+    Returns a single-scan snapshot of the active scene's current state plus the enumerated options
+    available for each settable enum-like field and the visibility of conditionally-rendered controls.
+    State, options, and visibility are all derived from the same scene walk so an agent that reads,
+    modifies, and writes back values does not race against a separate enumeration pass.
+
+    Requires the Unity Editor to be running with the McpBridge plugin active.
+
+    Returns:
+        A response dict with three top-level keys:
+
+        - ``state``: per-section current values. Keys are ``actor`` (with ``model`` and ``controller``),
+          ``mqtt`` (with ``ip`` and ``port``), ``display`` (with ``current_brightness``, ``brightness``,
+          and ``height_in_vr``), ``camera_mapping`` (a list of per-monitor dicts containing ``monitor``,
+          ``left``, ``top``, and ``camera``), and ``task`` (with ``require_lick``, ``require_wait``,
+          ``track_length``, and ``track_seed``).
+        - ``options``: enumerated alternatives for fields with a finite valid set. ``actor.model`` and
+          ``actor.controller`` list every Resources actor prefab and scene ControllerOutput respectively
+          (plus the literal ``"None"``); ``camera_mapping.camera`` lists every scene Camera not tagged
+          MainCamera or named ``Main Camera`` (also plus ``"None"``).
+        - ``visibility``: per-control flags indicating whether the matching control is currently rendered
+          in the Parameters window. ``task.require_lick`` is ``true`` only when the scene contains a
+          ``GuidanceZone``; ``task.require_wait`` is ``true`` only when the scene contains an
+          ``OccupancyZone``. Writes against fields whose visibility is ``false`` are rejected by
+          :func:`write_task_parameters_tool`.
+    """
+    return _unity_relay(tool="read_task_parameters")
+
+
+@mcp.tool()
+def write_task_parameters_tool(
+    actor: dict[str, Any] | None = None,
+    mqtt: dict[str, Any] | None = None,
+    display: dict[str, Any] | None = None,
+    camera_mapping: list[dict[str, Any]] | None = None,
+    task: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Writes a subset of the Task Parameters fields in a single atomic relay call.
+
+    Each top-level argument corresponds to one section of the Task Parameters window. Passing ``None``
+    (the default) leaves the section untouched; fields within a supplied section are also individually
+    optional so callers can update one value at a time. Writes flow through the same code paths the
+    GUI uses, so the scene is marked dirty and modified asset files (``DisplaySettings``,
+    ``savedFullScreenViews``) are flagged for save.
+
+    Validation rejects values that fall outside the enumeration reported by
+    :func:`read_task_parameters_tool`, mismatched monitor indices, and writes targeting
+    ``task.require_lick`` / ``task.require_wait`` when the corresponding zone is absent from the scene
+    (mirroring the GUI's conditional rendering). The tightened require-toggle contract guarantees that
+    a successful write means the flag will actually take effect at runtime.
+
+    Requires the Unity Editor to be running with the McpBridge plugin active.
+
+    Args:
+        actor: Optional dict with ``model`` (str matching ``options.actor.model``) and/or
+            ``controller`` (str matching ``options.actor.controller``).
+        mqtt: Optional dict with ``ip`` (str) and/or ``port`` (int).
+        display: Optional dict with ``current_brightness`` (0-100 float), ``brightness``
+            (0-100 float), and/or ``height_in_vr`` (float, Unity units).
+        camera_mapping: Optional list of per-monitor dicts. Each entry requires ``monitor`` (1-based
+            index, matching the GUI row index) and ``camera`` (str matching
+            ``options.camera_mapping.camera``). Omitted monitors keep their current assignment.
+        task: Optional dict with ``require_lick`` (bool), ``require_wait`` (bool), ``track_length``
+            (float), and/or ``track_seed`` (int). ``require_lick`` is rejected when the scene has no
+            ``GuidanceZone``; ``require_wait`` is rejected when the scene has no ``OccupancyZone``.
+
+    Returns:
+        A post-write snapshot in the same shape as :func:`read_task_parameters_tool`, so callers get
+        immediate confirmation of the new state without a separate read.
+    """
+    relay_arguments: dict[str, Any] = {}
+    if actor is not None:
+        relay_arguments["actor"] = actor
+    if mqtt is not None:
+        relay_arguments["mqtt"] = mqtt
+    if display is not None:
+        relay_arguments["display"] = display
+    if camera_mapping is not None:
+        relay_arguments["camera_mapping"] = camera_mapping
+    if task is not None:
+        relay_arguments["task"] = task
+    return _unity_relay(tool="write_task_parameters", arguments=relay_arguments)
+
+
 def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     """Relays a tool call to the Unity Editor's McpBridge HTTP listener.
 
