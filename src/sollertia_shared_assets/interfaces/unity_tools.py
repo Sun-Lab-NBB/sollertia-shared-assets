@@ -278,22 +278,21 @@ def read_task_parameters_tool() -> dict[str, Any]:
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with three top-level keys:
-
-        - ``state``: per-section current values. Keys are ``actor`` (with ``model`` and ``controller``),
-          ``mqtt`` (with ``ip`` and ``port``), ``display`` (with ``current_brightness``, ``brightness``,
-          and ``height_in_vr``), ``camera_mapping`` (a list of per-monitor dicts containing ``monitor``,
-          ``left``, ``top``, and ``camera``), and ``task`` (with ``require_lick``, ``require_wait``,
-          ``track_length``, and ``track_seed``).
-        - ``options``: enumerated alternatives for fields with a finite valid set. ``actor.model`` and
-          ``actor.controller`` list every Resources actor prefab and scene ControllerOutput respectively
-          (plus the literal ``"None"``); ``camera_mapping.camera`` lists every scene Camera not tagged
-          MainCamera or named ``Main Camera`` (also plus ``"None"``).
-        - ``visibility``: per-control flags indicating whether the matching control is currently rendered
-          in the Parameters window. ``task.require_lick`` is ``true`` only when the scene contains a
-          ``GuidanceZone``; ``task.require_wait`` is ``true`` only when the scene contains an
-          ``OccupancyZone``. Writes against fields whose visibility is ``false`` are rejected by
-          :func:`write_task_parameters_tool`.
+        A response dict with three top-level keys. The ``state`` key holds per-section current
+        values: ``actor`` (with ``model`` and ``controller``), ``mqtt`` (with ``ip`` and ``port``),
+        ``display`` (with ``current_brightness``, ``brightness``, and ``height_in_vr``),
+        ``camera_mapping`` (a list of per-monitor dicts containing ``monitor``, ``left``, ``top``,
+        and ``camera``), and ``task`` (with ``require_lick``, ``require_wait``, ``track_length``,
+        and ``track_seed``). The ``options`` key lists enumerated alternatives for fields with a
+        finite valid set: ``actor.model`` and ``actor.controller`` list every Resources actor prefab
+        and scene ControllerOutput respectively (each plus the literal ``"None"``), and
+        ``camera_mapping.camera`` lists every scene Camera not tagged MainCamera or named
+        ``Main Camera`` (also plus ``"None"``). The ``visibility`` key holds per-control flags
+        indicating whether the matching control is currently rendered in the Parameters window;
+        ``task.require_lick`` is true only when the scene contains a ``GuidanceZone`` and
+        ``task.require_wait`` is true only when the scene contains an ``OccupancyZone``. Writes
+        against fields whose visibility is false are rejected by
+        :func:`write_task_parameters_tool`.
     """
     return _unity_relay(tool="read_task_parameters")
 
