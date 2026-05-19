@@ -33,8 +33,6 @@ from .data_classes import (
 )
 from .configuration import (
     Cue,
-    Segment,
-    BaseTrial,
     TriggerType,
     GasPuffTrial,
     TaskTemplate,
@@ -59,7 +57,6 @@ if not console.enabled:
 
 __all__ = [
     "AcquisitionSystems",
-    "BaseTrial",
     "Cue",
     "Directories",
     "DrugData",
@@ -75,7 +72,6 @@ __all__ = [
     "ProcessingTrackers",
     "RawDataFiles",
     "RunTrainingDescriptor",
-    "Segment",
     "SessionData",
     "SessionTypes",
     "SubjectData",

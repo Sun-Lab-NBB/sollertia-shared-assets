@@ -136,33 +136,33 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | Tool                                            | Description                                                                                     |
 |-------------------------------------------------|-------------------------------------------------------------------------------------------------|
 | `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults                |
-| `create_scene_tool`                             | Creates a new Unity scene from ExperimentTemplate with explicit unsaved-edits handling          |
+| `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call     |
+| `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root   |
+| `delete_task_tool`                              | Removes a Unity task end-to-end: scene, scene companion, task prefab, and every segment prefab  |
 | `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system               |
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                                |
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                      |
 | `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                                |
 | `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                    |
-| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, Segment, TrialStructure, and VREnvironment  |
-| `delete_unity_asset_tool`                       | Deletes a Unity asset within the InfiniteCorridorTask or Scenes roots and refreshes assets      |
+| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment           |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                           |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                  |
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                            |
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                             |
 | `filter_sessions_tool`                          | Filters discovered session entries by date range and animal- or session-name criteria           |
-| `generate_task_prefab_tool`                     | Generates a Task prefab in Unity from a YAML task template                                      |
 | `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy from SessionData and per-session lifecycle status   |
 | `get_platform_environment_status_tool`          | Reports the status of the working directory, templates directory, and Google credentials        |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                               |
 | `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab            |
 | `inspect_scene_tool`                            | Returns the active scene's metadata, dirty flag, and recursive root GameObject hierarchy        |
 | `inspect_sessions_tool`                         | Produces a detailed health and inventory report for one or more sessions                        |
+| `list_assets_tool`                              | Lists Unity assets of a given type within a search path                                         |
 | `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                   |
 | `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                          |
 | `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                          |
 | `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                                |
 | `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                             |
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                                |
-| `list_unity_assets_tool`                        | Lists Unity assets of a given type within a search path                                         |
 | `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                          |
 | `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)          |
 | `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                      |
@@ -177,7 +177,6 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                   |
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                             |
 | `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                        |
-| `validate_prefab_against_template_tool`         | Validates Unity prefab cue inventory, segment geometry, and zone positions against the template |
 | `validate_template_tool`                        | Validates a TaskTemplate against its schema and cross-reference constraints                     |
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                              |
 | `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema          |
@@ -186,10 +185,10 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData            |
 | `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                   |
 
-***Note,*** tools that interact with Unity (`create_scene_tool`, `delete_unity_asset_tool`, `enter_play_mode_tool`,
-`exit_play_mode_tool`, `generate_task_prefab_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `inspect_scene_tool`,
-`list_scenes_tool`, `list_unity_assets_tool`, `open_scene_tool`, `validate_prefab_against_template_tool`) require the
-Unity Editor to be running on the local machine with the McpBridge plugin from
+***Note,*** tools that interact with Unity (`create_task_tool`, `delete_asset_tool`, `delete_task_tool`,
+`enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `inspect_scene_tool`,
+`list_assets_tool`, `list_scenes_tool`, `open_scene_tool`, `read_task_parameters_tool`, `write_task_parameters_tool`)
+require the Unity Editor to be running on the local machine with the McpBridge plugin from
 [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks) active. These tools relay commands to the
 Editor via HTTP.
 
@@ -375,9 +374,8 @@ In `configuration/configuration_utilities.py`:
 
 1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class.
 2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) with the signature
-   `(template: TaskTemplate, unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial],
-   cue_offset_cm: float)` that returns the new experiment configuration dataclass. Use
-   `_create_mesoscope_experiment_config` as reference.
+   `(unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial])` that returns the new
+   experiment configuration dataclass. Use `_create_mesoscope_experiment_config` as reference.
 3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key.
 
 **Step 7: Update downstream libraries**

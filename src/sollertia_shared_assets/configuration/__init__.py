@@ -2,7 +2,6 @@
 
 from .vr_configuration import (
     Cue,
-    Segment,
     TriggerType,
     TaskTemplate,
     VREnvironment,
@@ -21,7 +20,6 @@ from .configuration_utilities import (
 )
 from .mesoscope_configuration import MesoscopeExperimentConfiguration
 from .experiment_configuration import (
-    BaseTrial,
     GasPuffTrial,
     ExperimentState,
     WaterRewardTrial,
@@ -29,12 +27,10 @@ from .experiment_configuration import (
 
 __all__ = [
     "AcquisitionSystems",
-    "BaseTrial",
     "Cue",
     "ExperimentState",
     "GasPuffTrial",
     "MesoscopeExperimentConfiguration",
-    "Segment",
     "TaskTemplate",
     "TrialStructure",
     "TriggerType",

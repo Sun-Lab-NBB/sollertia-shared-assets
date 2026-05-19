@@ -7,11 +7,7 @@ configurations.
 
 from __future__ import annotations
 
-from dataclasses import field, dataclass
-
-from ataraxis_base_utilities import console
-
-from .vr_configuration import TriggerType, TrialStructure
+from dataclasses import dataclass
 
 
 @dataclass(slots=True)
@@ -44,79 +40,7 @@ class ExperimentState:
 
 
 @dataclass(slots=True)
-class BaseTrial(TrialStructure):
-    """Extends TrialStructure with experiment runtime fields common to all supported experiment trial types.
-
-    Notes:
-        Inherits spatial configuration fields from TrialStructure, including segment mapping and zone positions.
-
-        The trigger_type field is inherited but not used at runtime. Trial behavior is determined by the concrete
-        class type (WaterRewardTrial or GasPuffTrial), not the trigger_type value. The field exists only to maintain
-        schema compatibility with task templates.
-    """
-
-    trigger_type: str | TriggerType = ""
-    """Inherited from TrialStructure but not used at runtime. Trial behavior is determined by concrete class type."""
-    cue_sequence: list[int] = field(default_factory=list)
-    """The sequence of segment wall cue identifiers experienced by the animal when participating in this trial
-    type."""
-    trial_length_cm: float = 0.0
-    """The total length of the trial environment in centimeters."""
-
-    def validate_zones(self) -> None:
-        """Validates stimulus zone positions.
-
-        Notes:
-            This method must be called after trial_length_cm is populated by the experiment configuration class that
-            uses this class.
-        """
-        if self.trial_length_cm <= 0:
-            message = (
-                f"Unable to validate zone positions. The trial_length_cm must be populated before validation, "
-                f"but got {self.trial_length_cm}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_trigger_zone_end_cm < self.stimulus_trigger_zone_start_cm:
-            message = (
-                f"Unable to validate zone positions. The stimulus_trigger_zone_end_cm must be greater than or "
-                f"equal to stimulus_trigger_zone_start_cm ({self.stimulus_trigger_zone_start_cm}), but got "
-                f"{self.stimulus_trigger_zone_end_cm}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if not 0 <= self.stimulus_trigger_zone_start_cm <= self.trial_length_cm:
-            message = (
-                f"Unable to validate zone positions. The stimulus_trigger_zone_start_cm must be within the "
-                f"trial length (0 to {self.trial_length_cm} cm), but got {self.stimulus_trigger_zone_start_cm}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if not 0 <= self.stimulus_trigger_zone_end_cm <= self.trial_length_cm:
-            message = (
-                f"Unable to validate zone positions. The stimulus_trigger_zone_end_cm must be within the "
-                f"trial length (0 to {self.trial_length_cm} cm), but got {self.stimulus_trigger_zone_end_cm}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if not 0 <= self.stimulus_location_cm <= self.trial_length_cm:
-            message = (
-                f"Unable to validate zone positions. The stimulus_location_cm must be within the trial length "
-                f"(0 to {self.trial_length_cm} cm), but got {self.stimulus_location_cm}."
-            )
-            console.error(message=message, error=ValueError)
-
-        if self.stimulus_location_cm < self.stimulus_trigger_zone_start_cm:
-            message = (
-                f"Unable to validate zone positions. The stimulus_location_cm must not precede the "
-                f"stimulus_trigger_zone_start_cm ({self.stimulus_trigger_zone_start_cm}), but got "
-                f"{self.stimulus_location_cm}."
-            )
-            console.error(message=message, error=ValueError)
-
-
-@dataclass(slots=True)
-class WaterRewardTrial(BaseTrial):
+class WaterRewardTrial:
     """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal licks in the trigger zone.
 
     Notes:
@@ -132,7 +56,7 @@ class WaterRewardTrial(BaseTrial):
 
 
 @dataclass(slots=True)
-class GasPuffTrial(BaseTrial):
+class GasPuffTrial:
     """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails to meet occupancy duration.
 
     Notes:

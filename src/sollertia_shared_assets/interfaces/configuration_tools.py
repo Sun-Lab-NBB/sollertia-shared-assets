@@ -25,8 +25,6 @@ from .mcp_instance import (
 from ..data_classes import SessionTypes
 from ..configuration import (
     Cue,
-    Segment,
-    BaseTrial,
     TriggerType,
     GasPuffTrial,
     TaskTemplate,
@@ -46,11 +44,11 @@ from ..configuration import (
     populate_default_experiment_states,
 )
 
-_TRIAL_CLASSES: dict[str, type[BaseTrial]] = {
+_TRIAL_CLASSES: dict[str, type[WaterRewardTrial | GasPuffTrial]] = {
     "WaterRewardTrial": WaterRewardTrial,
     "GasPuffTrial": GasPuffTrial,
 }
-"""Maps trial class names to their ``BaseTrial`` subclasses."""
+"""Maps trial class names to their concrete trial type."""
 
 
 @mcp.tool()
@@ -218,8 +216,8 @@ def discover_templates_tool() -> dict[str, Any]:
         A response dict with ``templates`` (a list of per-template summary dicts), ``total_templates``,
         and ``templates_directory`` (the resolved templates directory path). Each summary dict carries
         ``name`` (the template filename stem), ``path`` (the absolute YAML path), and on a successful
-        load also ``cue_count``, ``segment_count``, ``trial_count``, and ``cue_offset_cm``. Templates
-        that fail to load instead carry an ``error`` field describing the failure.
+        load also ``cue_count``, ``trial_count``, and ``cue_offset_cm``. Templates that fail to load
+        instead carry an ``error`` field describing the failure.
     """
     try:
         templates_directory = get_task_templates_directory()
@@ -238,9 +236,8 @@ def discover_templates_tool() -> dict[str, Any]:
             entry["error"] = f"Failed to load: {exception}"
         else:
             entry["cue_count"] = len(template.cues)
-            entry["segment_count"] = len(template.segments)
             entry["trial_count"] = len(template.trial_structures)
-            entry["cue_offset_cm"] = template.cue_offset_cm
+            entry["cue_offset_cm"] = template.vr_environment.cue_offset_cm
         templates.append(entry)
 
     return ok_response(
@@ -305,8 +302,7 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
 
     Returns:
         A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``cue_count``,
-        ``segment_count``, ``trial_count``, and ``cue_offset_cm``) or ``issues`` (a list of validation
-        error messages).
+        ``trial_count``, and ``cue_offset_cm``) or ``issues`` (a list of validation error messages).
     """
     template_path = Path(file_path)
     if not template_path.exists():
@@ -317,16 +313,15 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
         return ok_response(valid=False, issues=[str(exception)], file_path=str(template_path))
     summary = {
         "cue_count": len(template.cues),
-        "segment_count": len(template.segments),
         "trial_count": len(template.trial_structures),
-        "cue_offset_cm": template.cue_offset_cm,
+        "cue_offset_cm": template.vr_environment.cue_offset_cm,
     }
     return ok_response(valid=True, file_path=str(template_path), summary=summary)
 
 
 @mcp.tool()
 def describe_template_schema_tool() -> dict[str, Any]:
-    """Returns the schema for TaskTemplate, including nested Cue, Segment, TrialStructure, and VREnvironment.
+    """Returns the schema for TaskTemplate, including nested Cue, TrialStructure, and VREnvironment.
 
     Use the returned schema to construct a valid payload for ``write_template_tool``.
 
@@ -337,7 +332,6 @@ def describe_template_schema_tool() -> dict[str, Any]:
     schema = describe_dataclass(cls=TaskTemplate)
     schema["nested_classes"] = {
         "Cue": describe_dataclass(cls=Cue),
-        "Segment": describe_dataclass(cls=Segment),
         "TrialStructure": describe_dataclass(cls=TrialStructure),
         "VREnvironment": describe_dataclass(cls=VREnvironment),
     }
@@ -522,9 +516,8 @@ def validate_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
         file_path: Absolute path to the experiment configuration YAML file.
 
     Returns:
-        A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``cue_count``,
-        ``segment_count``, ``trial_count``, ``state_count``, and ``unity_scene_name``) or ``issues``
-        (a list of validation error messages).
+        A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``trial_count``,
+        ``state_count``, and ``unity_scene_name``) or ``issues`` (a list of validation error messages).
     """
     configuration_path = Path(file_path)
     if not configuration_path.exists():
@@ -534,8 +527,6 @@ def validate_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
     except Exception as exception:
         return ok_response(valid=False, issues=[str(exception)], file_path=str(configuration_path))
     summary = {
-        "cue_count": len(experiment_configuration.cues),
-        "segment_count": len(experiment_configuration.segments),
         "trial_count": len(experiment_configuration.trial_structures),
         "state_count": len(experiment_configuration.experiment_states),
         "unity_scene_name": experiment_configuration.unity_scene_name,
@@ -561,9 +552,6 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
         return resolved
     schema = describe_dataclass(cls=resolved)
     schema["nested_classes"] = {
-        "Cue": describe_dataclass(cls=Cue),
-        "Segment": describe_dataclass(cls=Segment),
-        "VREnvironment": describe_dataclass(cls=VREnvironment),
         "ExperimentState": describe_dataclass(cls=ExperimentState),
         "WaterRewardTrial": describe_dataclass(cls=WaterRewardTrial),
         "GasPuffTrial": describe_dataclass(cls=GasPuffTrial),
