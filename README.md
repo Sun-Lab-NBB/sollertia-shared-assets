@@ -364,8 +364,11 @@ In `data_classes/session_data.py`:
 Three registries need entries for the new system:
 
 1. In `interfaces/mcp_instance.py`, import `<System>HardwareState` and add it to `HARDWARE_STATE_REGISTRY`.
-2. In `interfaces/mcp_instance.py`, import `<System>ExperimentConfiguration` and add it to
-   `EXPERIMENT_CONFIGURATION_REGISTRY`.
+2. In `configuration/configuration_utilities.py`, import `<System>ExperimentConfiguration` and add it to
+   `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this registry to load the per-session
+   experiment configuration snapshot and (if the configuration declares a `unity_scene_name`) cache the matching VR
+   task template. Acquisition systems that do not use Unity-based VR omit `unity_scene_name` from their schema, and
+   the VR template export is skipped automatically.
 3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
    this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
    new system into session loading.

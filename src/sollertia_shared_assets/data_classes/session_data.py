@@ -15,8 +15,8 @@ from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
 from ..configuration import (
+    EXPERIMENT_CONFIGURATION_REGISTRY,
     AcquisitionSystems,
-    MesoscopeExperimentConfiguration,
     get_task_templates_directory,
 )
 
@@ -533,19 +533,26 @@ class SessionData(YamlConfig):
                 dst=instance.raw_data.experiment_configuration_path,
             )
 
-            # Caches the VR task template that the experiment runs against alongside the experiment configuration.
-            # The matching template is resolved through the experiment configuration's unity_scene_name, which
-            # by convention equals the template's file stem in the configured task templates directory. Loading the
-            # experiment configuration from its copied destination avoids re-resolving the source path.
-            experiment_configuration = MesoscopeExperimentConfiguration.from_yaml(
+            # Dispatches the experiment configuration dataclass via EXPERIMENT_CONFIGURATION_REGISTRY so future
+            # acquisition systems can plug in their own experiment-configuration schema without modifying this
+            # method. Loading from the copied destination avoids re-resolving the source path.
+            experiment_configuration_class = EXPERIMENT_CONFIGURATION_REGISTRY[acquisition_system]
+            experiment_configuration = experiment_configuration_class.from_yaml(
                 file_path=instance.raw_data.experiment_configuration_path,
             )
-            templates_directory = get_task_templates_directory()
-            vr_template_path = templates_directory.joinpath(f"{experiment_configuration.unity_scene_name}.yaml")
-            shutil.copy2(
-                src=vr_template_path,
-                dst=instance.raw_data.vr_configuration_path,
-            )
+
+            # Caches the VR task template that the experiment runs against alongside the experiment configuration,
+            # but only when the experiment configuration declares a unity_scene_name. Acquisition systems that do
+            # not use Unity-based Virtual Reality omit this field entirely, so the gate below skips template export
+            # for non-VR sessions without requiring an explicit per-system branch.
+            unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
+            if unity_scene_name:
+                templates_directory = get_task_templates_directory()
+                vr_template_path = templates_directory.joinpath(f"{unity_scene_name}.yaml")
+                shutil.copy2(
+                    src=vr_template_path,
+                    dst=instance.raw_data.vr_configuration_path,
+                )
 
         # Marks the session as 'uninitialized' by writing the 'nk.bin' file into raw_data. The acquisition
         # runtime removes this marker once it has finished creating snapshots and initializing instruments

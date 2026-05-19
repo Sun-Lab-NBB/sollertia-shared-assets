@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    EXPERIMENT_CONFIGURATION_REGISTRY,
     mcp,
     read_yaml,
     serialize,
@@ -24,6 +23,7 @@ from .mcp_instance import (
 )
 from ..data_classes import SessionTypes
 from ..configuration import (
+    EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
     GasPuffTrial,

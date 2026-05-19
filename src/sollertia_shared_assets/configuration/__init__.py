@@ -8,6 +8,7 @@ from .vr_configuration import (
     TrialStructure,
 )
 from .configuration_utilities import (
+    EXPERIMENT_CONFIGURATION_REGISTRY,
     AcquisitionSystems,
     get_working_directory,
     set_working_directory,
@@ -26,6 +27,7 @@ from .experiment_configuration import (
 )
 
 __all__ = [
+    "EXPERIMENT_CONFIGURATION_REGISTRY",
     "AcquisitionSystems",
     "Cue",
     "ExperimentState",

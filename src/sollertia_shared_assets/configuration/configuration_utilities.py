@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from pathlib import Path
 from collections.abc import Callable
 
@@ -12,6 +13,9 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from .vr_configuration import TriggerType, TaskTemplate
 from .mesoscope_configuration import MesoscopeExperimentConfiguration
 from .experiment_configuration import GasPuffTrial, ExperimentState, WaterRewardTrial
+
+if TYPE_CHECKING:
+    from ataraxis_data_structures import YamlConfig
 
 
 class AcquisitionSystems(StrEnum):
@@ -24,6 +28,16 @@ class AcquisitionSystems(StrEnum):
     MESOSCOPE_VR = "mesoscope"
     """Uses the 2-Photon Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game
     engine to conduct experiments."""
+
+
+EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
+}
+"""Maps each acquisition system to its experiment configuration dataclass. Future acquisition systems register here so
+that the configuration schema, read, and write tools can dispatch to the correct dataclass without hard-coding any
+single system. ``SessionData.create()`` also consults this registry when caching the per-session experiment
+configuration snapshot, so future ExperimentConfiguration classes whose schema omits ``unity_scene_name`` can opt out
+of VR template export without modifying the session-creation logic."""
 
 
 type ExperimentConfigFactory = Callable[

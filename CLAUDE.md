@@ -177,13 +177,13 @@ Five dispatch registries route polymorphic behavior off the two primary enums. A
 session type means touching every registry below. Use the `/library-extension` skill — it owns the touch list and
 the import-time parity check that fails if any registry is incomplete.
 
-| Registry                              | File                                          | Keyed by             |
-|---------------------------------------|-----------------------------------------------|----------------------|
-| `DESCRIPTOR_REGISTRY`                 | `interfaces/mcp_instance.py`                  | `SessionTypes`       |
-| `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`                  | `AcquisitionSystems` |
-| `EXPERIMENT_CONFIGURATION_REGISTRY`   | `interfaces/mcp_instance.py`                  | `AcquisitionSystems` |
-| `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`                | `AcquisitionSystems` |
-| `_experiment_config_factory_registry` | `configuration/configuration_utilities.py`    | `AcquisitionSystems` |
+| Registry                              | File                                       | Keyed by             |
+|---------------------------------------|--------------------------------------------|----------------------|
+| `DESCRIPTOR_REGISTRY`                 | `interfaces/mcp_instance.py`               | `SessionTypes`       |
+| `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`               | `AcquisitionSystems` |
+| `EXPERIMENT_CONFIGURATION_REGISTRY`   | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
+| `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
+| `_experiment_config_factory_registry` | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 
 `_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the four
 public registries is missing entries for a known enum member. `_experiment_config_factory_registry` is **not** covered
