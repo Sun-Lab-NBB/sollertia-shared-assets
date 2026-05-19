@@ -201,8 +201,8 @@ public registries is missing entries for a known enum member.
 - **No tests for MCP tools**: `@mcp.tool()` functions live behind the FastMCP server and are excluded from coverage.
   Test the helper functions they delegate to instead.
 - **Frozen acquisition snapshots**: Every per-session YAML in `raw_data/` (descriptor, hardware state, system
-  configuration, experiment configuration, surgery metadata) is an immutable record of the session's acquisition
-  context. MCP write tools repair corruption; they do not edit live runtime state.
+  configuration, experiment configuration, VR configuration, surgery metadata) is an immutable record of the
+  session's acquisition context. MCP write tools repair corruption; they do not edit live runtime state.
 
 ### Workflow guidance
 

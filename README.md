@@ -171,19 +171,19 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system      |
 | `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot     |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                     |
-| `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                       |
+| `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                        |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                                |
 | `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                    |
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                   |
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                             |
 | `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                        |
-| `validate_template_tool`                        | Validates a TaskTemplate against its schema and cross-reference constraints                     |
+| `validate_template_tool`                        | Validates a TaskTemplate (live or session snapshot) against its schema and cross-reference checks |
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                              |
 | `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema          |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                     |
 | `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass      |
 | `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData            |
-| `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                   |
+| `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory              |
 
 ***Note,*** tools that interact with Unity (`create_task_tool`, `delete_asset_tool`, `delete_task_tool`,
 `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `inspect_scene_tool`,
