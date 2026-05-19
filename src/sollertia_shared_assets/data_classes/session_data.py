@@ -502,8 +502,8 @@ class SessionData(YamlConfig):
             message = (
                 f"Unable to initialize a new data acquisition session {session_name} for the animal '{animal_id}' and "
                 f"project '{project_name}'. The project does not exist on the local machine (PC). Use the "
-                f"'sl-project create' CLI command to create the project on the local machine before creating new "
-                f"sessions."
+                f"'slsa configure project' CLI command to create the project on the local machine before "
+                f"creating new sessions."
             )
             console.error(message=message, error=FileNotFoundError)
 

@@ -355,8 +355,8 @@ In `data_classes/session_data.py`:
    filenames or subdirectories unique to the new system's `raw_data`. Use `MesoscopeRawDataFiles` /
    `MesoscopeDirectories` as reference.
 2. Add a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all system-specific raw assets
-   and exposes a `build(root: Path) -> Self` classmethod that resolves every field against the session's `raw_data`
-   directory. Use `MesoscopeRawData` as reference.
+   and exposes a `build(cls, root: Path) -> <System>RawData` classmethod that resolves every field against the
+   session's `raw_data` directory. Use `MesoscopeRawData` as reference.
 3. Export the new class(es) from `data_classes/__init__.py`.
 
 **Step 5: Register the dispatch classes**
@@ -377,7 +377,8 @@ Three registries need entries for the new system:
 
 In `configuration/configuration_utilities.py`:
 
-1. Extend the `ExperimentConfigFactory` type alias so its return type includes the new experiment configuration class.
+1. Widen the `ExperimentConfigFactory` type alias's return type into a union that includes the new experiment
+   configuration class (e.g., `MesoscopeExperimentConfiguration | NewSystemExperimentConfiguration`).
 2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) with the signature
    `(unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial])` that returns the new
    experiment configuration dataclass. Use `_create_mesoscope_experiment_config` as reference.

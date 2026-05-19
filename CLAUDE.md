@@ -151,7 +151,7 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 | Directory                                          | Purpose                                                          |
 |----------------------------------------------------|------------------------------------------------------------------|
 | `src/sollertia_shared_assets/configuration/`       | VR-task and experiment configuration dataclasses (YamlConfig)    |
-| `src/sollertia_shared_assets/data_classes/`        | Session, descriptor, surgery, and discovery dataclasses          |
+| `src/sollertia_shared_assets/data_classes/`        | Session, descriptor, and surgery dataclasses + discovery helpers |
 | `src/sollertia_shared_assets/interfaces/`          | `slsa` CLI and FastMCP server with all MCP tool modules          |
 | `tests/`                                           | Test suite (configuration and data-classes only; MCP excluded)   |
 | `docs/`                                            | Sphinx API documentation source                                  |
@@ -246,7 +246,8 @@ Invoke `/library-extension`. It enumerates every registry and sibling-skill upda
 1. Add the `@mcp.tool()`-decorated function to the appropriate module under `src/sollertia_shared_assets/interfaces/`
 2. Use `ok_response(...)` and `error_response(...)` from `mcp_instance` for all responses
 3. Document the response key shape in the `Returns` docstring section — it is part of the public contract
-4. Update the README's MCP tool table and re-run `tox -e docs` to regenerate the API documentation
+4. Update the README's MCP tool table, ensuring each row description matches the source docstring summary, and
+   re-run `tox -e docs` to regenerate the API documentation
 
 **Running tests, linting, and the docs build:**
 

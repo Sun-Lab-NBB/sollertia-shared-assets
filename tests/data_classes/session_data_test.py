@@ -352,7 +352,7 @@ def test_session_data_create_raises_error_if_project_does_not_exist(clean_workin
         )
 
     assert "nonexistent_project" in str(exc_info.value)
-    assert "sl-project create" in str(exc_info.value)
+    assert "slsa configure project" in str(exc_info.value)
 
 
 def test_session_data_create_copies_experiment_configuration(
