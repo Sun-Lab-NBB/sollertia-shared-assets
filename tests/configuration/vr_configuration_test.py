@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 
 from sollertia_shared_assets.configuration import (
@@ -11,6 +13,9 @@ from sollertia_shared_assets.configuration import (
     VREnvironment,
     TrialStructure,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _create_base_task_template(
@@ -375,7 +380,7 @@ def test_task_template_helpers() -> None:
     assert codes == [1, 2]
 
 
-def test_task_template_yaml_round_trip(tmp_path) -> None:
+def test_task_template_yaml_round_trip(tmp_path: Path) -> None:
     """Verifies that TaskTemplate round-trips through YAML with every field preserved."""
     template = _create_base_task_template()
 

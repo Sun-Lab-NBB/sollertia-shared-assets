@@ -174,7 +174,6 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
             hints = {}
 
         schema: dict[str, Any] = {"class": target.__name__, "fields": {}}
-        # Builds the per-field schema with type, default or required status, and optional nested recursion.
         # noinspection PyDataclass
         for field_definition in fields(target):
             type_hint = hints.get(field_definition.name, field_definition.type)
@@ -223,10 +222,13 @@ def write_yaml_validated(
         A response dict with the file path and serialized data on success, or an error dict on failure.
     """
     if file_path.exists() and not overwrite:
-        return error_response(message=f"File already exists: {file_path}. Pass overwrite=True to replace.")
+        message = (
+            f"Unable to write {validator_cls.__name__} to {file_path}: a file already exists at this path. "
+            f"Pass overwrite=True to replace it."
+        )
+        return error_response(message=message)
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    # Writes the payload to a temporary sibling file and validates by round-tripping through the dataclass.
     # Keeps the temp file ending in .yaml because YamlConfig.from_yaml() rejects non-.yaml paths.
     temp_path = file_path.with_name(f".{file_path.stem}.{uuid.uuid4().hex[:8]}.tmp.yaml")
 
@@ -238,16 +240,17 @@ def write_yaml_validated(
     except Exception as exception:
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
-        return error_response(message=f"Validation failed for {validator_cls.__name__}: {exception}")
+        message = f"Unable to validate the payload as {validator_cls.__name__}: {exception}"
+        return error_response(message=message)
     finally:
         with contextlib.suppress(FileNotFoundError):
             temp_path.unlink()
 
-    # Persists the validated instance to the final destination using the canonical serialization method.
     try:
         instance.to_yaml(file_path=file_path)
     except Exception as exception:
-        return error_response(message=f"Failed to persist {validator_cls.__name__} to {file_path}: {exception}")
+        message = f"Unable to persist {validator_cls.__name__} to {file_path}: {exception}"
+        return error_response(message=message)
 
     return ok_response(file_path=str(file_path), data=serialize(value=instance))
 
@@ -264,11 +267,13 @@ def read_yaml(file_path: Path, validator_cls: type[YamlConfig]) -> dict[str, Any
         on failure.
     """
     if not file_path.exists():
-        return error_response(message=f"File not found: {file_path}")
+        message = f"Unable to read {validator_cls.__name__} from {file_path}: the file does not exist."
+        return error_response(message=message)
     try:
         instance = validator_cls.from_yaml(file_path=file_path)
     except Exception as exception:
-        return error_response(message=f"Failed to load {file_path} as {validator_cls.__name__}: {exception}")
+        message = f"Unable to load {file_path} as {validator_cls.__name__}: {exception}"
+        return error_response(message=message)
     return ok_response(file_path=str(file_path), data=serialize(value=instance))
 
 
@@ -283,9 +288,11 @@ def resolve_root_directory(root_directory: str) -> tuple[Path | None, dict[str, 
     """
     path = Path(root_directory)
     if not path.exists():
-        return None, error_response(message=f"Root directory does not exist: {path}")
+        message = f"Unable to resolve the root data directory. The path {path} does not exist."
+        return None, error_response(message=message)
     if not path.is_dir():
-        return None, error_response(message=f"Root directory is not a directory: {path}")
+        message = f"Unable to resolve the root data directory. The path {path} is not a directory."
+        return None, error_response(message=message)
     return path, None
 
 

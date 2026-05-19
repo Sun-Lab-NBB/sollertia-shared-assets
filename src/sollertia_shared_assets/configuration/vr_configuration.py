@@ -172,8 +172,16 @@ class TaskTemplate(YamlConfig):
     """Defines the spatial configuration for each trial type. Keys are trial names (e.g., 'ABC')."""
 
     def __post_init__(self) -> None:
-        """Validates task template configuration."""
-        # Validates cue catalog uniqueness.
+        """Validates task template configuration.
+
+        Runs the full cascade of integrity checks against the loaded template: cue catalog uniqueness (codes
+        and names), per-trial cue references, transition targets, trigger types, trial name pattern, and zone
+        positions within trial segment bounds.
+
+        Raises:
+            ValueError: If any of the validations above fails. The message identifies the offending field and
+                the specific constraint that was violated.
+        """
         codes = [cue.code for cue in self.cues]
         if len(codes) != len(set(codes)):
             duplicate_codes = {code for code in codes if codes.count(code) > 1}
@@ -192,14 +200,13 @@ class TaskTemplate(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
-        # Validates per-trial cue references, transition targets, trigger types, and zone positions.
         cue_names = set(names)
         defined_trial_names = set(self.trial_structures.keys())
         valid_trigger_types = {trigger_type.value for trigger_type in TriggerType}
         for trial_name, trial_structure in self.trial_structures.items():
-            # Trial names are embedded verbatim in Unity segment prefab filenames as
-            # ``TemplateName_TrialName.prefab``, so operator-controlled punctuation, whitespace, or path
-            # separators would corrupt the generated filesystem layout. Rejects them at template load.
+            # Rejects trial names containing characters other than ASCII letters, digits, and underscores.
+            # Trial names are embedded verbatim in Unity segment prefab filenames, so any path separator or
+            # whitespace would corrupt the generated filesystem layout.
             if not _TRIAL_NAME_PATTERN.match(trial_name):
                 message = (
                     f"Unable to initialize TaskTemplate. Trial name '{trial_name}' is invalid. Trial names "
@@ -226,7 +233,7 @@ class TaskTemplate(YamlConfig):
                         )
                         console.error(message=message, error=ValueError)
 
-            # Validates trigger_type values. Accepts both TriggerType enum and string values for YAML compatibility.
+            # Accepts both TriggerType enum and string values for YAML compatibility.
             trigger_value = (
                 trial_structure.trigger_type.value
                 if isinstance(trial_structure.trigger_type, TriggerType)
@@ -239,7 +246,6 @@ class TaskTemplate(YamlConfig):
                 )
                 console.error(message=message, error=ValueError)
 
-            # Validates zone positions are within the trial's segment bounds.
             trial_length_cm = self._get_trial_length_cm(trial_name=trial_name)
             self._validate_zone_positions(
                 trial_name=trial_name,
@@ -249,12 +255,12 @@ class TaskTemplate(YamlConfig):
 
     @property
     def _cue_by_name(self) -> dict[str, Cue]:
-        """Returns the mapping of cue names to their Cue class instances for all VR cues used in the template."""
+        """Indexes the template's cues by their human-readable name for fast lookup during validation."""
         return {cue.name: cue for cue in self.cues}
 
     @property
     def _cue_name_to_code(self) -> dict[str, int]:
-        """Returns the mapping of cue names to their unique identifier codes for all VR cues used in the template."""
+        """Indexes the template's cue identifier codes by their human-readable name for trial-sequence resolution."""
         return {cue.name: cue.code for cue in self.cues}
 
     def _get_trial_length_cm(self, trial_name: str) -> float:

@@ -56,9 +56,9 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
     """Returns a health report for the Sollertia platform configuration components owned by this package.
 
     Combines working directory, templates directory, and Google credentials status into a single report. Only
-    the working directory is required for ``slsa mcp`` to function; the task templates directory is needed only
-    when authoring task templates or experiment configurations, and Google credentials are needed only by hosts
-    that fetch subject metadata or water-restriction logs from Google Sheets. ``overall_ok`` reflects the
+    the working directory is required for ``slsa mcp`` to function. The task templates directory is needed only
+    when authoring task templates or experiment configurations. Google credentials are needed only by hosts that
+    fetch subject metadata or water-restriction logs from Google Sheets. ``overall_ok`` reflects the
     required components only — optional components contribute ``configured`` and ``ok`` per-component but do
     not gate the aggregate. System configuration mount checks are not included here — those live with the
     acquisition runtime package (sl-experiment).
@@ -326,7 +326,8 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
     """
     template_path = Path(file_path)
     if not template_path.exists():
-        return error_response(message=f"File not found: {template_path}")
+        message = f"Unable to validate the task template at {template_path}: the file does not exist."
+        return error_response(message=message)
     try:
         template = TaskTemplate.from_yaml(file_path=template_path)
     except Exception as exception:
@@ -387,12 +388,12 @@ def discover_experiments_tool(
     if project is not None:
         project_path = root.joinpath(project)  # type: ignore[union-attr]
         if not project_path.is_dir():
-            return error_response(message=f"Project '{project}' not found at {project_path}")
+            message = f"Unable to discover experiments. The project '{project}' was not found at {project_path}."
+            return error_response(message=message)
         project_paths = [project_path]
     else:
         project_paths = [child for child in safe_iterdir(directory=root) if child.is_dir()]  # type: ignore[arg-type]
 
-    # Collects experiment summaries from each project's configuration directory.
     experiments: list[dict[str, Any]] = []
     for project_path in sorted(project_paths, key=lambda candidate: candidate.name):
         configuration_directory = project_path.joinpath(CONFIGURATION_DIR)
@@ -415,9 +416,9 @@ def read_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
     """Loads a MesoscopeExperimentConfiguration YAML from any canonical location.
 
     The same experiment configuration schema is used for both the authored per-project source
-    config and the frozen per-session snapshot copied at acquisition time. This tool reads both:
-    pass the per-project path (``<root>/<project>/configuration/<experiment>.yaml``) to inspect
-    the authored source, or the per-session snapshot path
+    config and the frozen per-session snapshot copied at acquisition time. This tool reads both.
+    Pass the per-project path (``<root>/<project>/configuration/<experiment>.yaml``) to inspect
+    the authored source. Pass the per-session snapshot path
     (``<session>/raw_data/experiment_configuration.yaml``) to inspect the immutable record of
     what was active when the session was acquired.
 
@@ -498,13 +499,17 @@ def create_experiment_configuration_tool(
     destination = Path(file_path)
     template_file = Path(template_path)
     if destination.exists() and not overwrite:
-        return error_response(message=f"File already exists: {destination}. Pass overwrite=True to replace.")
+        message = (
+            f"Unable to write the experiment configuration to {destination}: a file already exists at this path. "
+            f"Pass overwrite=True to replace it."
+        )
+        return error_response(message=message)
     if not template_file.exists():
-        return error_response(message=f"Template file not found: {template_file}")
+        message = f"Unable to load the task template from {template_file}: the file does not exist."
+        return error_response(message=message)
 
     resolved_scene_name = unity_scene_name if unity_scene_name is not None else template_file.stem
 
-    # Loads the template, generates the experiment configuration, and populates default runtime states.
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_file)
         experiment_configuration = create_experiment_configuration(
@@ -541,7 +546,8 @@ def validate_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
     """
     configuration_path = Path(file_path)
     if not configuration_path.exists():
-        return error_response(message=f"File not found: {configuration_path}")
+        message = f"Unable to validate the experiment configuration at {configuration_path}: the file does not exist."
+        return error_response(message=message)
     try:
         experiment_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=configuration_path)
     except Exception as exception:
@@ -658,13 +664,17 @@ def _resolve_experiment_configuration_class(acquisition_system: str) -> type[Yam
         acquisition_enum = AcquisitionSystems(acquisition_system)
     except ValueError:
         valid = ", ".join(member.value for member in AcquisitionSystems)
-        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+        message = (
+            f"Unable to resolve the experiment configuration class. The acquisition_system "
+            f"'{acquisition_system}' is not a member of AcquisitionSystems. Valid values: {valid}."
+        )
+        return error_response(message=message)
     experiment_configuration_class = EXPERIMENT_CONFIGURATION_REGISTRY.get(acquisition_enum)
     if experiment_configuration_class is None:
         registered = ", ".join(member.value for member in EXPERIMENT_CONFIGURATION_REGISTRY)
-        return error_response(
-            message=(
-                f"No experiment configuration class registered for '{acquisition_system}'. Registered: {registered}"
-            )
+        message = (
+            f"Unable to resolve the experiment configuration class. No class is registered for "
+            f"'{acquisition_system}'. Registered systems: {registered}."
         )
+        return error_response(message=message)
     return experiment_configuration_class

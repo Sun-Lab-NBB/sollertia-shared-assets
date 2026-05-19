@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from ataraxis_data_structures import YamlConfig
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SubjectData:
     """Stores information about the subject of the surgical intervention."""
 
@@ -31,7 +31,7 @@ class SubjectData:
     """The current subject's status (alive / deceased)."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ProcedureData:
     """Stores general information about the surgical intervention."""
 
@@ -54,7 +54,7 @@ class ProcedureData:
     result, 3 indicates high-tier publication grade result."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DrugData:
     """Stores information about all medical substances (drugs) administered to the subject before, during, and
     immediately after the surgical intervention.
@@ -78,7 +78,7 @@ class DrugData:
     """The manufacturer code or internal reference code for the administered dexamethasone."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ImplantData:
     """Stores information about a single implantation procedure performed during the surgical intervention.
 
@@ -100,7 +100,7 @@ class ImplantData:
     """The implant's dorsal-ventral stereotactic coordinate, in millimeters, relative to bregma."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class InjectionData:
     """Stores information about a single injection performed during the surgical intervention.
 

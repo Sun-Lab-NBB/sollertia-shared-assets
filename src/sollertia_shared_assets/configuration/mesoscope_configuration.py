@@ -15,7 +15,7 @@ from .experiment_configuration import (  # noqa: TC001 - YamlConfig resolves the
 )
 
 
-# noinspection PyArgumentList
+# noinspection PyArgumentList - PyCharm misreports the YamlConfig-derived dataclass __init__ signature.
 @dataclass
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Defines an experiment session that uses the Mesoscope-VR data acquisition system.

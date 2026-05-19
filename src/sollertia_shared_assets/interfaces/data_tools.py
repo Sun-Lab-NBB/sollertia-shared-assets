@@ -45,6 +45,23 @@ _STATUS_KEYS: tuple[str, ...] = ("uninitialized", "incomplete", "acquired", "pro
 """Canonical lifecycle status keys used in ``counts`` dicts across the overview and inspection tools."""
 
 
+@dataclass(frozen=True, slots=True)
+class _SessionStatusInfo:
+    """Carries the lifecycle-status signals computed from a loaded ``SessionData`` instance."""
+
+    status: str
+    """The coarse lifecycle status; one of the values in ``_STATUS_KEYS``."""
+    uninitialized: bool
+    """Indicates whether the ``nk.bin`` uninitialized marker is present in the session's raw_data."""
+    incomplete: bool | None
+    """The descriptor's ``incomplete`` field, or None when the session is uninitialized or the descriptor
+    read failed."""
+    has_processed_data: bool
+    """Indicates whether the session's ``processed_data`` directory exists and is non-empty."""
+    error_detail: str | None
+    """Human-readable detail when the descriptor read failed, otherwise None."""
+
+
 @mcp.tool()
 def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
     """Walks the data root and groups loadable ``session_data.yaml`` markers into a project / animal / session tree.
@@ -58,12 +75,13 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
         root_directory: Absolute path to the data root to scan.
 
     Returns:
-        A response dict with ``projects`` (per-project entries with ``name``, ``path``, ``animals``,
-        ``session_count``, ``counts``, ``sessions_by_type``, ``experiment_count``, ``dataset_count``;
-        each animals entry carries ``id``, ``session_paths``, ``session_count``, ``counts``);
-        ``sessions`` (flat per-session entries suitable for chaining into ``filter_sessions_tool``);
-        top-level ``counts`` (status tally including errors); and ``total_projects``,
-        ``total_animals``, ``total_sessions``, ``root_directory``.
+        A response dict with top-level keys ``projects``, ``sessions``, ``counts``, ``total_projects``,
+        ``total_animals``, ``total_sessions``, and ``root_directory``. Each ``projects`` entry carries
+        ``name``, ``path``, ``animals``, ``session_count``, ``counts``, ``sessions_by_type``,
+        ``experiment_count``, and ``dataset_count``. Each animals entry carries ``id``, ``session_paths``,
+        ``session_count``, and ``counts``. The ``sessions`` list holds flat per-session entries suitable
+        for chaining into ``filter_sessions_tool``. The top-level ``counts`` mapping holds the
+        cross-project status tally, including errors.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -114,7 +132,6 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
 
     projects = _aggregate_projects(root=root, sessions=flat_sessions)  # type: ignore[arg-type]
 
-    # Augments each project with filesystem-derived experiment configuration and dataset counts.
     for project in projects:
         experiment_count, dataset_count = _count_project_artifacts(project_path=Path(project["path"]))
         project["experiment_count"] = experiment_count
@@ -253,8 +270,6 @@ def filter_sessions_tool(
         utc_timezone=utc_timezone,
     )
 
-    # Rehydrates filtered tuples back to the original entry dictionaries and recomputes session_paths
-    # from the filtered subset.
     filtered_entries = sorted(
         (session_map[session_name] for session_name, _ in filtered if session_name in session_map),
         key=lambda filtered_entry: filtered_entry.get("session_name", ""),
@@ -613,23 +628,6 @@ def describe_surgery_data_schema_tool() -> dict[str, Any]:
     return ok_response(schema=schema)
 
 
-@dataclass(frozen=True, slots=True)
-class _SessionStatusInfo:
-    """Carries the lifecycle-status signals computed from a loaded ``SessionData`` instance."""
-
-    status: str
-    """The coarse lifecycle status; one of the values in ``_STATUS_KEYS``."""
-    uninitialized: bool
-    """Indicates whether the ``nk.bin`` uninitialized marker is present in the session's raw_data."""
-    incomplete: bool | None
-    """The descriptor's ``incomplete`` field, or None when the session is uninitialized or the descriptor
-    read failed."""
-    has_processed_data: bool
-    """Indicates whether the session's ``processed_data`` directory exists and is non-empty."""
-    error_detail: str | None
-    """Human-readable detail when the descriptor read failed, otherwise None."""
-
-
 def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
     """Derives lifecycle status for a loaded ``SessionData`` using the canonical two-signal model.
 
@@ -697,7 +695,7 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
     Returns:
         A list of per-project aggregate dicts sorted by project name.
     """
-    # Buckets sessions under their project and animal by the SessionData identity fields.
+    # Buckets by SessionData identity rather than directory layout to suppress phantom-project entries from stray dirs.
     project_buckets: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for entry in sessions:
         if entry.get("status") == "error":
@@ -715,7 +713,6 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
         animal_buckets = project_buckets[project_name]
         project_path = root.joinpath(project_name)
 
-        # Aggregates per-animal summaries and accumulates per-project status and type counts.
         animals: list[dict[str, Any]] = []
         project_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
         sessions_by_type: dict[str, int] = {member.value: 0 for member in SessionTypes}
@@ -944,7 +941,11 @@ def _resolve_descriptor_class(session_type: str) -> type[YamlConfig] | dict[str,
         session_type_enum = SessionTypes(session_type)
     except ValueError:
         valid = ", ".join(member.value for member in SessionTypes)
-        return error_response(message=f"Invalid session_type '{session_type}'. Valid values: {valid}")
+        message = (
+            f"Unable to resolve the descriptor class. The session_type '{session_type}' is not a member of "
+            f"SessionTypes. Valid values: {valid}."
+        )
+        return error_response(message=message)
     return DESCRIPTOR_REGISTRY[session_type_enum]
 
 
@@ -966,13 +967,19 @@ def _resolve_hardware_state_class(acquisition_system: str) -> type[YamlConfig] |
         acquisition_enum = AcquisitionSystems(acquisition_system)
     except ValueError:
         valid = ", ".join(member.value for member in AcquisitionSystems)
-        return error_response(message=f"Invalid acquisition_system '{acquisition_system}'. Valid values: {valid}")
+        message = (
+            f"Unable to resolve the hardware-state class. The acquisition_system '{acquisition_system}' is "
+            f"not a member of AcquisitionSystems. Valid values: {valid}."
+        )
+        return error_response(message=message)
     hardware_state_class = HARDWARE_STATE_REGISTRY.get(acquisition_enum)
     if hardware_state_class is None:
         registered = ", ".join(member.value for member in HARDWARE_STATE_REGISTRY)
-        return error_response(
-            message=f"No hardware-state class registered for '{acquisition_system}'. Registered: {registered}"
+        message = (
+            f"Unable to resolve the hardware-state class. No class is registered for '{acquisition_system}'. "
+            f"Registered systems: {registered}."
         )
+        return error_response(message=message)
     return hardware_state_class
 
 
@@ -990,9 +997,11 @@ def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any
     """
     path = Path(session_path)
     if not path.exists():
-        return None, error_response(message=f"Session path does not exist: {path}")
+        message = f"Unable to resolve the session root. The path {path} does not exist."
+        return None, error_response(message=message)
     if path.joinpath(RAW_DATA_DIRECTORY).is_dir():
         return path, None
     if path.name == RAW_DATA_DIRECTORY and path.is_dir():
         return path.parent, None
-    return None, error_response(message=f"Could not locate the {RAW_DATA_DIRECTORY} directory under {path}")
+    message = f"Unable to resolve the session root. No {RAW_DATA_DIRECTORY} directory was located under {path}."
+    return None, error_response(message=message)

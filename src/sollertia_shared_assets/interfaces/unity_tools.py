@@ -30,7 +30,7 @@ def create_task_tool(template_name: str) -> dict[str, Any]:
     ``Assets/InfiniteCorridorTask/Tasks/<template_name>.prefab`` and the scene at
     ``Assets/Scenes/<template_name>.unity``; both paths are auto-resolved from the template basename so
     every task artifact shares one name end to end. Refuses to overwrite an existing scene at the
-    resolved path so a regeneration cycle is always an explicit two-step action: call
+    resolved path. Regeneration is therefore always an explicit two-step action: call
     ``delete_task_tool`` first to remove the existing task bundle (scene, prefab, segments), then call
     ``create_task_tool`` again to rebuild from scratch. The prefab itself is always regenerated because
     the template is authoritative.
@@ -245,21 +245,22 @@ def read_task_parameters_tool() -> dict[str, Any]:
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with three top-level keys. The ``state`` key holds per-section current
-        values: ``actor`` (with ``model`` and ``controller``), ``mqtt`` (with ``ip`` and ``port``),
-        ``display`` (with ``current_brightness``, ``brightness``, and ``height_in_vr``),
-        ``camera_mapping`` (a list of per-monitor dicts containing ``monitor``, ``left``, ``top``,
-        and ``camera``), and ``task`` (with ``require_lick``, ``require_wait``, ``track_length``,
-        and ``track_seed``). The ``options`` key lists enumerated alternatives for fields with a
-        finite valid set: ``actor.model`` and ``actor.controller`` list every Resources actor prefab
-        and scene ControllerOutput respectively (each plus the literal ``"None"``), and
+        A response dict with three top-level keys: ``state``, ``options``, and ``visibility``.
+        The ``state`` key holds per-section current values. ``actor`` carries ``model`` and
+        ``controller``. ``mqtt`` carries ``ip`` and ``port``. ``display`` carries
+        ``current_brightness``, ``brightness``, and ``height_in_vr``. ``camera_mapping`` carries
+        a list of per-monitor dicts with ``monitor``, ``left``, ``top``, and ``camera``. ``task``
+        carries ``require_lick``, ``require_wait``, ``track_length``, and ``track_seed``.
+        The ``options`` key lists enumerated alternatives for fields with a finite valid set.
+        ``actor.model`` lists every Resources actor prefab plus the literal ``"None"``.
+        ``actor.controller`` lists every scene ControllerOutput plus the literal ``"None"``.
         ``camera_mapping.camera`` lists every scene Camera not tagged MainCamera or named
-        ``Main Camera`` (also plus ``"None"``). The ``visibility`` key holds per-control flags
-        indicating whether the matching control is currently rendered in the Parameters window;
-        ``task.require_lick`` is true only when the scene contains a ``GuidanceZone`` and
-        ``task.require_wait`` is true only when the scene contains an ``OccupancyZone``. Writes
-        against fields whose visibility is false are rejected by
-        :func:`write_task_parameters_tool`.
+        ``Main Camera``, also plus ``"None"``.
+        The ``visibility`` key holds per-control flags indicating whether the matching control is
+        currently rendered in the Parameters window. ``task.require_lick`` is true only when the
+        scene contains a ``GuidanceZone``. ``task.require_wait`` is true only when the scene
+        contains an ``OccupancyZone``. Writes against fields whose visibility is false are
+        rejected by :func:`write_task_parameters_tool`.
     """
     return _unity_relay(tool="read_task_parameters")
 
@@ -329,7 +330,6 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
     Returns:
         The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable.
     """
-    # Constructs the JSON-encoded HTTP POST request for the Unity bridge.
     relay_arguments = arguments if arguments is not None else {}
     payload = json.dumps({"tool": tool, "args": relay_arguments}).encode("utf-8")
     request = urllib.request.Request(  # noqa: S310 - hardcoded localhost URL for the Unity Editor bridge.
@@ -339,21 +339,21 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         method="POST",
     )
 
-    # Sends the request and parses the JSON response, handling connectivity and decode errors.
     try:
         with urllib.request.urlopen(url=request, timeout=30) as response:  # noqa: S310 - same localhost URL.
             parsed = json.loads(response.read().decode("utf-8"))
     except urllib.error.URLError:
-        return error_response(
-            message=(
-                f"Unity Editor is not reachable. Ensure the Editor is open with the McpBridge plugin loaded "
-                f"and listening on {_UNITY_BRIDGE_URL}."
-            ),
+        message = (
+            f"Unable to reach the Unity Editor at {_UNITY_BRIDGE_URL}. Ensure the Editor is open with the "
+            f"McpBridge plugin loaded and listening on this address."
         )
+        return error_response(message=message)
     except json.JSONDecodeError:
-        return error_response(message="Unity bridge returned invalid JSON.")
+        message = "Unable to parse the Unity bridge response: the payload is not valid JSON."
+        return error_response(message=message)
 
     # The bridge contract guarantees a JSON object, but verify the shape so the typed return holds.
     if not isinstance(parsed, dict):
-        return error_response(message="Unity bridge returned a non-object JSON payload.")
+        message = "Unable to parse the Unity bridge response: the payload is a valid JSON value but not an object."
+        return error_response(message=message)
     return parsed

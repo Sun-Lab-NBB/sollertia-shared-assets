@@ -114,12 +114,10 @@ def test_set_working_directory_creates_app_directory(tmp_path: Path, monkeypatch
 
 def test_set_working_directory_overwrites_existing(clean_working_directory: Path) -> None:
     """Verifies that set_working_directory overwrites an existing cached path."""
-    # Sets the initial working directory.
     first_dir = clean_working_directory / "first"
     first_dir.mkdir()
     set_working_directory(path=first_dir)
 
-    # Replaces the cached path with a second directory.
     second_dir = clean_working_directory / "second"
     second_dir.mkdir()
     set_working_directory(path=second_dir)
@@ -150,7 +148,7 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
     """Verifies that get_working_directory raises error if the cached directory does not exist."""
     set_working_directory(path=clean_working_directory)
 
-    # Removes the cached working directory to simulate an out-of-date cache.
+    # Simulates an out-of-date cache.
     shutil.rmtree(clean_working_directory)
 
     with pytest.raises(FileNotFoundError, match=r"currently configured"):
@@ -237,7 +235,7 @@ def test_get_google_credentials_path_raises_error_if_file_missing(
 
     set_google_credentials_path(path=credentials_file)
 
-    # Removes the cached credentials file to simulate an out-of-date cache.
+    # Simulates an out-of-date cache.
     credentials_file.unlink()
 
     with pytest.raises(FileNotFoundError, match=r"previously configured"):

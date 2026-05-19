@@ -26,9 +26,7 @@ _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 
 @click.group("slsa", context_settings=_CONTEXT_SETTINGS)
 def slsa_cli() -> None:  # pragma: no cover
-    """Serves as the entry-point for interfacing with all interactive components of the sollertia-shared-assets
-    (SLSA) library.
-    """
+    """Provides the entry point for all interactive sollertia-shared-assets (SLSA) library components."""
 
 
 @slsa_cli.command("mcp", context_settings=_CONTEXT_SETTINGS)
@@ -204,8 +202,9 @@ def generate_experiment_configuration_file(
     if not template_path.exists():
         available_templates = sorted([template_file.stem for template_file in templates_directory.glob("*.yaml")])
         message = (
-            f"Template '{template}' not found in {templates_directory}. "
-            f"Available templates: {', '.join(available_templates) if available_templates else 'none'}."
+            f"Unable to generate the '{experiment}' experiment configuration. The template '{template}' was "
+            f"not found in {templates_directory}. Available templates: "
+            f"{', '.join(available_templates) if available_templates else 'none'}."
         )
         console.error(message=message, error=FileNotFoundError)
 

@@ -347,9 +347,21 @@ class _SystemRawDataBuilder(Protocol):
 
     @classmethod
     def build(cls, root: Path) -> Any:  # noqa: ANN401
+        """Resolves all system-specific raw-asset paths under the session's ``raw_data`` directory.
+
+        Conforming implementations construct and return a dataclass instance whose fields hold absolute paths
+        anchored on ``root``. The concrete return type is the implementing class itself (e.g., ``MesoscopeRawData``).
+
+        Args:
+            root: The session's ``raw_data`` directory absolute path.
+
+        Returns:
+            An instance of the conforming dataclass with every system-specific raw-asset path resolved.
+        """
         ...  # pragma: no cover
 
 
+# noinspection PyTypeChecker
 SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
 }
@@ -479,11 +491,10 @@ class SessionData(YamlConfig):
             console.error(message=message, error=ValueError)
         acquisition_system = AcquisitionSystems(acquisition_system)
 
-        # Acquires the UTC timestamp to use as the session name.
+        # Microsecond UTC timestamps as session names give unique, totally-ordered identifiers across hosts.
         # noinspection PyStringConversionWithoutDunderMethod
         session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
 
-        # Constructs the root session directory path from the caller-provided root directory.
         session_path = root_directory.joinpath(project_name, animal_id, session_name)
 
         # Prevents creating new sessions for non-existent projects.
@@ -496,14 +507,11 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=FileNotFoundError)
 
-        # Generates the session's raw data directory. This method assumes that the session is created on the
-        # data acquisition machine that only acquires the data and does not create the other session's directories used
-        # during data processing.
+        # Only the raw_data directory is created here; processed_data is owned by the processing machine and
+        # is created later, on a different host, when the session is loaded for processing.
         raw_data_path = session_path.joinpath(RAW_DATA_DIRECTORY)
         ensure_directory_exists(path=raw_data_path)
 
-        # Generates the SessionData instance. processed_data_path is left at the default Path() because the data
-        # acquisition machine does not own the processed data hierarchy.
         instance = cls(
             project_name=project_name,
             animal_id=animal_id,
@@ -516,15 +524,13 @@ class SessionData(YamlConfig):
             raw_data_path=raw_data_path,
         )
 
-        # Builds the runtime-only sub-dataclass attributes now that the session's roots are final.
         instance._build_sub_dataclasses()
 
-        # Saves the configured instance data to the session's directory so that it can be reused during processing or
-        # preprocessing.
+        # Persisting the marker file here lets future processing or preprocessing reuse this configuration
+        # without re-resolving the source paths.
         instance.save()
 
         if experiment_name is not None:
-            # Copies the experiment_configuration.yaml file to the session's directory.
             experiment_configuration_path = root_directory.joinpath(
                 project_name, "configuration", f"{experiment_name}.yaml"
             )
@@ -581,8 +587,6 @@ class SessionData(YamlConfig):
             FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input
                 directory.
         """
-        # To properly initialize the SessionData instance, the provided path should contain a single session_data.yaml
-        # file at any hierarchy level.
         session_data_files = list(session_path.rglob(RawDataFiles.SESSION_DATA))
         if len(session_data_files) != 1:
             message = (
@@ -593,11 +597,7 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=FileNotFoundError)
 
-        # If a single candidate is found (as expected), extracts it from the list and uses it to resolve the
-        # session data hierarchy.
         session_data_path = session_data_files.pop()
-
-        # Loads the session's data from the .yaml file.
         instance: SessionData = cls.from_yaml(file_path=session_data_path)
 
         # The method assumes that the 'donor' YAML file is always stored inside the raw_data directory of the session
@@ -607,14 +607,12 @@ class SessionData(YamlConfig):
         instance.raw_data_path = local_root.joinpath(RAW_DATA_DIRECTORY)
         instance.processed_data_path = local_root.joinpath(PROCESSED_DATA_DIRECTORY)
 
-        # Builds the runtime-only sub-dataclass attributes now that the local-host roots are finalized.
         instance._build_sub_dataclasses()
 
         return instance
 
     def mark_runtime_initialized(self) -> None:
-        """Removes the 'nk.bin' uninitialized-session marker to signal that the acquisition runtime has finished
-        creating snapshots and initializing instruments for this session.
+        """Removes the 'nk.bin' uninitialized-session marker after acquisition-runtime initialization completes.
 
         Notes:
             This service method is used by the sollertia-experiment library when it acquires a session's data. Do not

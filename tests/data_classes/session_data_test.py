@@ -1,6 +1,4 @@
-"""Contains tests for the SessionData class and related dataclasses provided by the
-``data_classes.session_data`` module.
-"""
+"""Contains tests for the dataclasses provided by the ``data_classes.session_data`` module."""
 
 from __future__ import annotations
 
@@ -158,7 +156,7 @@ def test_session_data_default_path_fields() -> None:
 
 
 def test_session_data_create_requires_valid_session_type(clean_working_directory: Path) -> None:
-    """Verifies that create() raises error for invalid session types."""
+    """Verifies that create() raises ValueError for invalid session types."""
     set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
@@ -175,7 +173,7 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
 
 
 def test_session_data_create_requires_valid_acquisition_system(clean_working_directory: Path) -> None:
-    """Verifies that create() raises error for invalid acquisition systems."""
+    """Verifies that create() raises ValueError for invalid acquisition systems."""
     set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
@@ -264,7 +262,7 @@ def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy: Pat
 
 
 def test_session_data_load_raises_error_no_session_data_file(tmp_path: Path) -> None:
-    """Verifies that load() raises error when session_data.yaml is missing."""
+    """Verifies that load() raises FileNotFoundError when session_data.yaml is missing."""
     session_path = tmp_path / "empty_session" / "raw_data"
     session_path.mkdir(parents=True)
 
@@ -273,7 +271,7 @@ def test_session_data_load_raises_error_no_session_data_file(tmp_path: Path) -> 
 
 
 def test_session_data_load_raises_error_multiple_session_data_files(tmp_path: Path) -> None:
-    """Verifies that load() raises error when multiple session_data.yaml files are found."""
+    """Verifies that load() raises FileNotFoundError when multiple session_data.yaml files are found."""
     session_path = tmp_path / "session"
     (session_path / "first").mkdir(parents=True)
     (session_path / "second").mkdir(parents=True)
@@ -353,7 +351,6 @@ def test_session_data_create_raises_error_if_project_does_not_exist(clean_workin
             root_directory=clean_working_directory,
         )
 
-    # Verifies that the error message names the project and suggests the CLI command.
     assert "nonexistent_project" in str(exc_info.value)
     assert "sl-project create" in str(exc_info.value)
 

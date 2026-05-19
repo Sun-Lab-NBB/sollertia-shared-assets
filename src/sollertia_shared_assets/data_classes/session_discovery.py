@@ -34,9 +34,9 @@ def validate_directory(directory: str) -> str | None:
     """
     path = Path(directory)
     if not path.exists():
-        return f"Directory does not exist: {directory}"
+        return f"Unable to validate the input directory. The path {directory} does not exist."
     if not path.is_dir():
-        return f"Path is not a directory: {directory}"
+        return f"Unable to validate the input directory. The path {directory} is not a directory."
     return None
 
 
@@ -233,7 +233,7 @@ def _parse_session_date(session_name: str, *, utc_timezone: bool = True) -> date
 
     try:
         year, month, day, hour, minute, second, microseconds = parts
-        utc_dt = datetime(
+        utc_datetime = datetime(
             year=int(year),
             month=int(month),
             day=int(day),
@@ -247,5 +247,5 @@ def _parse_session_date(session_name: str, *, utc_timezone: bool = True) -> date
         return None
 
     if utc_timezone:
-        return utc_dt
-    return utc_dt.astimezone(tz=ZoneInfo("America/New_York"))
+        return utc_datetime
+    return utc_datetime.astimezone(tz=ZoneInfo("America/New_York"))

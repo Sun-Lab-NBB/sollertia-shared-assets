@@ -44,7 +44,7 @@ type ExperimentConfigFactory = Callable[
     [str, dict[str, WaterRewardTrial | GasPuffTrial]],
     MesoscopeExperimentConfiguration,
 ]
-"""Type alias for experiment configuration factory functions."""
+"""Callable contract for the per-system factories invoked by ``create_experiment_configuration``."""
 
 _experiment_config_factory_registry: dict[str, ExperimentConfigFactory] = {}
 """Maps acquisition system names to their experiment configuration factory functions."""
@@ -289,8 +289,10 @@ def get_google_credentials_path() -> Path:
 
 
 def set_task_templates_directory(path: Path) -> None:
-    """Sets the path to the sollertia-unity-tasks project's Configurations (Template) directory for the local
-    machine (PC).
+    """Sets the path to the sollertia-unity-tasks project's Configurations (Template) directory.
+
+    Persists the path under ``platformdirs``-managed application data so it is reused by subsequent ``slsa mcp``
+    sessions on the same local machine (PC).
 
     Args:
         path: The path to the sollertia-unity-tasks project's Configurations (Template) directory.

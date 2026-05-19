@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def sample_experiment_config() -> MesoscopeExperimentConfiguration:
-    """Creates a sample MesoscopeExperimentConfiguration for testing."""
+    """Provides a sample MesoscopeExperimentConfiguration for testing."""
     state = ExperimentState(
         experiment_state_code=1,
         system_state_code=0,
@@ -41,8 +41,8 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 
 @pytest.fixture
 def clean_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Sets up a clean temporary working directory for testing."""
-    # Redirects platformdirs to an isolated temporary application-data directory.
+    """Provides an isolated temporary working directory for testing."""
+    # Isolates platformdirs from the host machine to avoid polluting real user state.
     app_dir = tmp_path / "app_data"
     app_dir.mkdir()
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))

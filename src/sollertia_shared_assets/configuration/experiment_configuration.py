@@ -23,14 +23,12 @@ class ExperimentState:
     supports_trials: bool = True
     """Determines whether trials are executed during this experiment state. When False, no trial-related processing
     occurs during this phase."""
-    # Configures reinforcing (water reward) trial guidance behavior.
     reinforcing_initial_guided_trials: int = 0
     """The number of reinforcing trials after the onset of the experiment state that use the guidance mode."""
     reinforcing_recovery_failed_threshold: int = 0
     """The number of sequentially failed reinforcing trials after which to enable the recovery guidance mode."""
     reinforcing_recovery_guided_trials: int = 0
     """The number of guided reinforcing trials to use in the recovery guidance mode."""
-    # Configures aversive (gas puff) trial guidance behavior.
     aversive_initial_guided_trials: int = 0
     """The number of aversive trials after the onset of the experiment state that use the guidance mode."""
     aversive_recovery_failed_threshold: int = 0
