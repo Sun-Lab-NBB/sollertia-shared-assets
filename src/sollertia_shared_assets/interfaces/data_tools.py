@@ -914,6 +914,7 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
     ]
     if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
         required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, instance.raw_data.experiment_configuration_path))
+        required.append((RawDataFiles.VR_CONFIGURATION.value, instance.raw_data.vr_configuration_path))
     return [
         {
             "name": name,

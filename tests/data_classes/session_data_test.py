@@ -22,9 +22,15 @@ from sollertia_shared_assets.data_classes import (
     MesoscopeRawDataFiles,
 )
 from sollertia_shared_assets.configuration import (
+    Cue,
+    TriggerType,
+    TaskTemplate,
+    VREnvironment,
+    TrialStructure,
     AcquisitionSystems,
     MesoscopeExperimentConfiguration,
     set_working_directory,
+    set_task_templates_directory,
 )
 
 _DEFAULT_PYTHON_VERSION = "3.14.4"
@@ -73,6 +79,33 @@ def _write_session_marker(
     )
     session.save()
     return session
+
+
+def _build_sample_task_template() -> TaskTemplate:
+    """Builds a minimal TaskTemplate suitable for testing the VR template caching behavior."""
+    return TaskTemplate(
+        cues=[
+            Cue(name="A", code=1, length_cm=50.0),
+            Cue(name="B", code=2, length_cm=50.0),
+        ],
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+            cue_offset_cm=0.0,
+        ),
+        trial_structures={
+            "trial1": TrialStructure(
+                cue_sequence=["A", "B"],
+                stimulus_trigger_zone_start_cm=80.0,
+                stimulus_trigger_zone_end_cm=100.0,
+                stimulus_location_cm=90.0,
+                show_stimulus_collision_boundary=False,
+                trigger_type=TriggerType.LICK,
+            ),
+        },
+    )
 
 
 def _make_session_with_paths(raw: Path, processed: Path) -> SessionData:
@@ -340,6 +373,13 @@ def test_session_data_create_copies_experiment_configuration(
     experiment_config_path = configuration_path / "test_experiment.yaml"
     sample_experiment_config.to_yaml(file_path=experiment_config_path)
 
+    templates_directory = clean_working_directory / "task_templates"
+    templates_directory.mkdir()
+    _build_sample_task_template().to_yaml(
+        file_path=templates_directory / f"{sample_experiment_config.unity_scene_name}.yaml",
+    )
+    set_task_templates_directory(path=templates_directory)
+
     session_data = SessionData.create(
         project_name="test_project",
         animal_id="test_animal",
@@ -358,8 +398,52 @@ def test_session_data_create_copies_experiment_configuration(
     assert "TestScene" in content
 
 
+def test_session_data_create_caches_vr_configuration(
+    clean_working_directory: Path,
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+) -> None:
+    """Verifies that create() caches the VR task template alongside the experiment configuration."""
+    set_working_directory(path=clean_working_directory)
+
+    project_path = clean_working_directory / "test_project"
+    project_path.mkdir()
+    configuration_path = project_path / "configuration"
+    configuration_path.mkdir()
+
+    experiment_config_path = configuration_path / "test_experiment.yaml"
+    sample_experiment_config.to_yaml(file_path=experiment_config_path)
+
+    templates_directory = clean_working_directory / "task_templates"
+    templates_directory.mkdir()
+    sample_template = _build_sample_task_template()
+    sample_template.to_yaml(
+        file_path=templates_directory / f"{sample_experiment_config.unity_scene_name}.yaml",
+    )
+    set_task_templates_directory(path=templates_directory)
+
+    session_data = SessionData.create(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+        experiment_name="test_experiment",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        root_directory=clean_working_directory,
+    )
+
+    session_vr_config = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
+    assert session_vr_config.exists()
+    assert session_vr_config == session_data.raw_data.vr_configuration_path
+
+    # Round-trips the cached file through TaskTemplate to confirm it parses as a valid VR template.
+    cached_template = TaskTemplate.from_yaml(file_path=session_vr_config)
+    assert "trial1" in cached_template.trial_structures
+    assert [cue.name for cue in cached_template.cues] == ["A", "B"]
+
+
 def test_session_data_create_without_experiment_name_skips_experiment_config(clean_working_directory: Path) -> None:
-    """Verifies that create() without experiment_name does not copy experiment configuration."""
+    """Verifies that create() without experiment_name does not copy experiment or VR configuration."""
     set_working_directory(path=clean_working_directory)
     (clean_working_directory / "test_project").mkdir()
 
@@ -374,7 +458,9 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(cle
     )
 
     session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
+    session_vr_config = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
     assert not session_experiment_config.exists()
+    assert not session_vr_config.exists()
 
 
 def test_session_data_post_init_coerces_string_session_type() -> None:
@@ -400,6 +486,7 @@ def test_session_data_raw_data_file_paths() -> None:
     assert session.raw_data.surgery_metadata_path == _SENTINEL_RAW_PATH / RawDataFiles.SURGERY_METADATA
     assert session.raw_data.hardware_state_path == _SENTINEL_RAW_PATH / RawDataFiles.HARDWARE_STATE
     assert session.raw_data.experiment_configuration_path == _SENTINEL_RAW_PATH / RawDataFiles.EXPERIMENT_CONFIGURATION
+    assert session.raw_data.vr_configuration_path == _SENTINEL_RAW_PATH / RawDataFiles.VR_CONFIGURATION
     assert session.raw_data.system_configuration_path == _SENTINEL_RAW_PATH / RawDataFiles.SYSTEM_CONFIGURATION
     assert session.raw_data.checksum_path == _SENTINEL_RAW_PATH / RawDataFiles.CHECKSUM
     assert session.raw_data.checksum_tracker_path == _SENTINEL_RAW_PATH / ProcessingTrackers.CHECKSUM
