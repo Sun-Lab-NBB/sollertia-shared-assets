@@ -35,7 +35,7 @@ from .session_discovery import (
     iterate_sessions,
     discover_sessions,
     validate_directory,
-    session_root_from_marker,
+    get_session_root_from_marker,
 )
 
 __all__ = [
@@ -65,7 +65,7 @@ __all__ = [
     "WindowCheckingDescriptor",
     "discover_sessions",
     "filter_sessions",
+    "get_session_root_from_marker",
     "iterate_sessions",
-    "session_root_from_marker",
     "validate_directory",
 ]

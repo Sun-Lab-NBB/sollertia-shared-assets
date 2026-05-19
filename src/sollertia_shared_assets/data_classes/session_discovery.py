@@ -74,10 +74,10 @@ def discover_sessions(root_path: Path) -> list[Path]:
     Raises:
         PermissionError: If the search encounters a directory it cannot read.
     """
-    return sorted(session_root_from_marker(marker=marker) for marker in root_path.rglob(RawDataFiles.SESSION_DATA))
+    return sorted(get_session_root_from_marker(marker=marker) for marker in root_path.rglob(RawDataFiles.SESSION_DATA))
 
 
-def session_root_from_marker(marker: Path) -> Path:
+def get_session_root_from_marker(marker: Path) -> Path:
     """Returns the session root directory from a ``session_data.yaml`` marker path.
 
     The marker lives at ``{session_root}/raw_data/session_data.yaml``, so the session root is two

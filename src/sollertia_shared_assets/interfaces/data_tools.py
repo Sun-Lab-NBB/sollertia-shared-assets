@@ -37,7 +37,7 @@ from ..data_classes import (
     ProcedureData,
     ProcessingTrackers,
     filter_sessions,
-    session_root_from_marker,
+    get_session_root_from_marker,
 )
 from ..configuration import AcquisitionSystems
 
@@ -76,7 +76,7 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
     # not corrupt the project / animal aggregation because their identity cannot be trusted.
     markers = sorted(root.rglob(RawDataFiles.SESSION_DATA))  # type: ignore[union-attr]
     for marker in markers:
-        session_root = session_root_from_marker(marker=marker)
+        session_root = get_session_root_from_marker(marker=marker)
         try:
             instance = SessionData.load(session_path=session_root)
         except Exception as exception:

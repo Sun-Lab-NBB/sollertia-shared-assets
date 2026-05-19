@@ -15,7 +15,7 @@ from sollertia_shared_assets.data_classes import (
     iterate_sessions,
     discover_sessions,
     validate_directory,
-    session_root_from_marker,
+    get_session_root_from_marker,
 )
 from sollertia_shared_assets.data_classes.session_discovery import (
     _parse_session_date,
@@ -95,13 +95,13 @@ def test_validate_directory_reports_non_directory_path(tmp_path: Path) -> None:
     assert str(file_path) in result
 
 
-def test_session_root_from_marker_returns_grandparent(tmp_path: Path) -> None:
-    """Verifies that session_root_from_marker strips the ``raw_data/session_data.yaml`` suffix."""
+def test_get_session_root_from_marker_returns_grandparent(tmp_path: Path) -> None:
+    """Verifies that get_session_root_from_marker strips the ``raw_data/session_data.yaml`` suffix."""
     marker = tmp_path / "proj" / "animal" / "2026-03-01-12-00-00-000000" / "raw_data" / "session_data.yaml"
     marker.parent.mkdir(parents=True)
     marker.touch()
 
-    assert session_root_from_marker(marker=marker) == marker.parent.parent
+    assert get_session_root_from_marker(marker=marker) == marker.parent.parent
 
 
 def test_discover_sessions_returns_sorted_roots(populated_project_tree: Path) -> None:

@@ -24,6 +24,8 @@ You MUST invoke the appropriate skill before performing ANY of the following tas
 | Writing or modifying Sphinx docs files     | `/api-docs`        |
 | Creating or verifying project structure    | `/project-layout`  |
 | Writing or modifying skill files / this MD | `/skill-design`    |
+| Auditing for style compliance              | `/audit-style`     |
+| Auditing for factual accuracy              | `/audit-facts`     |
 
 Each skill contains a verification checklist that you MUST complete before submitting any work. Failure to invoke the
 appropriate skill results in style violations that block release.
@@ -72,6 +74,8 @@ marketplace ships the `automation` plugin used across all Sun Lab repositories.
 | `/api-docs`                     | Apply Sun Lab Sphinx documentation conventions                               |
 | `/project-layout`               | Apply Sun Lab project directory structure conventions                        |
 | `/skill-design`                 | Generate, update, and verify skill files and this CLAUDE.md                  |
+| `/audit-facts`                  | Audit documentation files against source code for factual accuracy           |
+| `/audit-style`                  | Audit files against applicable style skill checklists for compliance         |
 | `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                   |
 | `/working-directory`            | Initialize the working directory, Google credentials, and templates path     |
 | `/project-hierarchy`            | Discover the project / animal / session tree under the data root             |
