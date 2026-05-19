@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 from .mcp_instance import (
     CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    EXPERIMENT_CONFIGURATION_REGISTRY,
     mcp,
     read_yaml,
     serialize,
@@ -24,6 +23,7 @@ from .mcp_instance import (
 )
 from ..data_classes import SessionTypes
 from ..configuration import (
+    EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
     GasPuffTrial,
@@ -249,12 +249,20 @@ def discover_templates_tool() -> dict[str, Any]:
 
 @mcp.tool()
 def read_template_tool(file_path: str) -> dict[str, Any]:
-    """Loads a TaskTemplate YAML.
+    """Loads a TaskTemplate YAML from either the live templates directory or a per-session frozen snapshot.
+
+    Notes:
+        TaskTemplates live in two places. The **live** template at ``<templates-directory>/<name>.yaml`` is the
+        authoring surface managed via this skill and is shared across projects; ``discover_templates_tool`` returns
+        the absolute paths of every live template. The per-session **frozen snapshot** at
+        ``<session>/raw_data/vr_configuration.yaml`` is the immutable copy cached by ``SessionData.create()`` at
+        acquisition time and records the exact template active when the session was acquired. This tool reads either
+        — the caller chooses by passing the corresponding absolute path.
 
     Args:
-        file_path: Absolute path to the template YAML file. The canonical home of task templates is
-            the directory configured via ``set_task_templates_directory_tool``; ``discover_templates_tool``
-            returns the full paths of templates in that directory.
+        file_path: Absolute path to the template YAML file. Pass a path under the configured templates directory
+            to read a live template, or a per-session ``raw_data/vr_configuration.yaml`` path to read the frozen
+            session snapshot.
 
     Returns:
         A response dict with ``data`` containing the full TaskTemplate payload and the resolved
@@ -270,15 +278,22 @@ def write_template_tool(
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates or replaces a TaskTemplate YAML.
+    """Creates or replaces a live TaskTemplate YAML in the templates directory.
 
     The ``template_payload`` must match the TaskTemplate schema (use ``describe_template_schema_tool`` to
     inspect the required structure). The payload is validated against ``TaskTemplate.__post_init__`` before
     being persisted.
 
+    Notes:
+        This tool targets the **live** authoring surface — TaskTemplate YAMLs under the configured templates
+        directory. Per-session frozen snapshots at ``<session>/raw_data/vr_configuration.yaml`` are immutable
+        records of the template active at acquisition time and are produced exclusively by ``SessionData.create()``.
+        Do not point this tool at a session's ``vr_configuration.yaml``; if a snapshot is corrupted or out of sync,
+        repair the live template and re-acquire, or restore the snapshot from a backup.
+
     Args:
-        file_path: Absolute path to the destination template YAML file. The canonical home of task
-            templates is the directory configured via ``set_task_templates_directory_tool``.
+        file_path: Absolute path to the destination template YAML file under the directory configured via
+            ``set_task_templates_directory_tool``.
         template_payload: The complete TaskTemplate payload as a JSON-friendly dict.
         overwrite: Determines whether to overwrite an existing template file.
 
@@ -297,8 +312,13 @@ def write_template_tool(
 def validate_template_tool(file_path: str) -> dict[str, Any]:
     """Loads and validates a TaskTemplate against its schema and cross-reference constraints.
 
+    Notes:
+        Accepts both live templates under the configured templates directory and per-session frozen snapshots at
+        ``<session>/raw_data/vr_configuration.yaml``. The validation logic is identical in either case — the schema
+        and cross-reference constraints belong to ``TaskTemplate``, not to a particular storage location.
+
     Args:
-        file_path: Absolute path to the template YAML file.
+        file_path: Absolute path to the template YAML file (live template or session snapshot).
 
     Returns:
         A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``cue_count``,

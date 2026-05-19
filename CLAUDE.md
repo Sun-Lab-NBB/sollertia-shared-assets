@@ -85,21 +85,24 @@ marketplace ships the `automation` plugin used across all Sun Lab repositories.
 | `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary    |
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
-member, `SessionTypes` member, `BaseTrial` subclass, `TriggerType` member, or extending the template vocabulary
-beyond the infinite corridor. The skill owns the touch list and the import-time parity check.
+member, `SessionTypes` member, runtime trial class (a sibling of `WaterRewardTrial` / `GasPuffTrial`), 
+`TriggerType` member, or extending the template vocabulary beyond the infinite corridor. The skill owns the touch list 
+and the import-time parity check.
 
 ## MCP server
 
 This library exposes an MCP server registered in the sollertia marketplace as part of the `assets` plugin. The server
-runs through the `slsa mcp` CLI command and is consumed by AI agents working on Sollertia data. Tool implementations
-live in `src/sollertia_shared_assets/interfaces/`:
+runs through the `slsa mcp` CLI command and is consumed by AI agents working on Sollertia data. The server bootstrap,
+the CLI, and all tool implementations live in `src/sollertia_shared_assets/interfaces/`:
 
-| Tool module         | File                                  | Surface                                                    |
-|---------------------|---------------------------------------|------------------------------------------------------------|
-| Configuration tools | `interfaces/configuration_tools.py`   | working dir, Google creds, templates dir, experiments      |
-| Data tools          | `interfaces/data_tools.py`            | session discovery, inspection, descriptors, surgery, etc.  |
-| Unity tools         | `interfaces/unity_tools.py`           | McpBridge HTTP relay (Editor must be running)              |
-| Shared MCP instance | `interfaces/mcp_instance.py`          | FastMCP instance, registries, response helpers, validators |
+| Module              | File                                | Surface                                                            |
+|---------------------|-------------------------------------|--------------------------------------------------------------------|
+| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `configure` subcommands                |
+| Server bootstrap    | `interfaces/mcp_server.py`          | Imports tool modules to trigger registration; exposes `run_server` |
+| Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, registries, response helpers, validators         |
+| Configuration tools | `interfaces/configuration_tools.py` | working dir, Google creds, templates dir, experiments              |
+| Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, surgery, etc.          |
+| Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                      |
 
 Project conventions for MCP tools:
 - MCP tool functions are excluded from unit tests by project convention. Do NOT write tests for `@mcp.tool()` functions.
@@ -123,8 +126,9 @@ contracts, or canonical filenames ripple through three downstream libraries:
   `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials path. Owns the system-level
   `MesoscopeSystemConfiguration`, which extends but does not live in this library.
 - **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `filter_sessions`, the working
-  directory (`<root>/configuration/`), the `ProcessingTrackers` enum, `MesoscopeHardwareState`, and
-  `MesoscopeExperimentConfiguration`.
+  directory itself (per-project artifacts like `<working_dir>/<project>/manifest.feather`) and its `configuration/`
+  subdirectory (where the forgery server configuration is persisted), the `ProcessingTrackers` enum,
+  `MesoscopeHardwareState`, and `MesoscopeExperimentConfiguration`.
 - **sollertia-unity-tasks** (Unity Editor McpBridge plugin). Consumed by `interfaces/unity_tools.py` over HTTP
   localhost; the plugin itself is authored on the Unity side.
 
@@ -151,9 +155,11 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Architecture
 
-- **Configuration layer**: `TaskTemplate` (system-agnostic Unity template) inherits from `YamlConfig`. The Mesoscope-VR
-  acquisition system extends it via `MesoscopeExperimentConfiguration`, also `YamlConfig`. Trial structures branch into
-  `WaterRewardTrial` and `GasPuffTrial` based on `TriggerType` (lick or occupancy).
+- **Configuration layer**: `TaskTemplate` (system-agnostic Unity template) and `MesoscopeExperimentConfiguration`
+  (Mesoscope-VR experiment config) are independent siblings — both inherit directly from `YamlConfig`, neither
+  inherits from the other. `create_experiment_configuration` converts a `TaskTemplate` into a
+  `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
+  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`).
 - **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
   session, `SessionData.load()` rehydrates one. Both build runtime-only `raw_data`, `processed_data`, and
   `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`. Descriptor and hardware-state classes are
@@ -171,22 +177,28 @@ Five dispatch registries route polymorphic behavior off the two primary enums. A
 session type means touching every registry below. Use the `/library-extension` skill — it owns the touch list and
 the import-time parity check that fails if any registry is incomplete.
 
-| Registry                              | File                                          | Keyed by             |
-|---------------------------------------|-----------------------------------------------|----------------------|
-| `DESCRIPTOR_REGISTRY`                 | `interfaces/mcp_instance.py`                  | `SessionTypes`       |
-| `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`                  | `AcquisitionSystems` |
-| `EXPERIMENT_CONFIGURATION_REGISTRY`   | `interfaces/mcp_instance.py`                  | `AcquisitionSystems` |
-| `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`                | `AcquisitionSystems` |
-| `_experiment_config_factory_registry` | `configuration/configuration_utilities.py`    | `AcquisitionSystems` |
+| Registry                              | File                                       | Keyed by             |
+|---------------------------------------|--------------------------------------------|----------------------|
+| `DESCRIPTOR_REGISTRY`                 | `interfaces/mcp_instance.py`               | `SessionTypes`       |
+| `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`               | `AcquisitionSystems` |
+| `EXPERIMENT_CONFIGURATION_REGISTRY`   | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
+| `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
+| `_experiment_config_factory_registry` | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 
 `_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the four
-public registries is missing entries for a known enum member.
+public registries is missing entries for a known enum member. `_experiment_config_factory_registry` is **not** covered
+by the parity check (a missing factory only fails at call time, not at import).
+
+A sixth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps trial-class **names** (e.g.,
+`"WaterRewardTrial"`) to their concrete dataclasses. It is not a dispatch registry and is not parity-checked;
+`list_supported_trial_types_tool` reads it to enumerate the trial vocabulary. Adding a new runtime trial class
+requires a matching entry here, otherwise the new class is silently omitted from the tool's response.
 
 ### Code standards
 
 - Apache-2.0 licensed; license string lives in `pyproject.toml` and is mirrored in `LICENSE`
 - Python 3.14 only (`requires-python = ">=3.14,<3.15"`)
-- MyPy in minimal mode (`disallow_untyped_defs`, `warn_unused_ignores`); not the full strict mode used by ataraxis-*
+- MyPy in strict mode (equivalent to `--strict`), with `extra_checks` and `pretty` output enabled in `pyproject.toml`
 - Google-style docstrings, 120-character line limit
 - Ruff for formatting and linting; `pyproject.toml` declares the project-specific lint ignores
 - See `/python-style` for complete conventions
@@ -201,8 +213,8 @@ public registries is missing entries for a known enum member.
 - **No tests for MCP tools**: `@mcp.tool()` functions live behind the FastMCP server and are excluded from coverage.
   Test the helper functions they delegate to instead.
 - **Frozen acquisition snapshots**: Every per-session YAML in `raw_data/` (descriptor, hardware state, system
-  configuration, experiment configuration, surgery metadata) is an immutable record of the session's acquisition
-  context. MCP write tools repair corruption; they do not edit live runtime state.
+  configuration, experiment configuration, VR configuration, surgery metadata) is an immutable record of the
+  session's acquisition context. MCP write tools repair corruption; they do not edit live runtime state.
 
 ### Workflow guidance
 

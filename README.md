@@ -52,14 +52,14 @@ ___
 ## Dependencies
 
 - [Python](https://www.python.org/downloads/) **3.14** (the only currently supported interpreter version).
-- An optional 
+- An optional
   [Google service account credentials JSON file](https://cloud.google.com/iam/docs/service-account-overview),
   required only when downstream Sollertia libraries fetch subject metadata or water-restriction logs from Google Sheets.
 - An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
   [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), required only by the MCP tools that
   generate task prefabs, manage scenes, and control Play Mode.
 
-For users, all Python library dependencies are installed automatically by all supported installation methods. For
+For users, all other library dependencies are installed automatically by all supported installation methods. For
 developers, see the [Developers](#developers) section for information on installing additional development
 dependencies.
 
@@ -166,24 +166,26 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                          |
 | `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)          |
 | `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                      |
-| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema (file-path based)                     |
-| `read_session_descriptor_tool`                  | Detects the appropriate descriptor class and loads the descriptor YAML                          |
+| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                       |
+| `read_session_descriptor_tool`                  | Loads a session descriptor YAML using the descriptor class for the given session type           |
 | `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system      |
 | `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot     |
+| `read_task_parameters_tool`                     | Reads the Unity Editor's Task Parameters window state, options, and per-control visibility      |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                     |
-| `read_template_tool`                            | Loads a TaskTemplate YAML by name from the configured templates directory                       |
+| `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                        |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                                |
 | `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                    |
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                   |
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                             |
 | `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                        |
-| `validate_template_tool`                        | Validates a TaskTemplate against its schema and cross-reference constraints                     |
+| `validate_template_tool`                        | Validates a TaskTemplate (live or session snapshot) against its schema and constraints          |
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                              |
 | `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema          |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                     |
 | `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass      |
 | `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData            |
-| `write_template_tool`                           | Creates or replaces a TaskTemplate YAML in the configured templates directory                   |
+| `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call       |
+| `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory              |
 
 ***Note,*** tools that interact with Unity (`create_task_tool`, `delete_asset_tool`, `delete_task_tool`,
 `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `inspect_scene_tool`,
@@ -195,7 +197,7 @@ Editor via HTTP.
 #### Client Registration
 
 MCP server registration and Claude Code skill assets for this library are distributed through the
-[sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace as part of the **configuration** plugin. Install the
+[sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace as part of the **assets** plugin. Install the
 plugin from the marketplace to automatically register the MCP server with compatible clients and make all associated
 skills available.
 
@@ -340,9 +342,9 @@ Export the new class from `data_classes/__init__.py`.
 
 **Step 3: Add the experiment-configuration module**
 
-Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a 
-`<System>ExperimentConfiguration` dataclass inheriting from `YamlConfig` that captures the runtime experiment 
-parameters for the new system. Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference. 
+Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a
+`<System>ExperimentConfiguration` dataclass inheriting from `YamlConfig` that captures the runtime experiment
+parameters for the new system. Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference.
 Export the new class from `configuration/__init__.py`.
 
 **Step 4: Add the system-specific raw-data dataclass**
@@ -362,8 +364,11 @@ In `data_classes/session_data.py`:
 Three registries need entries for the new system:
 
 1. In `interfaces/mcp_instance.py`, import `<System>HardwareState` and add it to `HARDWARE_STATE_REGISTRY`.
-2. In `interfaces/mcp_instance.py`, import `<System>ExperimentConfiguration` and add it to
-   `EXPERIMENT_CONFIGURATION_REGISTRY`.
+2. In `configuration/configuration_utilities.py`, import `<System>ExperimentConfiguration` and add it to
+   `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this registry to load the per-session
+   experiment configuration snapshot and (if the configuration declares a `unity_scene_name`) cache the matching VR
+   task template. Acquisition systems that do not use Unity-based VR omit `unity_scene_name` from their schema, and
+   the VR template export is skipped automatically.
 3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
    this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
    new system into session loading.
@@ -389,7 +394,7 @@ Claude Code skills and AI development assets for this project are distributed th
 
 - [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace: Provides MCP server registration,
   configuration-specific skills for working directory management, system and experiment configuration, session data,
-  subject metadata, dataset management, task templates, and MCP environment setup via the **configuration** plugin.
+  subject metadata, dataset management, task templates, and MCP environment setup via the **assets** plugin.
   Install this plugin to register the `slsa mcp` server with compatible MCP clients and make all configuration
   workflow skills available.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace: Provides shared development skills that enforce

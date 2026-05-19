@@ -14,7 +14,11 @@ from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from ..configuration import AcquisitionSystems
+from ..configuration import (
+    EXPERIMENT_CONFIGURATION_REGISTRY,
+    AcquisitionSystems,
+    get_task_templates_directory,
+)
 
 RAW_DATA_DIRECTORY: str = "raw_data"
 """Canonical name of the per-session raw data directory under each session root."""
@@ -39,6 +43,9 @@ class RawDataFiles(StrEnum):
     """The hardware state snapshot YAML written at the start of acquisition."""
     EXPERIMENT_CONFIGURATION = "experiment_configuration.yaml"
     """The experiment configuration YAML copied into the session for experiment sessions only."""
+    VR_CONFIGURATION = "vr_configuration.yaml"
+    """The Virtual Reality (VR) task template YAML cached into the session at acquisition time. Records the Unity task
+    template (cues, VR environment, trial structures) that was active when the session was acquired."""
     SYSTEM_CONFIGURATION = "system_configuration.yaml"
     """The system configuration YAML copied into the session by the acquisition runtime."""
     CHECKSUM = "ax_checksum.txt"
@@ -174,6 +181,12 @@ class RawData:
     """Stores the experiment configuration in effect when the session was acquired. Only populated for experiment
     sessions; callers should check .exists() before reading. The concrete parsing class is determined by the session's
     acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
+    vr_configuration_path: Path
+    """Stores the Virtual Reality (VR) task template (cues, VR environment, trial structures) that was active when the
+    session was acquired. Populated by ``SessionData.create()`` for experiment sessions by copying the template YAML
+    that matches the experiment configuration's ``unity_scene_name`` out of the task templates directory; for non-
+    experiment sessions, the acquisition runtime writes this file when a VR task is used. Callers should check
+    ``.exists()`` before reading. Parsed via ``TaskTemplate``."""
     checksum_path: Path
     """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
     accidental modification of raw assets after acquisition."""
@@ -205,6 +218,7 @@ class RawData:
             hardware_state_path=root.joinpath(RawDataFiles.HARDWARE_STATE),
             system_configuration_path=root.joinpath(RawDataFiles.SYSTEM_CONFIGURATION),
             experiment_configuration_path=root.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION),
+            vr_configuration_path=root.joinpath(RawDataFiles.VR_CONFIGURATION),
             checksum_path=root.joinpath(RawDataFiles.CHECKSUM),
             checksum_tracker_path=root.joinpath(ProcessingTrackers.CHECKSUM),
             nk_path=root.joinpath(RawDataFiles.NK_MARKER),
@@ -518,6 +532,27 @@ class SessionData(YamlConfig):
                 src=experiment_configuration_path,
                 dst=instance.raw_data.experiment_configuration_path,
             )
+
+            # Dispatches the experiment configuration dataclass via EXPERIMENT_CONFIGURATION_REGISTRY so future
+            # acquisition systems can plug in their own experiment-configuration schema without modifying this
+            # method. Loading from the copied destination avoids re-resolving the source path.
+            experiment_configuration_class = EXPERIMENT_CONFIGURATION_REGISTRY[acquisition_system]
+            experiment_configuration = experiment_configuration_class.from_yaml(
+                file_path=instance.raw_data.experiment_configuration_path,
+            )
+
+            # Caches the VR task template that the experiment runs against alongside the experiment configuration,
+            # but only when the experiment configuration declares a unity_scene_name. Acquisition systems that do
+            # not use Unity-based Virtual Reality omit this field entirely, so the gate below skips template export
+            # for non-VR sessions without requiring an explicit per-system branch.
+            unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
+            if unity_scene_name:
+                templates_directory = get_task_templates_directory()
+                vr_template_path = templates_directory.joinpath(f"{unity_scene_name}.yaml")
+                shutil.copy2(
+                    src=vr_template_path,
+                    dst=instance.raw_data.vr_configuration_path,
+                )
 
         # Marks the session as 'uninitialized' by writing the 'nk.bin' file into raw_data. The acquisition
         # runtime removes this marker once it has finished creating snapshots and initializing instruments

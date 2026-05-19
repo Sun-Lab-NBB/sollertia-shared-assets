@@ -24,7 +24,7 @@ from ..data_classes import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from ..configuration import AcquisitionSystems, MesoscopeExperimentConfiguration
+from ..configuration import EXPERIMENT_CONFIGURATION_REGISTRY, AcquisitionSystems
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
@@ -59,13 +59,6 @@ HARDWARE_STATE_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
 """Maps each acquisition system to its hardware-state dataclass. The canonical on-disk filename is
 always ``hardware_state.yaml`` (``RawDataFiles.HARDWARE_STATE``) regardless of system — the only
 thing that varies is the parsing class. Future acquisition systems register here."""
-
-EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
-}
-"""Maps each acquisition system to its experiment configuration dataclass. Future acquisition
-systems register here so that the configuration schema, read, and write tools can dispatch to the
-correct dataclass without hard-coding any single system."""
 
 
 def _assert_registry_coverage() -> None:

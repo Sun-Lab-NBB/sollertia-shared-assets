@@ -146,8 +146,7 @@ class TrialStructure:
             probability_sum = sum(self.transitions.values())
             if abs(probability_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
                 message = (
-                    f"Unable to initialize TrialStructure. The transitions must sum to 1.0, but got "
-                    f"{probability_sum}."
+                    f"Unable to initialize TrialStructure. The transitions must sum to 1.0, but got {probability_sum}."
                 )
                 console.error(message=message, error=ValueError)
 
