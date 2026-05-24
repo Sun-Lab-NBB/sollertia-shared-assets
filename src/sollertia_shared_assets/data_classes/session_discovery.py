@@ -132,8 +132,8 @@ def filter_sessions(
             animals are considered. When ``None``, sessions from all animals are considered.
         exclude_animals: Animal identifiers to exclude. Takes precedence over ``include_animals``.
         utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC
-            (True) or America/New_York (False). Session names reflect UTC timestamps; when this flag
-            is False, timestamps are converted to America/New_York before comparison.
+            (True) or the host machine's local time (False). Session names reflect UTC timestamps; when
+            this flag is False, timestamps are converted to local time before comparison.
 
     Returns:
         A set of ``(session_name, animal)`` tuples matching every filter.
@@ -194,7 +194,7 @@ def _parse_date_boundary(date_string: str, *, is_end_date: bool = False, utc_tim
         is_end_date: Determines whether to set the time component to the end of the day when only a
             date (no time) is provided. Used to make the end bound inclusive of the entire day.
         utc_timezone: Determines whether to interpret the input string as UTC. When False, interprets
-            it as America/New_York.
+            it as the host machine's local time.
 
     Returns:
         A timezone-aware datetime constructed from the input string.
@@ -207,9 +207,14 @@ def _parse_date_boundary(date_string: str, *, is_end_date: bool = False, utc_tim
     if date_only and is_end_date:
         parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    target_tz = ZoneInfo("UTC") if utc_timezone else ZoneInfo("America/New_York")
+    # Interprets the boundary in UTC for internal comparison, or in the host machine's local time when the caller
+    # requests human-facing local boundaries.
+    if utc_timezone:
+        utc_tz = ZoneInfo("UTC")
+        return parsed.replace(tzinfo=utc_tz) if parsed.tzinfo is None else parsed.astimezone(tz=utc_tz)
 
-    return parsed.replace(tzinfo=target_tz) if parsed.tzinfo is None else parsed.astimezone(tz=target_tz)
+    # A naive boundary is assumed to already be in local time; an aware boundary is converted to local time.
+    return parsed.astimezone()
 
 
 def _parse_session_date(session_name: str, *, utc_timezone: bool = True) -> datetime | None:
@@ -221,7 +226,7 @@ def _parse_session_date(session_name: str, *, utc_timezone: bool = True) -> date
     Args:
         session_name: The unique identifier of the session.
         utc_timezone: Determines whether to return the datetime in UTC. When False, converts to
-            America/New_York.
+            the host machine's local time.
 
     Returns:
         A timezone-aware datetime representing when the session was acquired, or ``None`` when the
@@ -248,4 +253,4 @@ def _parse_session_date(session_name: str, *, utc_timezone: bool = True) -> date
 
     if utc_timezone:
         return utc_datetime
-    return utc_datetime.astimezone(tz=ZoneInfo("America/New_York"))
+    return utc_datetime.astimezone()

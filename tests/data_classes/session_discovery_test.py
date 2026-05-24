@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import time
 from typing import TYPE_CHECKING
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -216,17 +218,26 @@ def test_filter_sessions_drops_malformed_session_names() -> None:
     assert result == {("2026-03-01-12-00-00-000000", "1")}
 
 
-def test_filter_sessions_america_new_york_timezone_handling() -> None:
-    """Verifies that utc_timezone=False shifts session timestamps to America/New_York for comparison.
+def test_filter_sessions_local_timezone_handling() -> None:
+    """Verifies that utc_timezone=False compares session timestamps in the host machine's local time.
 
-    A session name of ``2026-03-02-03-30-00-000000`` is 03:30 UTC on March 2, which is 23:30 EST on
-    March 1. With ``utc_timezone=False`` and ``end_date="2026-03-01"``, the session should fall within
-    the March 1 end-of-day boundary once converted to America/New_York.
+    The host is pinned to America/New_York for determinism. A session name of
+    ``2026-03-02-03-30-00-000000`` is 03:30 UTC on March 2, which is 22:30 EST on March 1, so it falls
+    within the March 1 end-of-day boundary when ``utc_timezone=False`` but not when ``utc_timezone=True``.
     """
-    keys = {("2026-03-02-03-30-00-000000", "1")}
-
-    included = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=False)
-    excluded = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=True)
+    original_tz = os.environ.get("TZ")
+    os.environ["TZ"] = "America/New_York"
+    time.tzset()
+    try:
+        keys = {("2026-03-02-03-30-00-000000", "1")}
+        included = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=False)
+        excluded = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=True)
+    finally:
+        if original_tz is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = original_tz
+        time.tzset()
 
     assert included == keys
     assert excluded == set()
@@ -239,13 +250,17 @@ def test_parse_session_date_valid_utc() -> None:
     assert parsed == datetime(2026, 3, 15, 14, 30, 45, 123456, tzinfo=ZoneInfo("UTC"))
 
 
-def test_parse_session_date_converts_to_new_york_when_requested() -> None:
-    """Verifies that utc_timezone=False converts the parsed datetime to America/New_York."""
-    parsed = _parse_session_date(session_name="2026-03-15-14-30-45-123456", utc_timezone=False)
+def test_parse_session_date_converts_to_local_when_requested() -> None:
+    """Verifies that utc_timezone=False converts the parsed datetime to the host machine's local time."""
+    name = "2026-03-15-14-30-45-123456"
+    utc_parsed = _parse_session_date(session_name=name, utc_timezone=True)
+    local_parsed = _parse_session_date(session_name=name, utc_timezone=False)
 
-    assert parsed is not None
-    assert parsed.tzinfo == ZoneInfo("America/New_York")
-    assert parsed.hour == 10  # UTC 14:30 = EDT 10:30 on March 15 2026 (DST in effect).
+    assert utc_parsed is not None
+    assert local_parsed is not None
+    # The conversion preserves the absolute instant and renders it in the host machine's local timezone.
+    assert local_parsed == utc_parsed
+    assert local_parsed.utcoffset() == utc_parsed.astimezone().utcoffset()
 
 
 @pytest.mark.parametrize(
@@ -281,9 +296,10 @@ def test_parse_date_boundary_date_only_keeps_start_at_midnight() -> None:
 
 
 def test_parse_date_boundary_respects_utc_flag() -> None:
-    """Verifies that utc_timezone switches the attached ZoneInfo between UTC and America/New_York."""
+    """Verifies that utc_timezone switches the boundary between UTC and the host machine's local time."""
     utc_parsed = _parse_date_boundary(date_string="2026-03-15", utc_timezone=True)
     local_parsed = _parse_date_boundary(date_string="2026-03-15", utc_timezone=False)
 
     assert utc_parsed.tzinfo == ZoneInfo("UTC")
-    assert local_parsed.tzinfo == ZoneInfo("America/New_York")
+    # The local boundary carries the host machine's UTC offset for the parsed date.
+    assert local_parsed.utcoffset() == datetime(2026, 3, 15).astimezone().utcoffset()
