@@ -235,7 +235,7 @@ def filter_sessions_tool(
         include_animals: When provided, only sessions from these animal IDs are considered.
         exclude_animals: Animal IDs to exclude. Takes precedence over ``include_animals``.
         utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC;
-            falls back to America/New_York when False.
+            falls back to the host machine's local time when False.
 
     Returns:
         A response dict with the filtered ``sessions`` list, a ``session_paths`` list of eligible
