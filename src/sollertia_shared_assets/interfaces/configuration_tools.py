@@ -606,10 +606,10 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
         acquisition_system: The AcquisitionSystems value to describe. Defaults to ``"mesoscope"``.
 
     Returns:
-        A response dict with ``acquisition_system`` (the validated enum value), ``schema`` (the
-        experiment configuration schema for the resolved acquisition system), and ``nested_classes``
-        mapping each nested dataclass name (including the supported trial classes) to its individual
-        schema.
+        A response dict with ``acquisition_system`` (the resolved acquisition system) and ``schema`` (the
+        experiment configuration schema for the resolved acquisition system). The ``schema`` carries a
+        ``nested_classes`` sub-mapping of each nested dataclass name (including the supported trial classes)
+        to its individual schema.
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):

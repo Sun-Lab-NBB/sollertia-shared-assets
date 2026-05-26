@@ -195,7 +195,9 @@ def create_experiment_configuration(
     Args:
         template: The TaskTemplate containing the VR structure (cues, trial zones) of the experiment.
         system: The data acquisition system for which to create the configuration.
-        unity_scene_name: The Unity scene name for the experiment. Must match the template's scene file name.
+        unity_scene_name: The Unity scene name for the experiment. This should match the template YAML file name so
+            SessionData.create() can locate the corresponding VR template during snapshot export. Matching is the
+            caller's responsibility and is not validated by this function.
         default_reward_size_ul: Water reward volume in microliters for lick-type trials.
         default_reward_tone_duration_ms: Reward tone duration in milliseconds for lick-type trials.
         default_puff_duration_ms: Gas puff duration in milliseconds for occupancy-type trials.

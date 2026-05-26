@@ -385,9 +385,11 @@ class SessionData(YamlConfig):
     Notes:
         Do not initialize this class directly. Instead, use the ``create()`` method when starting new data acquisition
         sessions or the ``load()`` method when accessing data for an existing session. Both methods build the
-        runtime-only ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes after the
-        persisted root paths have been finalized. Instances constructed via ``from_yaml`` directly (without going
-        through ``load()``) do not have these attributes populated; access raises AttributeError.
+        runtime-only ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes from the
+        currently configured root paths. ``create()`` finalizes only ``raw_data_path``; the ``processed_data`` root is
+        resolved later, on the processing host, by ``load()``, which finalizes both. Instances constructed via
+        ``from_yaml`` directly (without going through ``load()``) do not have these attributes populated; access raises
+        AttributeError.
 
         When this class is used to create a new session, it generates the new session's name using the current UTC
         timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall

@@ -32,8 +32,9 @@ class TriggerType(StrEnum):
     """Defines the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
-        All Sollertia platform acquisition systems share these core trial types. LICK corresponds to GuidanceZone in
-        Unity and OCCUPANCY corresponds to OccupancyZone in Unity.
+        All Sollertia platform acquisition systems share these core trial types. LICK maps to the StimulusTriggerZone
+        prefab (with a GuidanceZone child) in Unity, and OCCUPANCY maps to the OccupancyTriggerZone prefab (with
+        OccupancyZone and OccupancyGuidanceZone children).
     """
 
     LICK = "lick"
