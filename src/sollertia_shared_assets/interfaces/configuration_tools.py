@@ -33,6 +33,8 @@ from ..configuration import (
     WaterRewardTrial,
     AcquisitionSystems,
     MesoscopeExperimentConfiguration,
+    get_data_root,
+    set_data_root,
     get_working_directory,
     set_working_directory,
     get_google_credentials_path,
@@ -54,10 +56,10 @@ _TRIAL_CLASSES: dict[str, type[WaterRewardTrial | GasPuffTrial]] = {
 def get_platform_environment_status_tool() -> dict[str, Any]:
     """Returns a health report for the Sollertia platform configuration components owned by this package.
 
-    Combines working directory, templates directory, and Google credentials status into a single report. Only
-    the working directory is required for ``slsa mcp`` to function. The task templates directory is needed only
-    when authoring task templates or experiment configurations. Google credentials are needed only by hosts that
-    fetch subject metadata or water-restriction logs from Google Sheets. ``overall_ok`` reflects the
+    Combines working directory, data root, templates directory, and Google credentials status into a single
+    report. Only the working directory is required for ``slsa mcp`` to function. The task templates directory is
+    needed only when authoring task templates or experiment configurations. Google credentials are needed only by
+    hosts that fetch subject metadata or water-restriction logs from Google Sheets. ``overall_ok`` reflects the
     required components only — optional components contribute ``configured`` and ``ok`` per-component but do
     not gate the aggregate. System configuration mount checks are not included here — those live with the
     acquisition runtime package (sl-experiment).
@@ -74,6 +76,12 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
         report["working_directory"] = {"required": True, "configured": True, "path": str(working_directory), "ok": True}
     except FileNotFoundError as exception:
         report["working_directory"] = {"required": True, "configured": False, "error": str(exception), "ok": False}
+
+    try:
+        data_root = get_data_root()
+        report["data_root"] = {"required": False, "configured": True, "path": str(data_root), "ok": True}
+    except FileNotFoundError as exception:
+        report["data_root"] = {"required": False, "configured": False, "error": str(exception), "ok": False}
 
     try:
         templates_directory = get_task_templates_directory()
@@ -141,6 +149,38 @@ def set_working_directory_tool(directory: str) -> dict[str, Any]:
     except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(working_directory=str(path))
+
+
+@mcp.tool()
+def read_data_root_tool() -> dict[str, Any]:
+    """Returns the configured Sollertia platform data root path.
+
+    Returns:
+        A response dict with ``data_root`` containing the path.
+    """
+    try:
+        path = get_data_root()
+    except FileNotFoundError as exception:
+        return error_response(message=str(exception))
+    return ok_response(data_root=str(path))
+
+
+@mcp.tool()
+def set_data_root_tool(directory: str) -> dict[str, Any]:
+    """Sets the local Sollertia platform data root.
+
+    Args:
+        directory: The absolute path to use as the data root.
+
+    Returns:
+        A response dict with ``data_root`` containing the configured path.
+    """
+    try:
+        path = Path(directory)
+        set_data_root(path=path)
+    except (FileNotFoundError, OSError, ValueError) as exception:
+        return error_response(message=str(exception))
+    return ok_response(data_root=str(path))
 
 
 @mcp.tool()

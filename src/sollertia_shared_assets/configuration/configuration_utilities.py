@@ -120,6 +120,67 @@ def get_working_directory() -> Path:
     return working_directory
 
 
+def set_data_root(path: Path) -> None:
+    """Sets the specified directory as the local machine's Sollertia platform data root.
+
+    The data root is the directory under which all project directories, and therefore all animal and session
+    directories, are stored on this machine. Persisting it lets the discovery and inventory assets resolve the
+    project hierarchy without the caller supplying the root each time.
+
+    Notes:
+        This function caches the path to the data root in the user's data directory.
+
+        If the input path does not point to an existing directory, the function creates the requested directory.
+
+    Args:
+        path: The path to the directory to set as the local Sollertia platform data root.
+    """
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = app_dir.joinpath("data_root_path.txt")
+
+    ensure_directory_exists(path=path_file)
+    ensure_directory_exists(path=path)
+
+    with path_file.open(mode="w") as file:
+        file.write(str(path))
+
+    console.echo(message=f"Sollertia platform data root set to: {path}.", level=LogLevel.SUCCESS)
+
+
+def get_data_root() -> Path:
+    """Resolves and returns the path to the local machine's Sollertia platform data root.
+
+    Returns:
+        The path to the local data root, the directory under which all project directories are stored.
+
+    Raises:
+        FileNotFoundError: If the local data root has not been configured for the host-machine, or if the currently
+            configured directory does not exist at the expected path.
+    """
+    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = app_dir.joinpath("data_root_path.txt")
+
+    if not path_file.exists():
+        message = (
+            "Unable to resolve the path to the local Sollertia platform data root, as it has not been set. "
+            "Set the local data root by using the 'slsa configure data-root' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    with path_file.open() as file:
+        data_root = Path(file.read().strip())
+
+    if not data_root.exists():
+        message = (
+            "Unable to resolve the path to the local Sollertia platform data root, as the currently configured "
+            "directory does not exist at the expected path. Set a new data root by using the 'slsa configure "
+            "data-root' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    return data_root
+
+
 def create_experiment_configuration(
     template: TaskTemplate,
     system: AcquisitionSystems | str,
