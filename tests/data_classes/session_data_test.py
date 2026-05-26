@@ -32,16 +32,16 @@ from sollertia_shared_assets.configuration import (
     set_task_templates_directory,
 )
 
-_DEFAULT_PYTHON_VERSION = "3.14.4"
+_DEFAULT_PYTHON_VERSION: str = "3.14.4"
 """Canonical Python version string for SessionData fixtures; matches SessionData.python_version default."""
 
-_DEFAULT_EXPERIMENT_VERSION = "5.0.0"
+_DEFAULT_EXPERIMENT_VERSION: str = "5.0.0"
 """Canonical sollertia-experiment version string for SessionData fixtures; matches the dataclass default."""
 
-_SENTINEL_RAW_PATH = Path("/sentinel/raw")
+_SENTINEL_RAW_PATH: Path = Path("/sentinel/raw")
 """Placeholder raw_data root used by path-resolution tests; never touched on disk."""
 
-_SENTINEL_PROCESSED_PATH = Path("/sentinel/processed")
+_SENTINEL_PROCESSED_PATH: Path = Path("/sentinel/processed")
 """Placeholder processed_data root used by path-resolution tests; never touched on disk."""
 
 

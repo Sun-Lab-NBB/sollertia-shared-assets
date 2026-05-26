@@ -61,10 +61,22 @@ def _write_session(
 def populated_project_tree(tmp_path: Path) -> Path:
     """Creates a small multi-animal project tree with several sessions and returns the data root."""
     root = tmp_path / "data"
-    _write_session(root, "proj_a", "1", "2026-03-01-12-00-00-000000", "lick training")
-    _write_session(root, "proj_a", "1", "2026-03-05-12-00-00-000000", "run training")
-    _write_session(root, "proj_a", "2", "2026-03-10-12-00-00-000000", "mesoscope experiment")
-    _write_session(root, "proj_b", "3", "2026-03-15-12-00-00-000000", "window checking")
+    _write_session(
+        root=root, project="proj_a", animal="1", session="2026-03-01-12-00-00-000000", session_type="lick training"
+    )
+    _write_session(
+        root=root, project="proj_a", animal="1", session="2026-03-05-12-00-00-000000", session_type="run training"
+    )
+    _write_session(
+        root=root,
+        project="proj_a",
+        animal="2",
+        session="2026-03-10-12-00-00-000000",
+        session_type="mesoscope experiment",
+    )
+    _write_session(
+        root=root, project="proj_b", animal="3", session="2026-03-15-12-00-00-000000", session_type="window checking"
+    )
     return root
 
 
@@ -138,9 +150,9 @@ def test_iterate_sessions_yields_loaded_session_data(populated_project_tree: Pat
 def test_get_projects_for_animal_returns_sorted_membership(tmp_path: Path) -> None:
     """Verifies that get_projects_for_animal returns every project an animal has sessions in, sorted, and no others."""
     root = tmp_path / "data"
-    _write_session(root, "proj_b", "shared", "2026-03-01-12-00-00-000000")
-    _write_session(root, "proj_a", "shared", "2026-03-02-12-00-00-000000")
-    _write_session(root, "proj_a", "other", "2026-03-03-12-00-00-000000")
+    _write_session(root=root, project="proj_b", animal="shared", session="2026-03-01-12-00-00-000000")
+    _write_session(root=root, project="proj_a", animal="shared", session="2026-03-02-12-00-00-000000")
+    _write_session(root=root, project="proj_a", animal="other", session="2026-03-03-12-00-00-000000")
 
     assert get_projects_for_animal(root_path=root, animal_id="shared") == ("proj_a", "proj_b")
     assert get_projects_for_animal(root_path=root, animal_id="other") == ("proj_a",)
