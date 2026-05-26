@@ -30,18 +30,33 @@ from .surgery_data import (
     InjectionData,
     ProcedureData,
 )
+from .project_hierarchy import (
+    CONFIGURATION_DIRECTORY,
+    DATASET_MARKER_FILENAME,
+    PERSISTENT_DATA_DIRECTORY,
+    AnimalData,
+    ProjectData,
+)
 from .session_discovery import (
     filter_sessions,
     iterate_sessions,
+    discover_projects,
     discover_sessions,
     validate_directory,
+    iter_project_animals,
+    get_projects_for_animal,
+    parse_session_timestamp,
     get_session_root_from_marker,
 )
 
 __all__ = [
+    "CONFIGURATION_DIRECTORY",
+    "DATASET_MARKER_FILENAME",
+    "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
     "SYSTEM_RAW_DATA_REGISTRY",
+    "AnimalData",
     "Directories",
     "DrugData",
     "ImplantData",
@@ -55,6 +70,7 @@ __all__ = [
     "ProcedureData",
     "ProcessedData",
     "ProcessingTrackers",
+    "ProjectData",
     "RawData",
     "RawDataFiles",
     "RunTrainingDescriptor",
@@ -63,9 +79,13 @@ __all__ = [
     "SubjectData",
     "SurgeryData",
     "WindowCheckingDescriptor",
+    "discover_projects",
     "discover_sessions",
     "filter_sessions",
+    "get_projects_for_animal",
     "get_session_root_from_marker",
+    "iter_project_animals",
     "iterate_sessions",
+    "parse_session_timestamp",
     "validate_directory",
 ]

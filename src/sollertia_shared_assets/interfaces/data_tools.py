@@ -10,9 +10,7 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
-    CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
-    DATASET_MARKER_FILENAME,
     HARDWARE_STATE_REGISTRY,
     mcp,
     read_yaml,
@@ -26,8 +24,11 @@ from .mcp_instance import (
 )
 from ..data_classes import (
     RAW_DATA_DIRECTORY,
+    CONFIGURATION_DIRECTORY,
+    DATASET_MARKER_FILENAME,
     DrugData,
     ImplantData,
+    ProjectData,
     SessionData,
     SubjectData,
     SurgeryData,
@@ -224,7 +225,7 @@ def filter_sessions_tool(
 
     Args:
         sessions: Session entry dictionaries, each containing at least ``session_name`` and
-            ``animal`` keys. Typically the ``sessions`` list returned by ``get_data_root_overview_tool``.
+            ``animal`` keys. Typically, the ``sessions`` list returned by ``get_data_root_overview_tool``.
         start_date: Lower bound (inclusive). Accepts ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``.
             None disables the lower bound.
         end_date: Upper bound (inclusive). Date-only values include the entire day. None disables
@@ -711,7 +712,7 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
     projects: list[dict[str, Any]] = []
     for project_name in sorted(project_buckets):
         animal_buckets = project_buckets[project_name]
-        project_path = root.joinpath(project_name)
+        project_path = ProjectData(root=root, project_name=project_name).path
 
         animals: list[dict[str, Any]] = []
         project_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
@@ -764,7 +765,7 @@ def _count_project_artifacts(project_path: Path) -> tuple[int, int]:
         ``.yaml`` files directly under ``<project>/configuration/``; dataset count is the
         number of ``DATASET_MARKER_FILENAME`` occurrences anywhere under the project.
     """
-    configuration_directory = project_path.joinpath(CONFIGURATION_DIR)
+    configuration_directory = project_path.joinpath(CONFIGURATION_DIRECTORY)
     experiment_count = len(list(configuration_directory.glob("*.yaml"))) if configuration_directory.is_dir() else 0
     dataset_count = len(list(project_path.rglob(DATASET_MARKER_FILENAME))) if project_path.is_dir() else 0
     return experiment_count, dataset_count

@@ -29,9 +29,6 @@ from ..configuration import EXPERIMENT_CONFIGURATION_REGISTRY, AcquisitionSystem
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
-DATASET_MARKER_FILENAME: str = "dataset.yaml"
-"""Marker filename used to identify dataset directories during recursive discovery walks."""
-
 UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
 """Marker file present in ``raw_data`` while a session is **uninitialized** — the acquisition runtime has
 not yet finished creating hardware / experiment snapshots or initializing instruments. A session with this
@@ -39,9 +36,6 @@ marker holds no data of value and is a valid target for purging (treat it as tra
 runtime removes the marker once initialization completes. This is distinct from the descriptor's
 ``incomplete`` field (see ``read_descriptor_incomplete``), which signals that an initialized session
 encountered a runtime issue but still holds usable data."""
-
-CONFIGURATION_DIR: str = "configuration"
-"""Subdirectory under each project that holds experiment configuration YAML files."""
 
 DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
     SessionTypes.LICK_TRAINING: LickTrainingDescriptor,
@@ -168,6 +162,7 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
         if not is_dataclass(target):
             return {"type": _describe_type(type_hint=target)}
 
+        # noinspection PyBroadException
         try:
             hints = get_type_hints(target)
         except Exception:
@@ -181,6 +176,7 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
             if field_definition.default is not MISSING:
                 field_schema["default"] = serialize(value=field_definition.default)
             elif field_definition.default_factory is not MISSING:
+                # noinspection PyBroadException
                 try:
                     field_schema["default"] = serialize(value=field_definition.default_factory())
                 except Exception:
