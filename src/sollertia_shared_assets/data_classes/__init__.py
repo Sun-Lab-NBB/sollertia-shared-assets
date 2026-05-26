@@ -44,6 +44,8 @@ from .session_discovery import (
     discover_sessions,
     validate_directory,
     iter_project_animals,
+    get_projects_for_animal,
+    parse_session_timestamp,
     get_session_root_from_marker,
 )
 
@@ -80,8 +82,10 @@ __all__ = [
     "discover_projects",
     "discover_sessions",
     "filter_sessions",
+    "get_projects_for_animal",
     "get_session_root_from_marker",
     "iter_project_animals",
     "iterate_sessions",
+    "parse_session_timestamp",
     "validate_directory",
 ]

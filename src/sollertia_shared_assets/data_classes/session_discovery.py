@@ -143,6 +143,25 @@ def iter_project_animals(project: ProjectData) -> Iterator[AnimalData]:
             yield project.animal(animal_id=child.name)
 
 
+def get_projects_for_animal(root_path: Path, animal_id: str) -> tuple[str, ...]:
+    """Returns the names of all projects under the data root that include the given animal.
+
+    Project membership is derived from session markers, so a project is reported only when it holds at
+    least one session for the animal.
+
+    Args:
+        root_path: The absolute path to the data root to scan.
+        animal_id: The unique identifier of the animal whose projects are discovered.
+
+    Returns:
+        A sorted tuple of project names that include the animal.
+    """
+    matching_projects = {
+        session.project_name for session in iterate_sessions(root_path=root_path) if session.animal_id == animal_id
+    }
+    return tuple(sorted(matching_projects))
+
+
 def filter_sessions(
     sessions: Iterable[tuple[str, str]],
     *,
@@ -223,7 +242,7 @@ def filter_sessions(
                 matched.add((session, animal))
                 continue
 
-            session_date = _parse_session_date(session_name=session, utc_timezone=utc_timezone)
+            session_date = parse_session_timestamp(session_name=session, utc_timezone=utc_timezone)
             if session_date is None:
                 continue
             if parsed_start is not None and session_date < parsed_start:
@@ -235,6 +254,46 @@ def filter_sessions(
         filtered = matched
 
     return filtered
+
+
+def parse_session_timestamp(session_name: str, *, utc_timezone: bool = True) -> datetime | None:
+    """Parses a Sollertia session name and returns its acquisition datetime.
+
+    Session names follow the format ``YYYY-MM-DD-HH-MM-SS-microseconds`` and encode the acquisition
+    timestamp in UTC. Returns ``None`` rather than raising when the name does not follow this format, so
+    callers can skip non-conforming directory names during discovery walks.
+
+    Args:
+        session_name: The unique identifier of the session.
+        utc_timezone: Determines whether to return the datetime in UTC. When False, converts to
+            the host machine's local time.
+
+    Returns:
+        A timezone-aware datetime representing when the session was acquired, or ``None`` when the
+        session name does not follow the expected format.
+    """
+    parts = session_name.split(sep="-")
+    if len(parts) != _SESSION_NAME_COMPONENTS:
+        return None
+
+    try:
+        year, month, day, hour, minute, second, microseconds = parts
+        utc_datetime = datetime(
+            year=int(year),
+            month=int(month),
+            day=int(day),
+            hour=int(hour),
+            minute=int(minute),
+            second=int(second),
+            microsecond=int(microseconds),
+            tzinfo=ZoneInfo("UTC"),
+        )
+    except ValueError, IndexError:
+        return None
+
+    if utc_timezone:
+        return utc_datetime
+    return utc_datetime.astimezone()
 
 
 def _discover_projects_by_directory(root_path: Path) -> list[ProjectData]:
@@ -305,42 +364,3 @@ def _parse_date_boundary(date_string: str, *, is_end_date: bool = False, utc_tim
 
     # A naive boundary is assumed to already be in local time; an aware boundary is converted to local time.
     return parsed.astimezone()
-
-
-def _parse_session_date(session_name: str, *, utc_timezone: bool = True) -> datetime | None:
-    """Parses a Sollertia session name and returns its acquisition datetime.
-
-    Session names follow the format ``YYYY-MM-DD-HH-MM-SS-microseconds`` and encode the acquisition
-    timestamp in UTC.
-
-    Args:
-        session_name: The unique identifier of the session.
-        utc_timezone: Determines whether to return the datetime in UTC. When False, converts to
-            the host machine's local time.
-
-    Returns:
-        A timezone-aware datetime representing when the session was acquired, or ``None`` when the
-        session name does not follow the expected format.
-    """
-    parts = session_name.split(sep="-")
-    if len(parts) != _SESSION_NAME_COMPONENTS:
-        return None
-
-    try:
-        year, month, day, hour, minute, second, microseconds = parts
-        utc_datetime = datetime(
-            year=int(year),
-            month=int(month),
-            day=int(day),
-            hour=int(hour),
-            minute=int(minute),
-            second=int(second),
-            microsecond=int(microseconds),
-            tzinfo=ZoneInfo("UTC"),
-        )
-    except ValueError, IndexError:
-        return None
-
-    if utc_timezone:
-        return utc_datetime
-    return utc_datetime.astimezone()

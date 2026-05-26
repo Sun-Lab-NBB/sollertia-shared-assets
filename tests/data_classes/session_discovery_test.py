@@ -17,12 +17,11 @@ from sollertia_shared_assets.data_classes import (
     iterate_sessions,
     discover_sessions,
     validate_directory,
+    get_projects_for_animal,
+    parse_session_timestamp,
     get_session_root_from_marker,
 )
-from sollertia_shared_assets.data_classes.session_discovery import (
-    _parse_session_date,
-    _parse_date_boundary,
-)
+from sollertia_shared_assets.data_classes.session_discovery import _parse_date_boundary
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -136,6 +135,18 @@ def test_iterate_sessions_yields_loaded_session_data(populated_project_tree: Pat
     }
 
 
+def test_get_projects_for_animal_returns_sorted_membership(tmp_path: Path) -> None:
+    """Verifies that get_projects_for_animal returns every project an animal has sessions in, sorted, and no others."""
+    root = tmp_path / "data"
+    _write_session(root, "proj_b", "shared", "2026-03-01-12-00-00-000000")
+    _write_session(root, "proj_a", "shared", "2026-03-02-12-00-00-000000")
+    _write_session(root, "proj_a", "other", "2026-03-03-12-00-00-000000")
+
+    assert get_projects_for_animal(root_path=root, animal_id="shared") == ("proj_a", "proj_b")
+    assert get_projects_for_animal(root_path=root, animal_id="other") == ("proj_a",)
+    assert get_projects_for_animal(root_path=root, animal_id="absent") == ()
+
+
 def test_filter_sessions_preserves_input_when_no_filters_applied() -> None:
     """Verifies that filter_sessions is a no-op when every filter is None / empty."""
     keys = {
@@ -243,18 +254,18 @@ def test_filter_sessions_local_timezone_handling() -> None:
     assert excluded == set()
 
 
-def test_parse_session_date_valid_utc() -> None:
+def test_parse_session_timestamp_valid_utc() -> None:
     """Verifies that a well-formed session name parses to a UTC-aware datetime."""
-    parsed = _parse_session_date(session_name="2026-03-15-14-30-45-123456")
+    parsed = parse_session_timestamp(session_name="2026-03-15-14-30-45-123456")
 
     assert parsed == datetime(2026, 3, 15, 14, 30, 45, 123456, tzinfo=ZoneInfo("UTC"))
 
 
-def test_parse_session_date_converts_to_local_when_requested() -> None:
+def test_parse_session_timestamp_converts_to_local_when_requested() -> None:
     """Verifies that utc_timezone=False converts the parsed datetime to the host machine's local time."""
     name = "2026-03-15-14-30-45-123456"
-    utc_parsed = _parse_session_date(session_name=name, utc_timezone=True)
-    local_parsed = _parse_session_date(session_name=name, utc_timezone=False)
+    utc_parsed = parse_session_timestamp(session_name=name, utc_timezone=True)
+    local_parsed = parse_session_timestamp(session_name=name, utc_timezone=False)
 
     assert utc_parsed is not None
     assert local_parsed is not None
@@ -271,9 +282,9 @@ def test_parse_session_date_converts_to_local_when_requested() -> None:
         "not-a-session",  # Entirely wrong format.
     ],
 )
-def test_parse_session_date_returns_none_for_malformed_input(malformed: str) -> None:
-    """Verifies that _parse_session_date returns None for session names that cannot be parsed."""
-    assert _parse_session_date(session_name=malformed) is None
+def test_parse_session_timestamp_returns_none_for_malformed_input(malformed: str) -> None:
+    """Verifies that parse_session_timestamp returns None for session names that cannot be parsed."""
+    assert parse_session_timestamp(session_name=malformed) is None
 
 
 def test_parse_date_boundary_date_only_rolls_end_to_end_of_day() -> None:

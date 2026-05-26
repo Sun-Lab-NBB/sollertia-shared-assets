@@ -39,6 +39,8 @@ from .data_classes import (
     discover_sessions,
     validate_directory,
     iter_project_animals,
+    get_projects_for_animal,
+    parse_session_timestamp,
 )
 from .configuration import (
     Cue,
@@ -104,10 +106,12 @@ __all__ = [
     "discover_sessions",
     "filter_sessions",
     "get_google_credentials_path",
+    "get_projects_for_animal",
     "get_task_templates_directory",
     "get_working_directory",
     "iter_project_animals",
     "iterate_sessions",
+    "parse_session_timestamp",
     "set_google_credentials_path",
     "set_task_templates_directory",
     "set_working_directory",
