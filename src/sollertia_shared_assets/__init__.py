@@ -9,9 +9,16 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Natalie Yeung
 from ataraxis_base_utilities import console
 
 from .data_classes import (
+    RAW_DATA_DIRECTORY,
+    CONFIGURATION_DIRECTORY,
+    PROCESSED_DATA_DIRECTORY,
+    PERSISTENT_DATA_DIRECTORY,
+    RawData,
     DrugData,
+    AnimalData,
     Directories,
     ImplantData,
+    ProjectData,
     SessionData,
     SubjectData,
     SurgeryData,
@@ -19,6 +26,7 @@ from .data_classes import (
     SessionTypes,
     InjectionData,
     ProcedureData,
+    ProcessedData,
     ProcessingTrackers,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
@@ -27,8 +35,10 @@ from .data_classes import (
     MesoscopeExperimentDescriptor,
     filter_sessions,
     iterate_sessions,
+    discover_projects,
     discover_sessions,
     validate_directory,
+    iter_project_animals,
 )
 from .configuration import (
     Cue,
@@ -55,7 +65,12 @@ if not console.enabled:
     console.enable()
 
 __all__ = [
+    "CONFIGURATION_DIRECTORY",
+    "PERSISTENT_DATA_DIRECTORY",
+    "PROCESSED_DATA_DIRECTORY",
+    "RAW_DATA_DIRECTORY",
     "AcquisitionSystems",
+    "AnimalData",
     "Cue",
     "Directories",
     "DrugData",
@@ -68,7 +83,10 @@ __all__ = [
     "MesoscopeExperimentDescriptor",
     "MesoscopeHardwareState",
     "ProcedureData",
+    "ProcessedData",
     "ProcessingTrackers",
+    "ProjectData",
+    "RawData",
     "RawDataFiles",
     "RunTrainingDescriptor",
     "SessionData",
@@ -82,11 +100,13 @@ __all__ = [
     "WaterRewardTrial",
     "WindowCheckingDescriptor",
     "create_experiment_configuration",
+    "discover_projects",
     "discover_sessions",
     "filter_sessions",
     "get_google_credentials_path",
     "get_task_templates_directory",
     "get_working_directory",
+    "iter_project_animals",
     "iterate_sessions",
     "set_google_credentials_path",
     "set_task_templates_directory",

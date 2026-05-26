@@ -9,6 +9,7 @@ import pytest
 from sollertia_shared_assets.data_classes import (
     SYSTEM_RAW_DATA_REGISTRY,
     RawData,
+    AnimalData,
     Directories,
     SessionData,
     RawDataFiles,
@@ -162,13 +163,11 @@ def test_session_data_create_requires_valid_session_type(clean_working_directory
 
     with pytest.raises(ValueError, match=r"must be one of the SessionTypes"):
         SessionData.create(
-            project_name="test_project",
-            animal_id="test_animal",
+            animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
             session_type="invalid_session_type",
             python_version=_DEFAULT_PYTHON_VERSION,
             sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-            root_directory=clean_working_directory,
         )
 
 
@@ -179,13 +178,11 @@ def test_session_data_create_requires_valid_acquisition_system(clean_working_dir
 
     with pytest.raises(ValueError, match=r"must be one of the AcquisitionSystems"):
         SessionData.create(
-            project_name="test_project",
-            animal_id="test_animal",
+            animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
             session_type=SessionTypes.LICK_TRAINING,
             python_version=_DEFAULT_PYTHON_VERSION,
             sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system="not_a_real_system",
-            root_directory=clean_working_directory,
         )
 
 
@@ -195,13 +192,11 @@ def test_session_data_create_generates_session_directory(clean_working_directory
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
         session_type=SessionTypes.LICK_TRAINING,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        root_directory=clean_working_directory,
     )
 
     session_path = session_data.raw_data_path.parent
@@ -215,13 +210,11 @@ def test_session_data_create_saves_session_data_yaml(clean_working_directory: Pa
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
         session_type=SessionTypes.RUN_TRAINING,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        root_directory=clean_working_directory,
     )
 
     session_data_yaml = session_data.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
@@ -238,13 +231,11 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory: Path) -
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
         session_type=SessionTypes.LICK_TRAINING,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        root_directory=clean_working_directory,
     )
 
     assert session_data.raw_data_path.joinpath(RawDataFiles.NK_MARKER).exists()
@@ -342,13 +333,13 @@ def test_session_data_create_raises_error_if_project_does_not_exist(clean_workin
 
     with pytest.raises(FileNotFoundError) as exc_info:
         SessionData.create(
-            project_name="nonexistent_project",
-            animal_id="test_animal",
+            animal=AnimalData(
+                root=clean_working_directory, project_name="nonexistent_project", animal_id="test_animal"
+            ),
             session_type=SessionTypes.LICK_TRAINING,
             python_version=_DEFAULT_PYTHON_VERSION,
             sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-            root_directory=clean_working_directory,
         )
 
     assert "nonexistent_project" in str(exc_info.value)
@@ -378,14 +369,12 @@ def test_session_data_create_copies_experiment_configuration(
     set_task_templates_directory(path=templates_directory)
 
     session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
         session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
         experiment_name="test_experiment",
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        root_directory=clean_working_directory,
     )
 
     session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
@@ -419,14 +408,12 @@ def test_session_data_create_caches_vr_configuration(
     set_task_templates_directory(path=templates_directory)
 
     session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
         session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
         experiment_name="test_experiment",
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        root_directory=clean_working_directory,
     )
 
     session_vr_config = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
@@ -445,13 +432,11 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(cle
     (clean_working_directory / "test_project").mkdir()
 
     session_data = SessionData.create(
-        project_name="test_project",
-        animal_id="test_animal",
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
         session_type=SessionTypes.LICK_TRAINING,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        root_directory=clean_working_directory,
     )
 
     session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION

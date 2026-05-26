@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
-    CONFIGURATION_DIR,
     DESCRIPTOR_REGISTRY,
     mcp,
     read_yaml,
@@ -21,7 +20,7 @@ from .mcp_instance import (
     write_yaml_validated,
     resolve_root_directory,
 )
-from ..data_classes import SessionTypes
+from ..data_classes import CONFIGURATION_DIRECTORY, SessionTypes
 from ..configuration import (
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
@@ -396,7 +395,7 @@ def discover_experiments_tool(
 
     experiments: list[dict[str, Any]] = []
     for project_path in sorted(project_paths, key=lambda candidate: candidate.name):
-        configuration_directory = project_path.joinpath(CONFIGURATION_DIR)
+        configuration_directory = project_path.joinpath(CONFIGURATION_DIRECTORY)
         if not configuration_directory.is_dir():
             continue
         experiments.extend(

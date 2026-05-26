@@ -10,8 +10,15 @@ from zoneinfo import ZoneInfo
 from dateutil import parser
 
 from .session_data import SessionData, RawDataFiles
+from .project_hierarchy import (
+    CONFIGURATION_DIRECTORY,
+    DATASET_MARKER_FILENAME,
+    AnimalData,
+    ProjectData,
+)
 
 if TYPE_CHECKING:
+    from typing import Literal
     from collections.abc import Iterable, Iterator
 
 _SESSION_NAME_COMPONENTS: int = 7
@@ -90,6 +97,50 @@ def get_session_root_from_marker(marker: Path) -> Path:
         The path to the session root directory (the grandparent of the marker).
     """
     return marker.parents[1]
+
+
+def discover_projects(root_path: Path, strategy: Literal["markers", "directories"] = "markers") -> list[ProjectData]:
+    """Discovers the projects under a data root and returns them as ``ProjectData`` views.
+
+    The ``markers`` strategy is authoritative: it loads every session marker and buckets projects by their
+    ``SessionData`` identity, so only projects that hold at least one session surface and stray directories
+    cannot appear as phantom projects. The ``directories`` strategy lists the project directories directly,
+    which also surfaces projects that hold no sessions yet, at the cost of trusting the directory layout.
+
+    Args:
+        root_path: The absolute path to the data root to scan.
+        strategy: Whether to derive projects from session markers (``markers``) or from the directory layout
+            (``directories``).
+
+    Returns:
+        A list of ``ProjectData`` views anchored on the data root, sorted by project name.
+    """
+    if strategy == "directories":
+        return _discover_projects_by_directory(root_path=root_path)
+
+    project_names = {session.project_name for session in iterate_sessions(root_path=root_path)}
+    return [ProjectData(root=root_path, project_name=name) for name in sorted(project_names)]
+
+
+def iter_project_animals(project: ProjectData) -> Iterator[AnimalData]:
+    """Discovers the animal directories under a project and yields them as ``AnimalData`` views.
+
+    Enumeration is directory-based, so animals that hold no sessions yet are included. The project's
+    configuration directory, dataset directories, and hidden directories are skipped because they are not
+    animals.
+
+    Args:
+        project: The ``ProjectData`` view whose animal directories are discovered.
+
+    Yields:
+        Each ``AnimalData`` view for an animal directory under the project, in sorted order.
+    """
+    project_path = project.path
+    if not project_path.is_dir():
+        return
+    for child in sorted(project_path.iterdir()):
+        if _is_animal_directory(path=child):
+            yield project.animal(animal_id=child.name)
 
 
 def filter_sessions(
@@ -186,6 +237,45 @@ def filter_sessions(
     return filtered
 
 
+def _discover_projects_by_directory(root_path: Path) -> list[ProjectData]:
+    """Lists the project directories directly under the data root.
+
+    Args:
+        root_path: The absolute path to the data root to scan.
+
+    Returns:
+        A list of ``ProjectData`` views for the non-hidden directories directly under the root, sorted by name.
+    """
+    if not root_path.is_dir():
+        return []
+    return [
+        ProjectData(root=root_path, project_name=child.name)
+        for child in sorted(root_path.iterdir())
+        if child.is_dir() and not child.name.startswith(".")
+    ]
+
+
+def _is_animal_directory(path: Path) -> bool:
+    """Returns whether the given path is an animal directory under a project.
+
+    The project's configuration directory, dataset directories (those holding a dataset marker), and hidden
+    directories are not animals and therefore return False.
+
+    Args:
+        path: The candidate child path of a project directory.
+
+    Returns:
+        True when the path is a directory that represents an animal rather than configuration or a dataset.
+    """
+    if not path.is_dir():
+        return False
+    if path.name.startswith("."):
+        return False
+    if path.name == CONFIGURATION_DIRECTORY:
+        return False
+    return not path.joinpath(DATASET_MARKER_FILENAME).exists()
+
+
 def _parse_date_boundary(date_string: str, *, is_end_date: bool = False, utc_timezone: bool = True) -> datetime:
     """Parses a date or datetime string into a timezone-aware boundary.
 
@@ -210,8 +300,8 @@ def _parse_date_boundary(date_string: str, *, is_end_date: bool = False, utc_tim
     # Interprets the boundary in UTC for internal comparison, or in the host machine's local time when the caller
     # requests human-facing local boundaries.
     if utc_timezone:
-        utc_tz = ZoneInfo("UTC")
-        return parsed.replace(tzinfo=utc_tz) if parsed.tzinfo is None else parsed.astimezone(tz=utc_tz)
+        utc_zone = ZoneInfo("UTC")
+        return parsed.replace(tzinfo=utc_zone) if parsed.tzinfo is None else parsed.astimezone(tz=utc_zone)
 
     # A naive boundary is assumed to already be in local time; an aware boundary is converted to local time.
     return parsed.astimezone()

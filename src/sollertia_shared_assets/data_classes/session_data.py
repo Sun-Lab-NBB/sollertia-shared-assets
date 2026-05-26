@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 import shutil
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -19,6 +19,9 @@ from ..configuration import (
     AcquisitionSystems,
     get_task_templates_directory,
 )
+
+if TYPE_CHECKING:
+    from .project_hierarchy import AnimalData
 
 RAW_DATA_DIRECTORY: str = "raw_data"
 """Canonical name of the per-session raw data directory under each session root."""
@@ -436,19 +439,16 @@ class SessionData(YamlConfig):
                 f"acquisition system '{self.acquisition_system}' is not supported by the Sollertia platform."
             )
             console.error(message=message, error=ValueError)
-            return  # pragma: no cover
         self.system_raw_data = builder_cls.build(root=self.raw_data_path)
 
     @classmethod
     def create(
         cls,
-        project_name: str,
-        animal_id: str,
+        animal: AnimalData,
         session_type: str | SessionTypes,
         python_version: str,
         sollertia_experiment_version: str,
         acquisition_system: str | AcquisitionSystems,
-        root_directory: Path,
         experiment_name: str | None = None,
     ) -> SessionData:
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
@@ -457,15 +457,13 @@ class SessionData(YamlConfig):
             To access the data of an already existing session, use the load() method.
 
         Args:
-            project_name: The name of the project for which the session is acquired.
-            animal_id: The unique identifier of the animal participating in the session.
+            animal: The ``AnimalData`` view identifying the data root, project, and animal under which the session
+                is created. The session is created under ``animal.session_path(<session_name>)``.
             session_type: The type of the session.
             python_version: The Python version used to acquire the session's data.
             sollertia_experiment_version: The sollertia-experiment library version used to acquire the session's data.
             acquisition_system: The acquisition system that will run the session. Accepts an ``AcquisitionSystems``
                 enumeration member or its string value.
-            root_directory: The root directory of the acquisition system's project hierarchy on the local machine
-                (PC). The session is created under ``root_directory / project_name / animal_id / <session_name>``.
             experiment_name: The name of the experiment performed during the session or None, if the session is not
                 an experiment session.
 
@@ -495,26 +493,24 @@ class SessionData(YamlConfig):
         # noinspection PyStringConversionWithoutDunderMethod
         session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
 
-        session_path = root_directory.joinpath(project_name, animal_id, session_name)
-
         # Prevents creating new sessions for non-existent projects.
-        if not root_directory.joinpath(project_name).exists():
+        if not animal.project.exists():
             message = (
-                f"Unable to initialize a new data acquisition session {session_name} for the animal '{animal_id}' and "
-                f"project '{project_name}'. The project does not exist on the local machine (PC). Use the "
-                f"'slsa configure project' CLI command to create the project on the local machine before "
-                f"creating new sessions."
+                f"Unable to initialize a new data acquisition session {session_name} for the animal "
+                f"'{animal.animal_id}' and project '{animal.project_name}'. The project does not exist on the local "
+                f"machine (PC). Use the 'slsa configure project' CLI command to create the project on the local "
+                f"machine before creating new sessions."
             )
             console.error(message=message, error=FileNotFoundError)
 
         # Only the raw_data directory is created here; processed_data is owned by the processing machine and
         # is created later, on a different host, when the session is loaded for processing.
-        raw_data_path = session_path.joinpath(RAW_DATA_DIRECTORY)
+        raw_data_path = animal.session_path(session_name).joinpath(RAW_DATA_DIRECTORY)
         ensure_directory_exists(path=raw_data_path)
 
         instance = cls(
-            project_name=project_name,
-            animal_id=animal_id,
+            project_name=animal.project_name,
+            animal_id=animal.animal_id,
             session_name=session_name,
             session_type=session_type,
             acquisition_system=acquisition_system,
@@ -531,9 +527,7 @@ class SessionData(YamlConfig):
         instance.save()
 
         if experiment_name is not None:
-            experiment_configuration_path = root_directory.joinpath(
-                project_name, "configuration", f"{experiment_name}.yaml"
-            )
+            experiment_configuration_path = animal.project.configuration_directory.joinpath(f"{experiment_name}.yaml")
             shutil.copy2(
                 src=experiment_configuration_path,
                 dst=instance.raw_data.experiment_configuration_path,
