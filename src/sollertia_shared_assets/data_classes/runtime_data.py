@@ -16,7 +16,7 @@ class MesoscopeHardwareState(YamlConfig):
         All hardware parameters are stored using the appropriate datatypes and rounding methods that ensure
         their complete equivalence to the values used by the data acquisition system during runtime.
 
-        Any field set to 'None' indicates that the corresponding hardware module was not used by the executed data
+        Any field set to ``None`` indicates that the corresponding hardware module was not used by the executed data
         acquisition runtime.
     """
 

@@ -422,7 +422,6 @@ def discover_experiments_tool(
     if error is not None:
         return error
 
-    # Restricts the search to a single project when specified, otherwise scans all project directories.
     project_paths: list[Path]
     if project is not None:
         project_path = root.joinpath(project)  # type: ignore[union-attr]

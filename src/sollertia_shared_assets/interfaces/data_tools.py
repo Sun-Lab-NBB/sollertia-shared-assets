@@ -880,8 +880,7 @@ def _inventory_entry(scope: str, field_name: str, path: Path) -> dict[str, Any]:
         path: The resolved path value held in the field.
 
     Returns:
-        A dict with ``field``, ``path``, ``scope``, ``kind``, and ``exists`` keys. The ``kind`` is derived from
-        the path's suffix: paths with a non-empty suffix are reported as files, others as directories.
+        A dict with ``field``, ``path``, ``scope``, ``kind``, and ``exists`` keys.
     """
     is_file = bool(path.suffix)
     return {

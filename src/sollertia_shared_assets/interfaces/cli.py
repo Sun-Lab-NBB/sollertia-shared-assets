@@ -31,7 +31,7 @@ _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 
 @click.group("slsa", context_settings=_CONTEXT_SETTINGS)
 def slsa_cli() -> None:  # pragma: no cover
-    """Provides the entry point for all interactive sollertia-shared-assets (SLSA) library components."""
+    """Provides the entry point for all interactive sollertia-shared-assets library components."""
 
 
 @slsa_cli.command("mcp", context_settings=_CONTEXT_SETTINGS)

@@ -30,12 +30,12 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
-"""Marker file present in ``raw_data`` while a session is **uninitialized** — the acquisition runtime has
+"""Marker file present in ``raw_data`` while a session is uninitialized — the acquisition runtime has
 not yet finished creating hardware / experiment snapshots or initializing instruments. A session with this
-marker holds no data of value and is a valid target for purging (treat it as trash). The acquisition
-runtime removes the marker once initialization completes. This is distinct from the descriptor's
-``incomplete`` field (see ``read_descriptor_incomplete``), which signals that an initialized session
-encountered a runtime issue but still holds usable data."""
+marker holds no data of value and is a valid target for purging. The acquisition runtime removes the marker
+once initialization completes. This is distinct from the descriptor's ``incomplete`` field (see
+``read_descriptor_incomplete``), which signals that an initialized session encountered a runtime issue but
+still holds usable data."""
 
 DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
     SessionTypes.LICK_TRAINING: LickTrainingDescriptor,
@@ -141,16 +141,16 @@ def _describe_type(type_hint: Any) -> str:  # noqa: ANN401 - introspection helpe
 def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
     """Returns a structured schema description of a dataclass type.
 
-    The returned dict has shape ``{"class": <name>, "fields": {<field_name>: {"type", "default"|"required",
-    "nested"?}}}`` where ``nested`` recursively describes nested dataclass types. The recursion guard prevents
-    infinite recursion when a dataclass references itself either directly or transitively.
+    The recursion guard prevents infinite recursion when a dataclass references itself either directly or
+    transitively.
 
     Args:
         cls: The dataclass type to describe.
         recurse: Determines whether to recursively describe nested dataclass fields.
 
     Returns:
-        A structured schema dict.
+        A schema dict of shape ``{"class": <name>, "fields": {<field_name>: {"type", "default"|"required",
+        "nested"?}}}``, where ``nested`` recursively describes nested dataclass types.
     """
 
     def _describe_inner(target: type, seen: frozenset[type]) -> dict[str, Any]:

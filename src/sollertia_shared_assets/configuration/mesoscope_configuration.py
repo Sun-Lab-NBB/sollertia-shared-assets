@@ -25,7 +25,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """
 
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
-    """Defines experiment's structure by specifying the types of trials used by the phases (states) of the
+    """Defines the experiment's structure by specifying the types of trials used by the phases (states) of the
     experiment."""
     experiment_states: dict[str, ExperimentState]
     """Defines the experiment's flow by specifying the sequence of experiment and data acquisition system states
