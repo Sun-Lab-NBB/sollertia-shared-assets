@@ -60,8 +60,10 @@ state to prevent integration errors.
 
 ## Available skills
 
-The sollertia marketplace ships an `assets` plugin with skills that target this library directly. The ataraxis
-marketplace ships the `automation` plugin used across all Sun Lab repositories.
+The sollertia marketplace ships an `assets` plugin with skills that target this library directly, and a `unity` plugin
+whose Unity Editor skills drive the `McpBridge` relay tools that this library's `slsa mcp` server exposes through
+`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sun Lab
+repositories.
 
 | Skill                           | Description                                                                  |
 |---------------------------------|------------------------------------------------------------------------------|

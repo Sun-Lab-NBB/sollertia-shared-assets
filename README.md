@@ -403,17 +403,19 @@ acquisition runtime) and sollertia-forgery (data processing) as needed.
 
 Claude Code skills and AI development assets for this project are distributed through two marketplaces:
 
-- [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace: Provides MCP server registration,
-  configuration-specific skills for working directory management, system and experiment configuration, session data,
-  subject metadata, dataset management, task templates, and MCP environment setup via the **assets** plugin.
-  Install this plugin to register the `slsa mcp` server with compatible MCP clients and make all configuration
-  workflow skills available.
-- [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace: Provides shared development skills that enforce
-  Sun Lab coding conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and
-  general-purpose codebase exploration tools via the **automation** plugin.
+- [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace:
+  - **assets** plugin — registers the `slsa mcp` server with compatible MCP clients and provides configuration and
+    data skills for working directory setup, session discovery, session data, descriptors, hardware state, subject
+    metadata, task templates, experiment configuration, library extension, and MCP environment setup. The server also
+    fronts the Unity Editor relay that the **unity** plugin's skills drive.
+  - **unity** plugin — Unity Editor skills that drive the `McpBridge` relay tools served by the `slsa mcp` server,
+    document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger zone prefabs.
+- [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
+  - **automation** plugin — shared development skills that enforce Sun Lab coding conventions (Python style, README
+    style, commit messages, pyproject.toml, tox configuration) and general-purpose codebase exploration tools.
 
-Install both marketplace plugins to make all associated skills and development tools available to compatible AI coding
-agents.
+Install all three plugins to make the full skill set available to compatible AI coding agents. The **unity** plugin
+depends on the **assets** plugin for the backing `slsa mcp` server that drives the Unity Editor relay.
 
 ### Automation Troubleshooting
 
