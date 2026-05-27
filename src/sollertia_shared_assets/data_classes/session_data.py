@@ -55,7 +55,7 @@ class RawDataFiles(StrEnum):
     """The ataraxis data integrity checksum for the session's raw_data directory."""
     NK_MARKER = "nk.bin"
     """The 'uninitialized session' marker present in raw_data while the acquisition runtime has not yet finished
-    creating snapshots and initializing instruments. Removed by mark_runtime_initialized() once initialization
+    creating snapshots and initializing instruments. Removed by ``mark_runtime_initialized()`` once initialization
     completes."""
 
 
@@ -182,8 +182,8 @@ class RawData:
     parsing class is determined by the session's acquisition_system and is owned by sollertia-experiment."""
     experiment_configuration_path: Path
     """Stores the experiment configuration in effect when the session was acquired. Only populated for experiment
-    sessions; callers should check .exists() before reading. The concrete parsing class is determined by the session's
-    acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
+    sessions; callers should check ``.exists()`` before reading. The concrete parsing class is determined by the
+    session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
     """Stores the Virtual Reality (VR) task template (cues, VR environment, trial structures) that was active when the
     session was acquired. Populated by ``SessionData.create()`` for experiment sessions by copying the template YAML
@@ -197,7 +197,7 @@ class RawData:
     """Tracks the outcome of integrity checks performed by the checksum verification pipeline."""
     nk_path: Path
     """Marks the session as uninitialized while the acquisition runtime is still creating snapshots and initializing
-    instruments. Removed by mark_runtime_initialized() once the session is ready to begin acquisition."""
+    instruments. Removed by ``mark_runtime_initialized()`` once the session is ready to begin acquisition."""
     behavior_data_path: Path
     """Holds the raw behavior data captured during acquisition, including the raw messages emitted by every
     microcontroller managed by ataraxis-communication-interface."""
@@ -383,11 +383,13 @@ class SessionData(YamlConfig):
     entry point for all interactions with the session's data.
 
     Notes:
-        Do not initialize this class directly. Instead, use the create() method when starting new data acquisition
-        sessions or the load() method when accessing data for an existing session. Both methods build the runtime-only
-        ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes after the persisted root
-        paths have been finalized. Instances constructed via ``from_yaml`` directly (without going through load) do not
-        have these attributes populated; access raises AttributeError.
+        Do not initialize this class directly. Instead, use the ``create()`` method when starting new data acquisition
+        sessions or the ``load()`` method when accessing data for an existing session. Both methods build the
+        runtime-only ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes from the
+        currently configured root paths. ``create()`` finalizes only ``raw_data_path``; the ``processed_data`` root is
+        resolved later, on the processing host, by ``load()``, which finalizes both. Instances constructed via
+        ``from_yaml`` directly (without going through ``load()``) do not have these attributes populated; access raises
+        AttributeError.
 
         When this class is used to create a new session, it generates the new session's name using the current UTC
         timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall
@@ -454,7 +456,7 @@ class SessionData(YamlConfig):
         """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
 
         Notes:
-            To access the data of an already existing session, use the load() method.
+            To access the data of an already existing session, use the ``load()`` method.
 
         Args:
             animal: The ``AnimalData`` view identifying the data root, project, and animal under which the session
@@ -568,7 +570,7 @@ class SessionData(YamlConfig):
         """Loads the target session's data from the specified session_data.yaml file.
 
         Notes:
-            To create a new session, use the create() method.
+            To create a new session, use the ``create()`` method.
 
         Args:
             session_path: The path to the directory where to search for the session_data.yaml file. Typically, this

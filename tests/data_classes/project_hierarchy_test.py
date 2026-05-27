@@ -18,13 +18,13 @@ from sollertia_shared_assets.data_classes import (
 )
 from sollertia_shared_assets.configuration import AcquisitionSystems
 
-_LOCAL_ROOT = Path("/data/local")
+_LOCAL_ROOT: Path = Path("/data/local")
 """Sentinel local data root used by the path-resolution tests; never touched on disk."""
 
-_NAS_ROOT = Path("/mnt/nas")
+_NAS_ROOT: Path = Path("/mnt/nas")
 """Sentinel NAS storage root used by the multi-root resolution tests; never touched on disk."""
 
-_SERVER_ROOT = Path("/mnt/server")
+_SERVER_ROOT: Path = Path("/mnt/server")
 """Sentinel server storage root used by the multi-root resolution tests; never touched on disk."""
 
 

@@ -155,11 +155,13 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
 def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
     """Produces a per-session health and inventory report for each supplied session path.
 
-    Each report carries lifecycle status, an existence flag for every canonical ``raw_data`` file and
-    every ``processed_data`` subdirectory (with paired processing-tracker presence), and a
-    ``required_assets`` check (descriptor and system configuration always required; experiment
-    configuration also required for ``mesoscope experiment`` sessions). Paths that fail to resolve
-    or load surface with ``status="error"`` and an ``error_detail`` field without aborting the batch.
+    Each report carries an ``identity`` block (project, animal, session name, session type, acquisition
+    system, experiment name), lifecycle status, an existence flag for every canonical ``raw_data`` file and
+    every ``processed_data`` subdirectory (with paired processing-tracker presence), a ``required_assets``
+    check (descriptor and system configuration always required; experiment configuration and VR
+    configuration also required for ``mesoscope experiment`` sessions), and an ``issues`` list summarizing
+    any missing required assets. Paths that fail to resolve or load surface with ``status="error"`` and an
+    ``error_detail`` field without aborting the batch.
 
     Args:
         session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a
@@ -880,8 +882,7 @@ def _inventory_entry(scope: str, field_name: str, path: Path) -> dict[str, Any]:
         path: The resolved path value held in the field.
 
     Returns:
-        A dict with ``field``, ``path``, ``scope``, ``kind``, and ``exists`` keys. The ``kind`` is derived from
-        the path's suffix: paths with a non-empty suffix are reported as files, others as directories.
+        A dict with ``field``, ``path``, ``scope``, ``kind``, and ``exists`` keys.
     """
     is_file = bool(path.suffix)
     return {
@@ -897,7 +898,7 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
     """Returns the existence of each asset required for the session's type.
 
     Every session requires the descriptor and the system configuration snapshot; ``mesoscope experiment``
-    sessions additionally require the experiment configuration snapshot.
+    sessions additionally require the experiment configuration and VR configuration snapshots.
 
     Args:
         instance: The loaded ``SessionData`` instance.

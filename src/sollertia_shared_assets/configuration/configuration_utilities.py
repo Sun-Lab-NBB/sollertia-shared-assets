@@ -73,8 +73,8 @@ def set_working_directory(path: Path) -> None:
     Args:
         path: The path to the directory to set as the local Sollertia platform working directory.
     """
-    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = app_dir.joinpath("working_directory_path.txt")
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("working_directory_path.txt")
 
     ensure_directory_exists(path=path_file)
     ensure_directory_exists(path=path)
@@ -96,8 +96,8 @@ def get_working_directory() -> Path:
         FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
             currently configured directory does not exist at the expected path.
     """
-    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = app_dir.joinpath("working_directory_path.txt")
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("working_directory_path.txt")
 
     if not path_file.exists():
         message = (
@@ -120,6 +120,67 @@ def get_working_directory() -> Path:
     return working_directory
 
 
+def set_data_root(path: Path) -> None:
+    """Sets the specified directory as the local machine's Sollertia platform data root.
+
+    The data root is the directory under which all project directories, and therefore all animal and session
+    directories, are stored on this machine. Persisting it lets the discovery and inventory assets resolve the
+    project hierarchy without the caller supplying the root each time.
+
+    Notes:
+        This function caches the path to the data root in the user's data directory.
+
+        If the input path does not point to an existing directory, the function creates the requested directory.
+
+    Args:
+        path: The path to the directory to set as the local Sollertia platform data root.
+    """
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("data_root_path.txt")
+
+    ensure_directory_exists(path=path_file)
+    ensure_directory_exists(path=path)
+
+    with path_file.open(mode="w") as file:
+        file.write(str(path))
+
+    console.echo(message=f"Sollertia platform data root set to: {path}.", level=LogLevel.SUCCESS)
+
+
+def get_data_root() -> Path:
+    """Resolves and returns the path to the local machine's Sollertia platform data root.
+
+    Returns:
+        The path to the local data root, the directory under which all project directories are stored.
+
+    Raises:
+        FileNotFoundError: If the local data root has not been configured for the host-machine, or if the currently
+            configured directory does not exist at the expected path.
+    """
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("data_root_path.txt")
+
+    if not path_file.exists():
+        message = (
+            "Unable to resolve the path to the local Sollertia platform data root, as it has not been set. "
+            "Set the local data root by using the 'slsa configure data-root' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    with path_file.open() as file:
+        data_root = Path(file.read().strip())
+
+    if not data_root.exists():
+        message = (
+            "Unable to resolve the path to the local Sollertia platform data root, as the currently configured "
+            "directory does not exist at the expected path. Set a new data root by using the 'slsa configure "
+            "data-root' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    return data_root
+
+
 def create_experiment_configuration(
     template: TaskTemplate,
     system: AcquisitionSystems | str,
@@ -134,7 +195,9 @@ def create_experiment_configuration(
     Args:
         template: The TaskTemplate containing the VR structure (cues, trial zones) of the experiment.
         system: The data acquisition system for which to create the configuration.
-        unity_scene_name: The Unity scene name for the experiment. Must match the template's scene file name.
+        unity_scene_name: The Unity scene name for the experiment. This should match the template YAML file name so
+            SessionData.create() can locate the corresponding VR template during snapshot export. Matching is the
+            caller's responsibility and is not validated by this function.
         default_reward_size_ul: Water reward volume in microliters for lick-type trials.
         default_reward_tone_duration_ms: Reward tone duration in milliseconds for lick-type trials.
         default_puff_duration_ms: Gas puff duration in milliseconds for occupancy-type trials.
@@ -187,10 +250,10 @@ def populate_default_experiment_states(
 ) -> None:
     """Populates the experiment configuration with the requested number of default-valued runtime states.
 
-    Generates `state_count` sequentially numbered runtime states named 'state_1', 'state_2', and so on. Each state uses
-    the module-level default duration and is configured with reinforcing or aversive guidance parameters depending on
-    the trial types present in the experiment configuration. States are appended to the experiment configuration's
-    existing experiment_states mapping.
+    Generates ``state_count`` sequentially numbered runtime states named 'state_1', 'state_2', and so on. Each
+    state uses the module-level default duration and is configured with reinforcing or aversive guidance parameters
+    depending on the trial types present in the experiment configuration. States are appended to the experiment
+    configuration's existing experiment_states mapping.
 
     Args:
         experiment_configuration: The experiment configuration to extend with default runtime states.
@@ -247,8 +310,8 @@ def set_google_credentials_path(path: Path) -> None:
         )
         console.error(message=message, error=ValueError)
 
-    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = app_dir.joinpath("google_credentials_path.txt")
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("google_credentials_path.txt")
 
     ensure_directory_exists(path=path_file)
 
@@ -268,8 +331,8 @@ def get_google_credentials_path() -> Path:
         FileNotFoundError: If the Google service account credentials path has not been configured for the host-machine,
             or if the previously configured credentials file does not exist at the expected path.
     """
-    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = app_dir.joinpath("google_credentials_path.txt")
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("google_credentials_path.txt")
 
     if not path_file.exists():
         message = (
@@ -319,8 +382,8 @@ def set_task_templates_directory(path: Path) -> None:
         )
         console.error(message=message, error=ValueError)
 
-    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = app_dir.joinpath("task_templates_directory_path.txt")
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("task_templates_directory_path.txt")
 
     ensure_directory_exists(path=path_file)
 
@@ -340,8 +403,8 @@ def get_task_templates_directory() -> Path:
         FileNotFoundError: If the task templates directory path has not been configured for the host-machine, or if
             the previously configured directory does not exist at the expected path.
     """
-    app_dir = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = app_dir.joinpath("task_templates_directory_path.txt")
+    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
+    path_file = application_directory.joinpath("task_templates_directory_path.txt")
 
     if not path_file.exists():
         message = (
@@ -372,10 +435,10 @@ def _create_mesoscope_experiment_config(
 
     Args:
         unity_scene_name: The Unity scene name for the experiment.
-        trial_structures: The converted trial structures dictionary.
+        trial_structures: The per-trial reward and puff parameters, keyed by trial name.
 
     Returns:
-        The initialized MesoscopeExperimentConfiguration instance.
+        The experiment configuration populated with the given trial structures and an empty experiment-state map.
     """
     return MesoscopeExperimentConfiguration(
         trial_structures=trial_structures,

@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ExperimentState:
     """Defines the structure and runtime parameters of an experiment state (phase)."""
 
@@ -37,7 +37,7 @@ class ExperimentState:
     """The number of guided aversive trials to use in the recovery guidance mode."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class WaterRewardTrial:
     """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal licks in the trigger zone.
 
@@ -53,7 +53,7 @@ class WaterRewardTrial:
     """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class GasPuffTrial:
     """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails to meet occupancy duration.
 

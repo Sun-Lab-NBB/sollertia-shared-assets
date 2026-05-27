@@ -20,6 +20,8 @@ from sollertia_shared_assets.configuration import (
     WaterRewardTrial,
     AcquisitionSystems,
     MesoscopeExperimentConfiguration,
+    get_data_root,
+    set_data_root,
     get_working_directory,
     set_working_directory,
     get_google_credentials_path,
@@ -153,6 +155,53 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
 
     with pytest.raises(FileNotFoundError, match=r"currently configured"):
         get_working_directory()
+
+
+def test_set_data_root_creates_directory(clean_working_directory: Path) -> None:
+    """Verifies that set_data_root creates the directory if it does not exist (working-directory model)."""
+    new_dir = clean_working_directory.parent / "new_data_root"
+    assert not new_dir.exists()
+
+    set_data_root(path=new_dir)
+
+    assert new_dir.exists()
+
+
+def test_set_data_root_writes_path_file(clean_working_directory: Path) -> None:
+    """Verifies that set_data_root writes the path to the cache file."""
+    set_data_root(path=clean_working_directory)
+
+    app_dir = clean_working_directory.parent / "app_data"
+    path_file = app_dir / "data_root_path.txt"
+    assert path_file.exists()
+    assert path_file.read_text() == str(clean_working_directory)
+
+
+def test_get_data_root_returns_cached_path(clean_working_directory: Path) -> None:
+    """Verifies that get_data_root returns the cached directory path."""
+    set_data_root(path=clean_working_directory)
+
+    assert get_data_root() == clean_working_directory
+
+
+def test_get_data_root_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies that get_data_root raises FileNotFoundError if not configured."""
+    app_dir = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+
+    with pytest.raises(FileNotFoundError, match=r"has not been set"):
+        get_data_root()
+
+
+def test_get_data_root_raises_error_if_directory_missing(clean_working_directory: Path) -> None:
+    """Verifies that get_data_root raises error if the cached directory does not exist."""
+    set_data_root(path=clean_working_directory)
+
+    # Simulates an out-of-date cache.
+    shutil.rmtree(clean_working_directory)
+
+    with pytest.raises(FileNotFoundError, match=r"currently configured"):
+        get_data_root()
 
 
 def test_set_google_credentials_path_creates_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -16,7 +16,7 @@ class MesoscopeHardwareState(YamlConfig):
         All hardware parameters are stored using the appropriate datatypes and rounding methods that ensure
         their complete equivalence to the values used by the data acquisition system during runtime.
 
-        Any field set to 'None' indicates that the corresponding hardware module was not used by the executed data
+        Any field set to ``None`` indicates that the corresponding hardware module was not used by the executed data
         acquisition runtime.
     """
 
@@ -114,10 +114,10 @@ class RunTrainingDescriptor(YamlConfig):
     speed and duration thresholds."""
     run_speed_increase_step_cm_s: float = 0.05
     """The value, in centimeters per second, used by the system to increment the running speed threshold each
-    time the animal receives 'increase_threshold' volume of water."""
+    time the animal receives 'increase_threshold_ml' volume of water."""
     run_duration_increase_step_s: float = 0.1
     """The value, in seconds, used by the system to increment the duration threshold each time the animal
-    receives 'increase_threshold' volume of water."""
+    receives 'increase_threshold_ml' volume of water."""
     maximum_water_volume_ml: float = 1.0
     """The maximum volume of water the system is allowed to dispense during training."""
     maximum_training_time_min: int = 40

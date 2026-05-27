@@ -22,10 +22,10 @@ _UNITY_BRIDGE_URL: str = "http://localhost:8090/"
 
 @mcp.tool()
 def create_task_tool(template_name: str) -> dict[str, Any]:
-    """Creates a Unity task end-to-end from a YAML task template: generates the task prefab and the
-    matching scene in one call.
+    """Creates a Unity task end-to-end from a YAML task template.
 
-    Mirrors the ``CreateTask/New Task`` Editor menu so the agentic and manual paths produce
+    Generates the task prefab and the matching scene in one call. Mirrors the ``CreateTask/New Task`` Editor
+    menu so the agentic and manual paths produce
     byte-equivalent assets. The prefab is built at
     ``Assets/InfiniteCorridorTask/Tasks/<template_name>.prefab`` and the scene at
     ``Assets/Scenes/<template_name>.unity``; both paths are auto-resolved from the template basename so
@@ -58,12 +58,12 @@ def create_task_tool(template_name: str) -> dict[str, Any]:
 
 @mcp.tool()
 def delete_task_tool(template_name: str) -> dict[str, Any]:
-    """Removes every Unity artifact that ``create_task_tool`` produces for a given template in a single
-    call: the scene plus its ``savedFullScreenViews`` companion, the task prefab, and every segment
-    prefab whose filename begins with the template basename.
+    """Removes every Unity artifact that ``create_task_tool`` produces for a given template in a single call.
 
-    Mirrors ``create_task_tool`` — the two tools cover the full lifecycle of a task's generated
-    artifacts. Cue prefabs and cue materials are intentionally **not** removed because they are shared
+    Removes the scene plus its ``savedFullScreenViews`` companion, the task prefab, and every segment prefab
+    whose filename begins with the template basename. Mirrors ``create_task_tool`` — the two tools cover the
+    full lifecycle of a task's generated artifacts. Cue prefabs and cue materials are intentionally not removed
+    because they are shared
     across every template that declares a matching ``(name, length_cm)`` identity; deleting them
     would corrupt sibling tasks. Use ``delete_asset_tool`` for individual cue cleanup. The
     template YAML is also preserved as the source of truth — to remove the template itself, edit the

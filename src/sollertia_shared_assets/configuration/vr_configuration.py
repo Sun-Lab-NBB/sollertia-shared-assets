@@ -32,8 +32,9 @@ class TriggerType(StrEnum):
     """Defines the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
-        All Sollertia platform acquisition systems share these core trial types. LICK corresponds to GuidanceZone in
-        Unity and OCCUPANCY corresponds to OccupancyZone in Unity.
+        All Sollertia platform acquisition systems share these core trial types. LICK maps to the StimulusTriggerZone
+        prefab (with a GuidanceZone child) in Unity, and OCCUPANCY maps to the OccupancyTriggerZone prefab (with
+        OccupancyZone and OccupancyGuidanceZone children).
     """
 
     LICK = "lick"
@@ -44,7 +45,7 @@ class TriggerType(StrEnum):
     disable the stimulus delivery."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Cue:
     """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
 
@@ -80,7 +81,7 @@ class Cue:
             console.error(message=message, error=ValueError)
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class VREnvironment:
     """Defines the Unity Virtual Reality (VR) corridor system configuration.
 
@@ -102,7 +103,7 @@ class VREnvironment:
     sequence origin, in centimeters."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class TrialStructure:
     """Defines the spatial configuration of a trial structure for Unity prefabs.
 
@@ -264,13 +265,21 @@ class TaskTemplate(YamlConfig):
         return {cue.name: cue.code for cue in self.cues}
 
     def _get_trial_length_cm(self, trial_name: str) -> float:
-        """Returns the total length of the VR trial's segment in centimeters."""
+        """Returns the total length of the VR trial's segment in centimeters.
+
+        Args:
+            trial_name: The name of the trial structure whose segment length to compute.
+        """
         trial = self.trial_structures[trial_name]
         cue_map = self._cue_by_name
         return sum(cue_map[cue_name].length_cm for cue_name in trial.cue_sequence)
 
     def _get_trial_cue_codes(self, trial_name: str) -> list[int]:
-        """Returns the sequence of cue codes for the specified trial's cue sequence."""
+        """Returns the sequence of cue codes for the specified trial's cue sequence.
+
+        Args:
+            trial_name: The name of the trial structure whose cue codes to resolve.
+        """
         trial = self.trial_structures[trial_name]
         cue_name_to_code = self._cue_name_to_code
         return [cue_name_to_code[name] for name in trial.cue_sequence]
