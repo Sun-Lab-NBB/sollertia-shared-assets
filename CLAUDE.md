@@ -101,10 +101,10 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 
 | Module              | File                                | Surface                                                            |
 |---------------------|-------------------------------------|--------------------------------------------------------------------|
-| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `configure` subcommands                |
+| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands        |
 | Server bootstrap    | `interfaces/mcp_server.py`          | Imports tool modules to trigger registration; exposes `run_server` |
 | Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, registries, response helpers, validators         |
-| Configuration tools | `interfaces/configuration_tools.py` | working dir, Google creds, templates dir, experiments              |
+| Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, Google creds, templates dir, experiments   |
 | Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, surgery, etc.          |
 | Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                      |
 
@@ -170,10 +170,11 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   dispatched by `SessionTypes` and `AcquisitionSystems` enum membership.
 - **Interface layer**: A single `FastMCP` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and registry helpers. Tool modules import the instance and register `@mcp.tool()` functions. The CLI
-  (`slsa`) starts the server and exposes `configure {directory,google,templates,project,experiment}` commands.
-- **Persistent host settings**: Three independent `platformdirs`-backed settings — working directory, Google
-  credentials path, templates directory — are managed in `configuration/configuration_utilities.py`. Only the working
-  directory is required for `slsa mcp` to function.
+  (`slsa`) starts the server and exposes `configure {directory,data-root,google,templates,project,experiment}` and
+  `get {directory,data-root,google,templates,projects,experiments}` command groups.
+- **Persistent host settings**: Four independent `platformdirs`-backed settings — working directory, data root,
+  Google credentials path, templates directory — are managed in `configuration/configuration_utilities.py`. Only the
+  working directory is required for `slsa mcp` to function.
 
 ### Extension contracts
 

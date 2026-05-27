@@ -103,16 +103,24 @@ platform libraries.
 
 This library provides the `slsa` CLI that exposes the following commands and command groups:
 
-| Command                 | Description                                                          |
-|-------------------------|----------------------------------------------------------------------|
-| `mcp`                   | Starts the MCP server for agentic configuration management           |
-| `configure directory`   | Sets the local Sollertia platform working directory                  |
-| `configure google`      | Sets the path to the Google service account credentials file         |
-| `configure templates`   | Sets the path to the sollertia-unity-tasks task templates directory  |
-| `configure project`     | Creates a project directory structure for data acquisition           |
-| `configure experiment`  | Creates an experiment configuration from a task template             |
+| Command                | Description                                                           |
+|------------------------|-----------------------------------------------------------------------|
+| `mcp`                  | Starts the MCP server for agentic configuration management            |
+| `get directory`        | Reports the configured local Sollertia platform working directory     |
+| `get data-root`        | Reports the configured local Sollertia platform data root             |
+| `get google`           | Reports the configured Google service account credentials file path   |
+| `get templates`        | Reports the configured sollertia-unity-tasks task templates directory |
+| `get projects`         | Lists the projects stored under the data root                         |
+| `get experiments`      | Lists the experiment configurations available for a project           |
+| `configure directory`  | Sets the local Sollertia platform working directory                   |
+| `configure data-root`  | Sets the local Sollertia platform data root                           |
+| `configure google`     | Sets the path to the Google service account credentials file          |
+| `configure templates`  | Sets the path to the sollertia-unity-tasks task templates directory   |
+| `configure project`    | Creates a project directory structure for data acquisition            |
+| `configure experiment` | Creates an experiment configuration from a task template              |
 
-Use `slsa --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage information.
+Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage
+information.
 
 ### MCP Server
 
@@ -151,7 +159,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                             |
 | `filter_sessions_tool`                          | Filters discovered session entries by date range and animal- or session-name criteria           |
 | `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy from SessionData and per-session lifecycle status   |
-| `get_platform_environment_status_tool`          | Reports the status of the working directory, templates directory, and Google credentials        |
+| `get_platform_environment_status_tool`          | Reports the status of the working directory, data root, templates directory, and Google creds    |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                               |
 | `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab            |
 | `inspect_scene_tool`                            | Returns the active scene's metadata, dirty flag, and recursive root GameObject hierarchy        |
@@ -164,6 +172,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                             |
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                                |
 | `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                          |
+| `read_data_root_tool`                           | Returns the configured Sollertia platform data root path                                        |
 | `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)          |
 | `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                      |
 | `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                       |
@@ -174,6 +183,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                     |
 | `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                        |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                                |
+| `set_data_root_tool`                            | Sets the local Sollertia platform data root                                                     |
 | `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                    |
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                   |
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                             |

@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "8.1.0rc1"
+version = "8.1.0"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -56,9 +56,6 @@ dependencies = [
     # Provides IANA timezone data for zoneinfo on Windows, which does not ship system tzdata.
     "tzdata>=2024,<2027; sys_platform == 'win32'",
 
-    # Data Processing
-    "polars>=1,<2",
-
     # YAML serialization (used directly by MCP helpers to stage caller-supplied dicts for YamlConfig validation)
     "pyyaml>=6,<7",
 
@@ -69,6 +66,7 @@ dependencies = [
     "httpx>=0.28,<1",
 ]
 
+# Project URLs. Points to the GitHub repository and the hosted API documentation.
 [project.urls]
 Homepage = "https://github.com/Sun-Lab-NBB/sollertia-shared-assets"
 Documentation = "https://sollertia-shared-assets-api-docs.netlify.app/"
@@ -166,6 +164,7 @@ convention = "google"
     "T201",    # Print statements are allowed in tests
 ]
 
+# Import-sorting (isort) configuration.
 [tool.ruff.lint.isort]
 case-sensitive = true              # Takes case into account when sorting imports
 combine-as-imports = true          # Combines multiple "as" imports for the same package
@@ -211,9 +210,8 @@ exclude = [
 [tool.coverage.run]
 omit = ["*/interfaces/*"]
 
+# Maps coverage measured in site-packages to source files in src.
 [tool.coverage.paths]
-
-# Maps coverage measured in site-packages to source files in src
 source = ["src/", ".tox/*/lib/python*/site-packages/"]
 
 # Same as above, specifies the output directory for the coverage .html report
