@@ -199,8 +199,9 @@ the touch list and the import-time parity check that fails if any registry is in
 
 `_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the five
 public dispatch registries is missing entries for a known enum member, or if `SYSTEM_SESSION_TYPES` leaves an
-acquisition system with no session types or a session type unclaimed by any system. `_experiment_config_factory_registry`
-is **not** covered by the parity check (a missing factory only fails at call time, not at import).
+acquisition system with no session types or a session type unclaimed by any system.
+`_experiment_config_factory_registry` is **not** covered by the parity check (a missing factory only fails at call
+time, not at import).
 
 An eighth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps each `AcquisitionSystems` member to
 its trial-class **names** (e.g., `"WaterRewardTrial"`) and their concrete dataclasses. It is not a dispatch registry
