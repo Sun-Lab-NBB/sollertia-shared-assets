@@ -118,7 +118,6 @@ This library provides the `slsa` CLI that exposes the following commands and com
 | `configure google`     | Sets the path to the Google service account credentials file          |
 | `configure templates`  | Sets the path to the sollertia-unity-tasks task templates directory   |
 | `configure project`    | Creates a project directory structure for data acquisition            |
-| `configure experiment` | Creates an experiment configuration from a task template              |
 
 Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage
 information.
@@ -169,10 +168,11 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `list_assets_tool`                              | Lists Unity assets of a given type within a search path                                        |
 | `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                  |
 | `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
+| `list_session_type_support_tool`                | Returns the full mapping of each acquisition system to the session types it can run            |
 | `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
 | `list_supported_data_assets_tool`               | Enumerates the read-asset data formats supported by the Sollertia platform                     |
-| `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
-| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                            |
+| `list_supported_session_types_tool`             | Enumerates session types, optionally scoped to one acquisition system                          |
+| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by an acquisition system's experiment configuration     |
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
 | `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                         |
 | `read_data_root_tool`                           | Returns the configured Sollertia platform data root path                                       |
@@ -290,7 +290,7 @@ window-checking). Each type has its own descriptor dataclass that captures the t
 outcome metadata, persisted as `session_descriptor.yaml` inside the session's `raw_data` directory. The descriptor
 filename is flat across all types — only the parsing class varies, and is dispatched via `DESCRIPTOR_REGISTRY`.
 
-**Step 1: Extend the SessionTypes enum**
+**Step 1: Extend the SessionTypes enum and pair it with an acquisition system**
 
 In `data_classes/session_data.py`, add a new member to `SessionTypes`:
 
@@ -302,6 +302,10 @@ class SessionTypes(StrEnum):
     WINDOW_CHECKING = "window checking"
     NEW_TYPE = "new type"  # Add new session type here
 ```
+
+Then add the new member to the `SYSTEM_SESSION_TYPES` frozenset of every acquisition system that can run it. The
+import-time parity check (`_assert_registry_coverage`) raises if any session type is claimed by no acquisition
+system, and `SessionData.create()` rejects a session type that is not paired with the session's acquisition system.
 
 **Step 2: Add the descriptor dataclass**
 
@@ -334,8 +338,9 @@ Each system contributes its own hardware-state snapshot, experiment-configuratio
 data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
 by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
 `SYSTEM_RAW_DATA_REGISTRY`. A fourth registry, `_experiment_config_factory_registry`, dispatches `TaskTemplate`-to-
-configuration factories. System-level hardware and software configuration classes live in the acquisition runtime
-package (sollertia-experiment), not in this library.
+configuration factories. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
+System-level hardware and software configuration classes live in the acquisition runtime package
+(sollertia-experiment), not in this library.
 
 **Step 1: Extend the AcquisitionSystems enum**
 
@@ -385,6 +390,10 @@ Three registries need entries for the new system:
 3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
    this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
    new system into session loading.
+4. In `data_classes/session_data.py`, add a `SYSTEM_SESSION_TYPES` entry mapping the new `AcquisitionSystems` key to
+   the `frozenset` of `SessionTypes` the system can run. The parity check raises if a system declares no session
+   types, and `SessionData.create()` uses this set to reject session-type / system pairings the system does not
+   support.
 
 **Step 6: Add the TaskTemplate-to-configuration factory**
 

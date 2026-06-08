@@ -9,10 +9,8 @@ import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
 from .mcp_server import run_server
-from ..data_classes import CONFIGURATION_DIRECTORY, ProjectData, discover_projects
+from ..data_classes import ProjectData, discover_projects
 from ..configuration import (
-    TaskTemplate,
-    AcquisitionSystems,
     get_data_root,
     set_data_root,
     get_working_directory,
@@ -21,8 +19,6 @@ from ..configuration import (
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
-    create_experiment_configuration,
-    populate_default_experiment_states,
 )
 
 _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
@@ -108,8 +104,8 @@ def get_experiments(project: str) -> None:  # pragma: no cover
     else:
         console.echo(
             message=(
-                f"No experiment configurations are available for the '{project}' project. Use "
-                f"'slsa configure experiment' to create one."
+                f"No experiment configurations are available for the '{project}' project. Use your acquisition "
+                f"system's CLI to create one (for Mesoscope-VR, 'sle mesoscope configure experiment')."
             )
         )
 
@@ -180,136 +176,7 @@ def configure_task_templates_directory(directory: Path) -> None:  # pragma: no c
     required=True,
     help="The name of the project to be created.",
 )
-@click.option(
-    "-r",
-    "--root-directory",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the root data directory under which to create the project.",
-)
-def configure_project(project: str, root_directory: Path) -> None:  # pragma: no cover
-    """Creates the data structure for a new project under the provided root data directory."""
-    ProjectData(root=root_directory, project_name=project).create()
+def configure_project(project: str) -> None:  # pragma: no cover
+    """Creates the data structure for a new project under the configured Sollertia platform data root."""
+    ProjectData(root=get_data_root(), project_name=project).create()
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
-
-
-@configure_group.command("experiment", context_settings=_CONTEXT_SETTINGS)
-@click.option(
-    "-p",
-    "--project",
-    type=str,
-    required=True,
-    help="The name of the project for which to generate the new experiment configuration file.",
-)
-@click.option(
-    "-e",
-    "--experiment",
-    type=str,
-    required=True,
-    help="The name of the experiment for which to create the configuration file.",
-)
-@click.option(
-    "-t",
-    "--template",
-    type=str,
-    required=True,
-    help="The name of the task template to use (filename without .yaml extension).",
-)
-@click.option(
-    "-r",
-    "--root-directory",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
-    required=True,
-    help="The absolute path to the root data directory that contains the project.",
-)
-@click.option(
-    "-sc",
-    "--state-count",
-    type=int,
-    default=1,
-    show_default=True,
-    help="The number of runtime states supported by the experiment.",
-)
-@click.option(
-    "--reward-size",
-    type=float,
-    default=5.0,
-    show_default=True,
-    help="Default water reward volume in microliters for lick-type trials.",
-)
-@click.option(
-    "--reward-tone-duration",
-    type=int,
-    default=300,
-    show_default=True,
-    help="Default reward tone duration in milliseconds for lick-type trials.",
-)
-@click.option(
-    "--puff-duration",
-    type=int,
-    default=100,
-    show_default=True,
-    help="Default gas puff duration in milliseconds for occupancy-type trials.",
-)
-@click.option(
-    "--occupancy-duration",
-    type=int,
-    default=1000,
-    show_default=True,
-    help="Default occupancy threshold duration in milliseconds for occupancy-type trials.",
-)
-def generate_experiment_configuration_file(
-    project: str,
-    experiment: str,
-    template: str,
-    root_directory: Path,
-    state_count: int,
-    reward_size: float,
-    reward_tone_duration: int,
-    puff_duration: int,
-    occupancy_duration: int,
-) -> None:  # pragma: no cover
-    """Creates an experiment configuration from a task template under the provided root data directory."""
-    project_path = root_directory.joinpath(project)
-    if not project_path.exists():
-        message = (
-            f"Unable to generate the {experiment} experiment's configuration file: the project '{project}' does not "
-            f"exist under the provided root directory {root_directory}. Use 'slsa configure project' first."
-        )
-        console.error(message=message, error=ValueError)
-
-    file_path = project_path.joinpath(CONFIGURATION_DIRECTORY, f"{experiment}.yaml")
-
-    templates_directory = get_task_templates_directory()
-    template_path = templates_directory.joinpath(f"{template}.yaml")
-    if not template_path.exists():
-        available_templates = sorted([template_file.stem for template_file in templates_directory.glob("*.yaml")])
-        message = (
-            f"Unable to generate the '{experiment}' experiment configuration. The template '{template}' was "
-            f"not found in {templates_directory}. Available templates: "
-            f"{', '.join(available_templates) if available_templates else 'none'}."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    task_template = TaskTemplate.from_yaml(file_path=template_path)
-
-    experiment_configuration = create_experiment_configuration(
-        template=task_template,
-        system=AcquisitionSystems.MESOSCOPE_VR,
-        unity_scene_name=template,
-        default_reward_size_ul=reward_size,
-        default_reward_tone_duration_ms=reward_tone_duration,
-        default_puff_duration_ms=puff_duration,
-        default_occupancy_duration_ms=occupancy_duration,
-    )
-
-    populate_default_experiment_states(
-        experiment_configuration=experiment_configuration,
-        state_count=state_count,
-    )
-
-    experiment_configuration.to_yaml(file_path=file_path)
-    console.echo(
-        message=f"{experiment} experiment's configuration file: created from template '{template}'.",
-        level=LogLevel.SUCCESS,
-    )

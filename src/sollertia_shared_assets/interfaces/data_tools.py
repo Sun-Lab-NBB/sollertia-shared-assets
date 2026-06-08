@@ -414,8 +414,8 @@ def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str,
     Args:
         file_path: Absolute path to the descriptor YAML. Canonical location is
             ``<session>/raw_data/session_descriptor.yaml``.
-        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use
-            (``lick training``, ``run training``, ``mesoscope experiment``, or ``window checking``).
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use; see
+            ``list_supported_session_types_tool`` for the supported values.
 
     Returns:
         A response dict with ``data`` (the descriptor payload), ``descriptor_class``, ``session_type``,
@@ -447,8 +447,7 @@ def write_session_descriptor_tool(
         file_path: Absolute path to the destination descriptor YAML. Canonical location is
             ``<session>/raw_data/session_descriptor.yaml``.
         session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate
-            against (``lick training``, ``run training``, ``mesoscope experiment``, or
-            ``window checking``).
+            against; see ``list_supported_session_types_tool`` for the supported values.
         descriptor_payload: The complete descriptor payload matching the schema for ``session_type``.
         overwrite: Determines whether to overwrite an existing file.
 

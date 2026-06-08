@@ -1,8 +1,8 @@
-"""Provides system-agnostic experiment configuration classes.
+"""Provides system-agnostic experiment configuration building blocks.
 
-This module contains dataclasses for defining experiment states and trial structures that are independent of
-the specific data acquisition system. These classes serve as the foundation for system-specific experiment
-configurations.
+This module contains the ``ExperimentState`` dataclass and the system-agnostic trial classes (``WaterRewardTrial``
+and ``GasPuffTrial``) that define experiment phases and trial primitives independent of the specific data acquisition
+system. System-specific experiment configurations compose these into their own schema.
 """
 
 from __future__ import annotations
@@ -39,12 +39,11 @@ class ExperimentState:
 
 @dataclass(frozen=True, slots=True)
 class WaterRewardTrial:
-    """Defines a trial that delivers water rewards (reinforcing stimuli) when the animal licks in the trigger zone.
+    """Defines a trial that delivers a water reward (a reinforcing stimulus) when the animal meets the trial's success
+    condition.
 
-    Notes:
-        In trigger mode, the animal must lick while inside the stimulus trigger zone to receive the water
-        reward. In guidance mode, the animal receives the reward upon colliding with the stimulus boundary,
-        with no lick required.
+    The reward is a configured volume of water accompanied by an auditory tone. The behavioral condition that earns
+    the reward is defined by the task and the acquisition system, not by this class.
     """
 
     reward_size_ul: float = 5.0
@@ -55,18 +54,15 @@ class WaterRewardTrial:
 
 @dataclass(frozen=True, slots=True)
 class GasPuffTrial:
-    """Defines a trial that delivers N2 gas puffs (aversive stimuli) when the animal fails to meet occupancy duration.
+    """Defines a trial that delivers a gas puff (an aversive stimulus) when the animal fails the trial's avoidance
+    condition.
 
-    Notes:
-        In trigger mode, the animal must occupy the stimulus trigger zone for the specified duration to
-        disarm the stimulus boundary and avoid the gas puff. If the animal exits the zone early or collides
-        with the boundary before meeting the occupancy threshold, the gas puff is delivered. In guidance
-        mode, when the animal exits the zone early, an OccupancyFailed message is emitted, allowing
-        sollertia-experiment to block movement and prevent the animal from reaching the armed boundary.
+    The animal avoids the puff by satisfying an occupancy condition for the configured duration; failing to do so
+    delivers a puff of the configured duration. The behavioral condition is defined by the task and the acquisition
+    system, not by this class.
     """
 
     puff_duration_ms: int = 100
-    """The duration, in milliseconds, for which to deliver the N2 gas puff when the animal fails the trial."""
+    """The duration, in milliseconds, for which to deliver the gas puff when the animal fails the trial."""
     occupancy_duration_ms: int = 1000
-    """The time, in milliseconds, the animal must occupy the trigger zone to disarm the stimulus boundary and avoid
-    the gas puff."""
+    """The time, in milliseconds, the animal must satisfy the occupancy condition to avoid the gas puff."""

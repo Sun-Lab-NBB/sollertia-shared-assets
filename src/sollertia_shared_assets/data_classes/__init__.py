@@ -14,6 +14,7 @@ from .runtime_data import (
 )
 from .session_data import (
     RAW_DATA_DIRECTORY,
+    SYSTEM_SESSION_TYPES,
     PROCESSED_DATA_DIRECTORY,
     SYSTEM_RAW_DATA_REGISTRY,
     RawData,
@@ -63,6 +64,7 @@ __all__ = [
     "RAW_DATA_DIRECTORY",
     "READ_ASSET_REGISTRY",
     "SYSTEM_RAW_DATA_REGISTRY",
+    "SYSTEM_SESSION_TYPES",
     "AnimalData",
     "Directories",
     "DrugData",

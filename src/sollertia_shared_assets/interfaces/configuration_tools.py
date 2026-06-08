@@ -22,7 +22,14 @@ from .mcp_instance import (
     write_yaml_validated,
     resolve_root_directory,
 )
-from ..data_classes import READ_ASSET_REGISTRY, CONFIGURATION_DIRECTORY, ReadAssets, ProjectData, SessionTypes
+from ..data_classes import (
+    READ_ASSET_REGISTRY,
+    SYSTEM_SESSION_TYPES,
+    CONFIGURATION_DIRECTORY,
+    ReadAssets,
+    ProjectData,
+    SessionTypes,
+)
 from ..configuration import (
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
@@ -46,11 +53,14 @@ from ..configuration import (
     populate_default_experiment_states,
 )
 
-_TRIAL_CLASSES: dict[str, type[WaterRewardTrial | GasPuffTrial]] = {
-    "WaterRewardTrial": WaterRewardTrial,
-    "GasPuffTrial": GasPuffTrial,
+_TRIAL_CLASSES: dict[AcquisitionSystems, dict[str, type[WaterRewardTrial | GasPuffTrial]]] = {
+    AcquisitionSystems.MESOSCOPE_VR: {
+        "WaterRewardTrial": WaterRewardTrial,
+        "GasPuffTrial": GasPuffTrial,
+    },
 }
-"""Maps trial class names to their concrete trial type."""
+"""Maps each acquisition system to the trial classes its experiment configuration supports, keyed by trial class
+name. ``list_supported_trial_types_tool`` reads this per acquisition system."""
 
 
 @mcp.tool()
@@ -717,15 +727,36 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str) -> di
 
 
 @mcp.tool()
-def list_supported_session_types_tool() -> dict[str, Any]:
-    """Enumerates the SessionTypes supported by the Sollertia platform.
+def list_supported_session_types_tool(acquisition_system: str | None = None) -> dict[str, Any]:
+    """Enumerates the SessionTypes supported by the platform, optionally scoped to one acquisition system.
+
+    When ``acquisition_system`` is provided, only the session types that system can run are returned (per
+    ``SYSTEM_SESSION_TYPES``); when omitted, every platform session type is returned. Agents operating within a
+    configured acquisition system should pass that system so the result reflects what the local host can actually
+    run. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values, and
+    ``list_session_type_support_tool`` to retrieve the full system-to-session-type mapping at once.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value to scope the result to, or None for every session type.
 
     Returns:
-        A response dict with ``session_types`` (a list of dicts containing ``value``, ``name``,
-        and ``descriptor_class`` for each supported session type). The descriptor filename is
-        always ``session_descriptor.yaml`` regardless of session type and is therefore not
-        returned.
+        A response dict with ``acquisition_system`` (the echoed filter, or None) and ``session_types`` (a list of
+        dicts containing ``value``, ``name``, and ``descriptor_class`` for each session type). The descriptor
+        filename is always ``session_descriptor.yaml`` regardless of session type and is therefore not returned.
     """
+    if acquisition_system is not None:
+        try:
+            system = AcquisitionSystems(acquisition_system)
+        except ValueError:
+            valid = ", ".join(member.value for member in AcquisitionSystems)
+            message = (
+                f"Unable to list the supported session types. The acquisition_system '{acquisition_system}' is not a "
+                f"member of AcquisitionSystems. Valid values: {valid}."
+            )
+            return error_response(message=message)
+        supported = SYSTEM_SESSION_TYPES[system]
+    else:
+        supported = frozenset(SessionTypes)
     entries: list[dict[str, Any]] = [
         {
             "value": session_type.value,
@@ -733,8 +764,30 @@ def list_supported_session_types_tool() -> dict[str, Any]:
             "descriptor_class": DESCRIPTOR_REGISTRY[session_type].__name__,
         }
         for session_type in SessionTypes
+        if session_type in supported
     ]
-    return ok_response(session_types=entries)
+    return ok_response(acquisition_system=acquisition_system, session_types=entries)
+
+
+@mcp.tool()
+def list_session_type_support_tool() -> dict[str, Any]:
+    """Returns the full mapping of acquisition systems to the session types each one can run.
+
+    Use this to retrieve the entire system-to-session-type landscape in a single call; use
+    ``list_supported_session_types_tool`` with an ``acquisition_system`` argument when only one system's session
+    types are needed.
+
+    Returns:
+        A response dict with ``session_type_support`` (a dict mapping each acquisition system value to the list of
+        session type values it supports).
+    """
+    support: dict[str, list[str]] = {
+        system.value: [
+            session_type.value for session_type in SessionTypes if session_type in SYSTEM_SESSION_TYPES[system]
+        ]
+        for system in AcquisitionSystems
+    }
+    return ok_response(session_type_support=support)
 
 
 @mcp.tool()
@@ -773,18 +826,33 @@ def list_supported_data_assets_tool() -> dict[str, Any]:
 
 
 @mcp.tool()
-def list_supported_trial_types_tool() -> dict[str, Any]:
-    """Enumerates the trial classes supported by experiment configurations.
+def list_supported_trial_types_tool(acquisition_system: str) -> dict[str, Any]:
+    """Enumerates the trial classes supported by the ``acquisition_system``'s experiment configuration.
+
+    Trial classes are specific to each acquisition system's experiment configuration, so this tool requires the
+    target system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value whose trial vocabulary to enumerate.
 
     Returns:
-        A response dict with ``trial_types`` (a list of dicts containing ``class_name`` and ``schema`` for
-        each supported trial class).
+        A response dict with ``acquisition_system`` and ``trial_types`` (a list of dicts containing ``class_name``
+        and ``schema`` for each supported trial class).
     """
+    try:
+        system = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        message = (
+            f"Unable to list the supported trial types. The acquisition_system '{acquisition_system}' is not a member "
+            f"of AcquisitionSystems. Valid values: {valid}."
+        )
+        return error_response(message=message)
     entries: list[dict[str, Any]] = [
         {"class_name": class_name, "schema": describe_dataclass(cls=trial_class)}
-        for class_name, trial_class in _TRIAL_CLASSES.items()
+        for class_name, trial_class in _TRIAL_CLASSES.get(system, {}).items()
     ]
-    return ok_response(trial_types=entries)
+    return ok_response(acquisition_system=acquisition_system, trial_types=entries)
 
 
 @mcp.tool()

@@ -66,6 +66,7 @@ from .configuration import (
     get_task_templates_directory,
     set_task_templates_directory,
     create_experiment_configuration,
+    populate_default_experiment_states,
 )
 
 # Ensures console is enabled when this library is imported.
@@ -122,6 +123,7 @@ __all__ = [
     "iter_project_animals",
     "iterate_sessions",
     "parse_session_timestamp",
+    "populate_default_experiment_states",
     "resolve_read_asset",
     "set_data_root",
     "set_google_credentials_path",

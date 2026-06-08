@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from sollertia_shared_assets.data_classes import (
+    SYSTEM_SESSION_TYPES,
     SYSTEM_RAW_DATA_REGISTRY,
     RawData,
     AnimalData,
@@ -610,6 +611,40 @@ def test_system_raw_data_registry_includes_mesoscope_vr() -> None:
     """Verifies that the registry exposes the expected acquisition systems."""
     assert AcquisitionSystems.MESOSCOPE_VR in SYSTEM_RAW_DATA_REGISTRY
     assert SYSTEM_RAW_DATA_REGISTRY[AcquisitionSystems.MESOSCOPE_VR] is MesoscopeRawData
+
+
+def test_system_session_types_maps_mesoscope_vr() -> None:
+    """Verifies that SYSTEM_SESSION_TYPES pairs the Mesoscope-VR system with its four session types."""
+    assert SYSTEM_SESSION_TYPES[AcquisitionSystems.MESOSCOPE_VR] == frozenset(
+        {
+            SessionTypes.LICK_TRAINING,
+            SessionTypes.RUN_TRAINING,
+            SessionTypes.MESOSCOPE_EXPERIMENT,
+            SessionTypes.WINDOW_CHECKING,
+        }
+    )
+
+
+def test_session_data_create_rejects_unsupported_session_type(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that create() rejects a session type the acquisition system does not support."""
+    # Narrows the Mesoscope-VR session-type set so WINDOW_CHECKING becomes an unsupported pairing for this test. The
+    # enforcement runs before the project-existence check, so no on-disk project is required.
+    monkeypatch.setitem(
+        SYSTEM_SESSION_TYPES,
+        AcquisitionSystems.MESOSCOPE_VR,
+        frozenset({SessionTypes.LICK_TRAINING}),
+    )
+    with pytest.raises(ValueError, match=r"is not supported by"):
+        SessionData.create(
+            animal=AnimalData(root=tmp_path, project_name="test_project", animal_id="test_animal"),
+            session_type=SessionTypes.WINDOW_CHECKING,
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        )
 
 
 def test_session_data_build_sub_dataclasses_returns_typed_instances() -> None:
