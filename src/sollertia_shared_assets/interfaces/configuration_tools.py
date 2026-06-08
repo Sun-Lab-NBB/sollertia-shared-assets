@@ -49,8 +49,6 @@ from ..configuration import (
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
-    create_experiment_configuration,
-    populate_default_experiment_states,
 )
 
 _TRIAL_CLASSES: dict[AcquisitionSystems, dict[str, type[WaterRewardTrial | GasPuffTrial]]] = {
@@ -569,39 +567,34 @@ def write_experiment_configuration_tool(
 
 
 @mcp.tool()
-def create_experiment_configuration_tool(
+def create_experiment_from_vr_template_tool(
     file_path: str,
     acquisition_system: str,
     template_path: str,
     state_count: int = 1,
-    unity_scene_name: str | None = None,
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates an experiment configuration for ``acquisition_system`` from a task template using sensible defaults.
+    """Creates an experiment configuration for ``acquisition_system`` from a Unity VR task template.
 
-    Loads the template at ``template_path``, builds an experiment configuration via
-    ``create_experiment_configuration`` (which dispatches to the ``acquisition_system``'s factory), populates the
-    requested number of default-valued runtime states, and writes the result to ``file_path``. Use
-    ``write_experiment_configuration_tool`` instead when full control over the payload is required, and
-    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
-
-    Notes:
-        ``template_path`` and ``unity_scene_name`` are the creation inputs for any acquisition system that uses the
-        Unity VR task system (sollertia-unity-tasks, driven through sle's VR task driver) — Mesoscope-VR is the
-        current such system, and any future system that interfaces with the same VR task driver reuses these exact
-        fields. A system that does not use the Unity VR task system builds its configuration from different inputs;
-        extend this tool's parameters alongside that system's factory when one is added.
+    Loads the task template at ``template_path`` and builds the experiment configuration through the acquisition
+    system's experiment-configuration class, which maps the template's trial structures to runtime trials and seeds
+    ``state_count`` default-valued runtime states. Then writes the result to ``file_path``. This tool serves only
+    acquisition systems whose experiment configuration is built from a Unity VR task template; a system that builds
+    its configuration from different inputs is authored directly with ``write_experiment_configuration_tool`` or
+    another specialized skill. The embedded Unity scene name is inferred from the template filename, mirroring how
+    sollertia-unity-tasks derives the scene name at task creation. Use ``list_supported_acquisition_systems_tool`` to
+    enumerate valid ``acquisition_system`` values.
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
             location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
             implicitly by the sollertia-experiment session-creation flow; this tool does not create them.
-        acquisition_system: The ``AcquisitionSystems`` value whose factory builds the configuration.
-        template_path: Absolute path to the TaskTemplate YAML to instantiate.
+        acquisition_system: The ``AcquisitionSystems`` value whose experiment configuration is built from the
+            template.
+        template_path: Absolute path to the Unity VR task template YAML to instantiate. The embedded Unity scene
+            name is inferred from this file's stem (the filename without the ``.yaml`` extension).
         state_count: Number of default-valued runtime states to generate.
-        unity_scene_name: The Unity scene name to embed in the experiment configuration. Defaults to the template
-            file's stem (the filename without the ``.yaml`` extension), which is the convention most projects follow.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
@@ -611,29 +604,39 @@ def create_experiment_configuration_tool(
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
         return resolved
+
+    # Dispatches to the acquisition system's own experiment-configuration class, which owns the template-to-config
+    # translation. A system whose configuration is not built from a VR task template does not expose from_task_template
+    # and is authored through write_experiment_configuration_tool instead.
+    template_factory = getattr(resolved, "from_task_template", None)
+    if template_factory is None:
+        message = (
+            f"Unable to create an experiment configuration for acquisition system '{acquisition_system}' from a Unity "
+            f"VR task template: its experiment configuration is not built from a task template. Author it directly "
+            f"with write_experiment_configuration_tool instead."
+        )
+        return error_response(message=message)
+
     destination = Path(file_path)
-    template_file = Path(template_path)
     if destination.exists() and not overwrite:
         message = (
             f"Unable to write the experiment configuration to {destination}: a file already exists at this path. "
             f"Pass overwrite=True to replace it."
         )
         return error_response(message=message)
+
+    template_file = Path(template_path)
     if not template_file.exists():
         message = f"Unable to load the task template from {template_file}: the file does not exist."
         return error_response(message=message)
 
-    resolved_scene_name = unity_scene_name if unity_scene_name is not None else template_file.stem
+    resolved_scene_name = template_file.stem
 
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_file)
-        experiment_configuration = create_experiment_configuration(
+        experiment_configuration = template_factory(
             template=task_template,
-            system=AcquisitionSystems(acquisition_system),
             unity_scene_name=resolved_scene_name,
-        )
-        populate_default_experiment_states(
-            experiment_configuration=experiment_configuration,
             state_count=state_count,
         )
         destination.parent.mkdir(parents=True, exist_ok=True)

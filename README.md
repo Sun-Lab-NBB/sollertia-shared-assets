@@ -143,7 +143,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults               |
+| `create_experiment_configuration_tool`          | Creates an experiment configuration for an acquisition system using sensible defaults          |
 | `create_project_tool`                           | Creates the on-disk directory structure for a new project under a data root                    |
 | `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call    |
 | `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root  |
