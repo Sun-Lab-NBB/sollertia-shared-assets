@@ -48,7 +48,8 @@ class RawDataFiles(StrEnum):
     """The experiment configuration YAML copied into the session for experiment sessions only."""
     VR_CONFIGURATION = "vr_configuration.yaml"
     """The Virtual Reality (VR) task template YAML cached into the session at acquisition time. Records the Unity task
-    template (cues, VR environment, trial structures) that was active when the session was acquired."""
+    template (cues, VR environment, trial structures) that was active when the session was acquired. Optional: only
+    acquisition systems that use the Unity VR task system write this file."""
     SYSTEM_CONFIGURATION = "system_configuration.yaml"
     """The system configuration YAML copied into the session by the acquisition runtime."""
     CHECKSUM = "ax_checksum.txt"
@@ -186,10 +187,11 @@ class RawData:
     session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
     """Stores the Virtual Reality (VR) task template (cues, VR environment, trial structures) that was active when the
-    session was acquired. Populated by ``SessionData.create()`` for experiment sessions by copying the template YAML
-    that matches the experiment configuration's ``unity_scene_name`` out of the task templates directory; for non-
-    experiment sessions, the acquisition runtime writes this file when a VR task is used. Callers should check
-    ``.exists()`` before reading. Parsed via ``TaskTemplate``."""
+    session was acquired. Optional: only acquisition systems that use the Unity VR task system populate this file —
+    systems that do not use VR never write it. Populated by ``SessionData.create()`` for experiment sessions by
+    copying the template YAML that matches the experiment configuration's ``unity_scene_name`` out of the task
+    templates directory; for non-experiment sessions, the acquisition runtime writes this file when a VR task is used.
+    Callers should check ``.exists()`` before reading. Parsed via ``TaskTemplate``."""
     checksum_path: Path
     """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
     accidental modification of raw assets after acquisition."""
@@ -375,6 +377,22 @@ session's ``raw_data`` directory. ``SessionData._build_sub_dataclasses`` consult
 ``<System>RawData`` builder here."""
 
 
+SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
+    AcquisitionSystems.MESOSCOPE_VR: frozenset(
+        {
+            SessionTypes.LICK_TRAINING,
+            SessionTypes.RUN_TRAINING,
+            SessionTypes.MESOSCOPE_EXPERIMENT,
+            SessionTypes.WINDOW_CHECKING,
+        }
+    ),
+}
+"""Maps each acquisition system to the set of session types it can run. ``SessionData.create()`` rejects a session
+type that is not paired with the session's acquisition system, and ``_assert_registry_coverage`` verifies that every
+acquisition system declares at least one session type and that every session type is claimed by at least one system.
+Future acquisition systems register the session types they support here."""
+
+
 @dataclass
 class SessionData(YamlConfig):
     """Defines the structure and the metadata of a data acquisition session.
@@ -490,6 +508,19 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=ValueError)
         acquisition_system = AcquisitionSystems(acquisition_system)
+
+        # Rejects session-type / acquisition-system pairings the platform does not recognize. SYSTEM_SESSION_TYPES is
+        # the single source of truth for which session types each acquisition system can run, so a typo or an
+        # unsupported combination fails here instead of producing an unrunnable session on disk.
+        session_type = SessionTypes(session_type)
+        if session_type not in SYSTEM_SESSION_TYPES[acquisition_system]:
+            supported = ", ".join(member.value for member in SYSTEM_SESSION_TYPES[acquisition_system])
+            message = (
+                f"Unable to initialize a new data acquisition session. The session type '{session_type.value}' is not "
+                f"supported by the '{acquisition_system.value}' acquisition system. Supported session types: "
+                f"{supported}."
+            )
+            console.error(message=message, error=ValueError)
 
         # Microsecond UTC timestamps as session names give unique, totally-ordered identifiers across hosts.
         # noinspection PyStringConversionWithoutDunderMethod

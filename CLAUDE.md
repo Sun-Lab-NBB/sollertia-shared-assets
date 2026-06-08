@@ -62,33 +62,33 @@ state to prevent integration errors.
 
 The sollertia marketplace ships an `assets` plugin with skills that target this library directly, and a `unity` plugin
 whose Unity Editor skills drive the `McpBridge` relay tools that this library's `slsa mcp` server exposes through
-`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sun Lab
+`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sollertia Platform
 repositories.
 
-| Skill                           | Description                                                                  |
-|---------------------------------|------------------------------------------------------------------------------|
-| `/explore-codebase`             | Perform in-depth codebase exploration at session start                       |
-| `/python-style`                 | Apply Sun Lab Python coding conventions (REQUIRED for Python changes)        |
-| `/readme-style`                 | Apply Sun Lab README conventions (REQUIRED for README changes)               |
-| `/commit`                       | Draft Sun Lab style-compliant git commit messages                            |
-| `/pyproject-style`              | Apply Sun Lab pyproject.toml conventions                                     |
-| `/tox-config`                   | Apply Sun Lab tox.ini conventions                                            |
-| `/api-docs`                     | Apply Sun Lab Sphinx documentation conventions                               |
-| `/project-layout`               | Apply Sun Lab project directory structure conventions                        |
-| `/skill-design`                 | Generate, update, and verify skill files and this CLAUDE.md                  |
-| `/audit-facts`                  | Audit documentation files against source code for factual accuracy           |
-| `/audit-style`                  | Audit files against applicable style skill checklists for compliance         |
-| `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                   |
-| `/working-directory`            | Initialize the working directory, Google credentials, and templates path     |
-| `/project-hierarchy`            | Discover the project / animal / session tree under the data root             |
-| `/session-discovery`            | Discover and filter sessions by date, animal, or name (`session_paths` flow) |
-| `/session-data`                 | Read, write, and validate `session_data.yaml` markers                        |
-| `/session-descriptors`          | Read, write, and validate per-session-type `session_descriptor.yaml` files   |
-| `/session-hardware-state`       | Read, write, and validate `hardware_state.yaml` snapshots                    |
-| `/subject-metadata`             | Read and amend `surgery_metadata.yaml` SurgeryData files                     |
-| `/experiment-configuration`     | Author per-project `MesoscopeExperimentConfiguration` YAMLs                  |
-| `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                      |
-| `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary    |
+| Skill                           | Description                                                                      |
+|---------------------------------|----------------------------------------------------------------------------------|
+| `/explore-codebase`             | Perform in-depth codebase exploration at session start                           |
+| `/python-style`                 | Apply Sollertia Platform Python coding conventions (REQUIRED for Python changes) |
+| `/readme-style`                 | Apply Sollertia Platform README conventions (REQUIRED for README changes)        |
+| `/commit`                       | Draft Sollertia Platform style-compliant git commit messages                     |
+| `/pyproject-style`              | Apply Sollertia Platform pyproject.toml conventions                              |
+| `/tox-config`                   | Apply Sollertia Platform tox.ini conventions                                     |
+| `/api-docs`                     | Apply Sollertia Platform Sphinx documentation conventions                        |
+| `/project-layout`               | Apply Sollertia Platform project directory structure conventions                 |
+| `/skill-design`                 | Generate, update, and verify skill files and this CLAUDE.md                      |
+| `/audit-facts`                  | Audit documentation files against source code for factual accuracy               |
+| `/audit-style`                  | Audit files against applicable style skill checklists for compliance             |
+| `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                       |
+| `/working-directory`            | Initialize the working directory, Google credentials, and templates path         |
+| `/project-hierarchy`            | Discover the project / animal / session tree under the data root                 |
+| `/session-discovery`            | Discover and filter sessions by date, animal, or name (`session_paths` flow)     |
+| `/session-data`                 | Read, write, and validate `session_data.yaml` markers                            |
+| `/session-descriptors`          | Read, write, and validate per-session-type `session_descriptor.yaml` files       |
+| `/session-hardware-state`       | Read, write, and validate `hardware_state.yaml` snapshots                        |
+| `/subject-metadata`             | Read and amend `surgery_metadata.yaml` SurgeryData files                         |
+| `/experiment-configuration`     | Author per-project `MesoscopeExperimentConfiguration` YAMLs                      |
+| `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
+| `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
 member, `SessionTypes` member, runtime trial class (a sibling of `WaterRewardTrial` / `GasPuffTrial`), 
@@ -150,14 +150,14 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Key areas
 
-| Directory                                          | Purpose                                                          |
-|----------------------------------------------------|------------------------------------------------------------------|
-| `src/sollertia_shared_assets/configuration/`       | VR-task and experiment configuration dataclasses (YamlConfig)    |
-| `src/sollertia_shared_assets/data_classes/`        | Session, descriptor, and surgery dataclasses + discovery helpers |
-| `src/sollertia_shared_assets/interfaces/`          | `slsa` CLI and FastMCP server with all MCP tool modules          |
-| `tests/`                                           | Test suite (configuration and data-classes only; MCP excluded)   |
-| `docs/`                                            | Sphinx API documentation source                                  |
-| `envs/`                                            | Conda/mamba development environment specifications               |
+| Directory                                    | Purpose                                                                                      |
+|----------------------------------------------|----------------------------------------------------------------------------------------------|
+| `src/sollertia_shared_assets/configuration/` | VR-task and experiment configuration dataclasses (YamlConfig)                                |
+| `src/sollertia_shared_assets/data_classes/`  | Session, descriptor, and surgery dataclasses, the read-asset registry, and discovery helpers |
+| `src/sollertia_shared_assets/interfaces/`    | `slsa` CLI and FastMCP server with all MCP tool modules                                      |
+| `tests/`                                     | Test suite (configuration and data-classes only; MCP excluded)                               |
+| `docs/`                                      | Sphinx API documentation source                                                              |
+| `envs/`                                      | Conda/mamba development environment specifications                                           |
 
 ### Architecture
 
@@ -172,7 +172,7 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   dispatched by `SessionTypes` and `AcquisitionSystems` enum membership.
 - **Interface layer**: A single `FastMCP` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and registry helpers. Tool modules import the instance and register `@mcp.tool()` functions. The CLI
-  (`slsa`) starts the server and exposes `configure {directory,data-root,google,templates,project,experiment}` and
+  (`slsa`) starts the server and exposes `configure {directory,data-root,google,templates,project}` and
   `get {directory,data-root,google,templates,projects,experiments}` command groups.
 - **Persistent host settings**: Four independent `platformdirs`-backed settings — working directory, data root,
   Google credentials path, templates directory — are managed in `configuration/configuration_utilities.py`. Only the
@@ -180,9 +180,12 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Extension contracts
 
-Five dispatch registries route polymorphic behavior off the two primary enums. Adding a new acquisition system or
-session type means touching every registry below. Use the `/library-extension` skill — it owns the touch list and
-the import-time parity check that fails if any registry is incomplete.
+Six registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
+`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). A seventh structure, `SYSTEM_SESSION_TYPES`, is an
+association keyed by `AcquisitionSystems` that records which session types each acquisition system can run. Adding a
+new acquisition system or session type means touching the relevant registries below and `SYSTEM_SESSION_TYPES`;
+adding a new external read asset means touching `READ_ASSET_REGISTRY`. Use the `/library-extension` skill — it owns
+the touch list and the import-time parity check that fails if any registry is incomplete.
 
 | Registry                              | File                                       | Keyed by             |
 |---------------------------------------|--------------------------------------------|----------------------|
@@ -190,16 +193,21 @@ the import-time parity check that fails if any registry is incomplete.
 | `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`               | `AcquisitionSystems` |
 | `EXPERIMENT_CONFIGURATION_REGISTRY`   | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 | `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
+| `SYSTEM_SESSION_TYPES`                | `data_classes/session_data.py`             | `AcquisitionSystems` |
+| `READ_ASSET_REGISTRY`                 | `data_classes/read_assets.py`              | `ReadAssets`         |
 | `_experiment_config_factory_registry` | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 
-`_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the four
-public registries is missing entries for a known enum member. `_experiment_config_factory_registry` is **not** covered
-by the parity check (a missing factory only fails at call time, not at import).
+`_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the five
+public dispatch registries is missing entries for a known enum member, or if `SYSTEM_SESSION_TYPES` leaves an
+acquisition system with no session types or a session type unclaimed by any system.
+`_experiment_config_factory_registry` is **not** covered by the parity check (a missing factory only fails at call
+time, not at import).
 
-A sixth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps trial-class **names** (e.g.,
-`"WaterRewardTrial"`) to their concrete dataclasses. It is not a dispatch registry and is not parity-checked;
-`list_supported_trial_types_tool` reads it to enumerate the trial vocabulary. Adding a new runtime trial class
-requires a matching entry here, otherwise the new class is silently omitted from the tool's response.
+An eighth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps each `AcquisitionSystems` member to
+its trial-class **names** (e.g., `"WaterRewardTrial"`) and their concrete dataclasses. It is not a dispatch registry
+and is not parity-checked; `list_supported_trial_types_tool(acquisition_system)` reads it to enumerate a system's
+trial vocabulary. Adding a new runtime trial class requires a matching entry under the relevant system, otherwise the
+new class is silently omitted from the tool's response.
 
 ### Code standards
 
@@ -215,8 +223,8 @@ requires a matching entry here, otherwise the new class is silently omitted from
 - **Library naming in prose**: Write `sollertia-shared-assets`, not `slsa`, in documentation, comments, and commit
   messages. The short form is reserved for the CLI entry point and the mamba environment name (`slsa_dev`).
 - **Minimal machinery**: Prefer concrete classes, explicit `Path` fields, and `if`/`elif` dispatch over ABCs,
-  `@property`-derived state, back-references, or unnecessary registries. The five registries listed above are
-  necessary because they cross enum boundaries; do not add more without justification.
+  `@property`-derived state, back-references, or unnecessary registries. The registries and the `SYSTEM_SESSION_TYPES`
+  association listed above are necessary because they cross enum boundaries; do not add more without justification.
 - **No tests for MCP tools**: `@mcp.tool()` functions live behind the FastMCP server and are excluded from coverage.
   Test the helper functions they delegate to instead.
 - **Frozen acquisition snapshots**: Every per-session YAML in `raw_data/` (descriptor, hardware state, system

@@ -14,7 +14,10 @@ from mcp.server.fastmcp import FastMCP
 from ataraxis_base_utilities import console
 
 from ..data_classes import (
+    READ_ASSET_REGISTRY,
+    SYSTEM_SESSION_TYPES,
     SYSTEM_RAW_DATA_REGISTRY,
+    ReadAssets,
     SessionData,
     RawDataFiles,
     SessionTypes,
@@ -56,12 +59,14 @@ thing that varies is the parsing class. Future acquisition systems register here
 
 
 def _assert_registry_coverage() -> None:
-    """Verifies at import time that every ``SessionTypes`` and ``AcquisitionSystems`` member has an entry in each
-    dispatch registry.
+    """Verifies at import time that every ``SessionTypes``, ``AcquisitionSystems``, and ``ReadAssets`` member has an
+    entry in each dispatch registry. Also verifies that ``SYSTEM_SESSION_TYPES`` pairs every acquisition system with
+    at least one session type and claims every session type under at least one system.
 
     Raises:
-        RuntimeError: If any registry is missing entries for known enum members. The error message names the
-            offending registry and the missing members so extenders can immediately locate the unwired touch point.
+        RuntimeError: If any registry is missing entries for known enum members, or if ``SYSTEM_SESSION_TYPES`` leaves
+            an acquisition system or a session type unpaired. The error message names the offending registry and the
+            missing members so extenders can immediately locate the unwired touch point.
     """
     coverage_checks: tuple[tuple[str, frozenset[StrEnum], frozenset[StrEnum]], ...] = (
         ("DESCRIPTOR_REGISTRY", frozenset(SessionTypes), frozenset(DESCRIPTOR_REGISTRY)),
@@ -72,6 +77,7 @@ def _assert_registry_coverage() -> None:
             frozenset(EXPERIMENT_CONFIGURATION_REGISTRY),
         ),
         ("SYSTEM_RAW_DATA_REGISTRY", frozenset(AcquisitionSystems), frozenset(SYSTEM_RAW_DATA_REGISTRY)),
+        ("READ_ASSET_REGISTRY", frozenset(ReadAssets), frozenset(READ_ASSET_REGISTRY)),
     )
     for registry_name, expected, actual in coverage_checks:
         missing = expected - actual
@@ -79,10 +85,32 @@ def _assert_registry_coverage() -> None:
             missing_names = ", ".join(sorted(member.name for member in missing))
             message = (
                 f"{registry_name} is missing entries for {missing_names}. Every enum member must have a registered "
-                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' "
-                f"sections for the full extension touch list."
+                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' / "
+                f"'Adding a New Read Asset' sections for the full extension touch list."
             )
             console.error(message=message, error=RuntimeError)
+
+    # SYSTEM_SESSION_TYPES is an association (system -> session-type set), not a dispatch registry, so it is checked
+    # separately. Every acquisition system must declare at least one session type, and every session type must be
+    # claimed by at least one system; either gap would let SessionData.create reject a legitimate session or admit an
+    # unrunnable one.
+    systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(SYSTEM_SESSION_TYPES)
+    if systems_missing_session_types:
+        missing_names = ", ".join(sorted(member.name for member in systems_missing_session_types))
+        message = (
+            f"SYSTEM_SESSION_TYPES is missing entries for {missing_names}. Every acquisition system must declare the "
+            f"session types it can run. See the README's 'Adding New Acquisition Systems' section."
+        )
+        console.error(message=message, error=RuntimeError)
+    claimed_session_types: frozenset[SessionTypes] = frozenset().union(*SYSTEM_SESSION_TYPES.values())
+    orphan_session_types = frozenset(SessionTypes) - claimed_session_types
+    if orphan_session_types:
+        orphan_names = ", ".join(sorted(member.name for member in orphan_session_types))
+        message = (
+            f"SYSTEM_SESSION_TYPES does not claim {orphan_names}. Every session type must be supported by at least one "
+            f"acquisition system. See the README's 'Adding New Session Types' section."
+        )
+        console.error(message=message, error=RuntimeError)
 
 
 _assert_registry_coverage()

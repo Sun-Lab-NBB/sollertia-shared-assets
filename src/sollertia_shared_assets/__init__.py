@@ -10,12 +10,14 @@ from ataraxis_base_utilities import console
 
 from .data_classes import (
     RAW_DATA_DIRECTORY,
+    READ_ASSET_REGISTRY,
     CONFIGURATION_DIRECTORY,
     PROCESSED_DATA_DIRECTORY,
     PERSISTENT_DATA_DIRECTORY,
     RawData,
     DrugData,
     AnimalData,
+    ReadAssets,
     Directories,
     ImplantData,
     ProjectData,
@@ -37,6 +39,7 @@ from .data_classes import (
     iterate_sessions,
     discover_projects,
     discover_sessions,
+    resolve_read_asset,
     validate_directory,
     iter_animal_sessions,
     iter_project_animals,
@@ -63,6 +66,7 @@ from .configuration import (
     get_task_templates_directory,
     set_task_templates_directory,
     create_experiment_configuration,
+    populate_default_experiment_states,
 )
 
 # Ensures console is enabled when this library is imported.
@@ -74,6 +78,7 @@ __all__ = [
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
+    "READ_ASSET_REGISTRY",
     "AcquisitionSystems",
     "AnimalData",
     "Cue",
@@ -93,6 +98,7 @@ __all__ = [
     "ProjectData",
     "RawData",
     "RawDataFiles",
+    "ReadAssets",
     "RunTrainingDescriptor",
     "SessionData",
     "SessionTypes",
@@ -117,6 +123,8 @@ __all__ = [
     "iter_project_animals",
     "iterate_sessions",
     "parse_session_timestamp",
+    "populate_default_experiment_states",
+    "resolve_read_asset",
     "set_data_root",
     "set_google_credentials_path",
     "set_task_templates_directory",

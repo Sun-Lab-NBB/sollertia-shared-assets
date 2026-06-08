@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 from pathlib import Path
 
 if TYPE_CHECKING:
+    from collections.abc import Sized
+
     from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
@@ -20,7 +22,14 @@ from .mcp_instance import (
     write_yaml_validated,
     resolve_root_directory,
 )
-from ..data_classes import CONFIGURATION_DIRECTORY, ProjectData, SessionTypes
+from ..data_classes import (
+    READ_ASSET_REGISTRY,
+    SYSTEM_SESSION_TYPES,
+    CONFIGURATION_DIRECTORY,
+    ReadAssets,
+    ProjectData,
+    SessionTypes,
+)
 from ..configuration import (
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
@@ -32,7 +41,6 @@ from ..configuration import (
     ExperimentState,
     WaterRewardTrial,
     AcquisitionSystems,
-    MesoscopeExperimentConfiguration,
     get_data_root,
     set_data_root,
     get_working_directory,
@@ -45,11 +53,14 @@ from ..configuration import (
     populate_default_experiment_states,
 )
 
-_TRIAL_CLASSES: dict[str, type[WaterRewardTrial | GasPuffTrial]] = {
-    "WaterRewardTrial": WaterRewardTrial,
-    "GasPuffTrial": GasPuffTrial,
+_TRIAL_CLASSES: dict[AcquisitionSystems, dict[str, type[WaterRewardTrial | GasPuffTrial]]] = {
+    AcquisitionSystems.MESOSCOPE_VR: {
+        "WaterRewardTrial": WaterRewardTrial,
+        "GasPuffTrial": GasPuffTrial,
+    },
 }
-"""Maps trial class names to their concrete trial type."""
+"""Maps each acquisition system to the trial classes its experiment configuration supports, keyed by trial class
+name. ``list_supported_trial_types_tool`` reads this per acquisition system."""
 
 
 @mcp.tool()
@@ -487,90 +498,119 @@ def discover_experiments_tool(
 
 
 @mcp.tool()
-def read_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
-    """Loads a MesoscopeExperimentConfiguration YAML from any canonical location.
+def read_experiment_configuration_tool(file_path: str, acquisition_system: str) -> dict[str, Any]:
+    """Loads an experiment configuration YAML, parsing it with the dataclass that matches ``acquisition_system``.
 
-    The same experiment configuration schema is used for both the authored per-project source
-    config and the frozen per-session snapshot copied at acquisition time. This tool reads both.
-    Pass the per-project path (``<root>/<project>/configuration/<experiment>.yaml``) to inspect
-    the authored source. Pass the per-session snapshot path
-    (``<session>/raw_data/experiment_configuration.yaml``) to inspect the immutable record of
-    what was active when the session was acquired.
+    The same experiment configuration schema is used for both the authored per-project source config and the
+    frozen per-session snapshot copied at acquisition time. This tool reads both. Pass the per-project path
+    (``<root>/<project>/configuration/<experiment>.yaml``) to inspect the authored source. Pass the per-session
+    snapshot path (``<session>/raw_data/experiment_configuration.yaml``) to inspect the immutable record of what
+    was active when the session was acquired. Use ``list_supported_acquisition_systems_tool`` to enumerate valid
+    ``acquisition_system`` values.
 
     Args:
-        file_path: Absolute path to the experiment configuration YAML file. Accepts either the
-            per-project source path or the per-session frozen snapshot path.
+        file_path: Absolute path to the experiment configuration YAML file. Accepts either the per-project
+            source path or the per-session frozen snapshot path.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which experiment-configuration dataclass
+            to parse the file with.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` containing the full experiment configuration
-        payload.
+        A response dict with ``data`` (the full experiment configuration payload), ``acquisition_system``, and
+        ``file_path``.
     """
-    return read_yaml(file_path=Path(file_path), validator_cls=MesoscopeExperimentConfiguration)
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    response = read_yaml(file_path=Path(file_path), validator_cls=resolved)
+    if response.get("success"):
+        response["acquisition_system"] = acquisition_system
+    return response
 
 
 @mcp.tool()
 def write_experiment_configuration_tool(
     file_path: str,
+    acquisition_system: str,
     configuration_payload: dict[str, Any],
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates or replaces an experiment configuration YAML.
+    """Creates or replaces an experiment configuration YAML, validated against ``acquisition_system``.
 
-    The ``configuration_payload`` must match the MesoscopeExperimentConfiguration schema. Use
-    ``describe_experiment_configuration_schema_tool`` to inspect the required structure.
+    The ``configuration_payload`` must match the experiment-configuration schema for ``acquisition_system``. Use
+    ``describe_experiment_configuration_schema_tool`` to inspect the required structure, and
+    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     Args:
-        file_path: Absolute path to the destination experiment configuration YAML file. Canonical
-            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``. Project
-            directories are created implicitly by the sollertia-experiment session-creation flow;
-            this tool does not create them.
+        file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
+            location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
+            implicitly by the sollertia-experiment session-creation flow; this tool does not create them.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which experiment-configuration dataclass
+            to validate against.
         configuration_payload: The complete experiment configuration payload.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` (the validated configuration payload).
+        A response dict with ``file_path``, ``data`` (the validated configuration payload), and
+        ``acquisition_system``.
     """
-    return write_yaml_validated(
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
+    response = write_yaml_validated(
         file_path=Path(file_path),
         payload=configuration_payload,
-        validator_cls=MesoscopeExperimentConfiguration,
+        validator_cls=resolved,
         overwrite=overwrite,
     )
+    if response.get("success"):
+        response["acquisition_system"] = acquisition_system
+    return response
 
 
 @mcp.tool()
 def create_experiment_configuration_tool(
     file_path: str,
+    acquisition_system: str,
     template_path: str,
     state_count: int = 1,
     unity_scene_name: str | None = None,
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates an experiment configuration from a task template using sensible defaults.
+    """Creates an experiment configuration for ``acquisition_system`` from a task template using sensible defaults.
 
     Loads the template at ``template_path``, builds an experiment configuration via
-    ``create_experiment_configuration``, populates the requested number of default-valued runtime
-    states, and writes the result to ``file_path``. Use ``write_experiment_configuration_tool``
-    instead when full control over the payload is required.
+    ``create_experiment_configuration`` (which dispatches to the ``acquisition_system``'s factory), populates the
+    requested number of default-valued runtime states, and writes the result to ``file_path``. Use
+    ``write_experiment_configuration_tool`` instead when full control over the payload is required, and
+    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+
+    Notes:
+        ``template_path`` and ``unity_scene_name`` are the creation inputs for any acquisition system that uses the
+        Unity VR task system (sollertia-unity-tasks, driven through sle's VR task driver) — Mesoscope-VR is the
+        current such system, and any future system that interfaces with the same VR task driver reuses these exact
+        fields. A system that does not use the Unity VR task system builds its configuration from different inputs;
+        extend this tool's parameters alongside that system's factory when one is added.
 
     Args:
-        file_path: Absolute path to the destination experiment configuration YAML file. Canonical
-            per-project location is ``<root>/<project>/configuration/<experiment>.yaml``. Project
-            directories are created implicitly by the sollertia-experiment session-creation flow;
-            this tool does not create them.
+        file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
+            location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
+            implicitly by the sollertia-experiment session-creation flow; this tool does not create them.
+        acquisition_system: The ``AcquisitionSystems`` value whose factory builds the configuration.
         template_path: Absolute path to the TaskTemplate YAML to instantiate.
         state_count: Number of default-valued runtime states to generate.
-        unity_scene_name: The Unity scene name to embed in the experiment configuration. Defaults
-            to the template file's stem (the filename without the ``.yaml`` extension), which is the
-            convention most projects follow.
+        unity_scene_name: The Unity scene name to embed in the experiment configuration. Defaults to the template
+            file's stem (the filename without the ``.yaml`` extension), which is the convention most projects follow.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
-        A response dict with ``file_path``, ``template_path``, and ``data`` (the generated experiment
-        configuration payload).
+        A response dict with ``file_path``, ``acquisition_system``, ``template_path``, and ``data`` (the generated
+        experiment configuration payload).
     """
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
     destination = Path(file_path)
     template_file = Path(template_path)
     if destination.exists() and not overwrite:
@@ -589,7 +629,7 @@ def create_experiment_configuration_tool(
         task_template = TaskTemplate.from_yaml(file_path=template_file)
         experiment_configuration = create_experiment_configuration(
             template=task_template,
-            system=AcquisitionSystems.MESOSCOPE_VR,
+            system=AcquisitionSystems(acquisition_system),
             unity_scene_name=resolved_scene_name,
         )
         populate_default_experiment_states(
@@ -603,44 +643,70 @@ def create_experiment_configuration_tool(
 
     return ok_response(
         file_path=str(destination),
+        acquisition_system=acquisition_system,
         template_path=str(template_file),
         data=serialize(value=experiment_configuration),
     )
 
 
 @mcp.tool()
-def validate_experiment_configuration_tool(file_path: str) -> dict[str, Any]:
-    """Loads and validates an experiment configuration YAML.
+def validate_experiment_configuration_tool(file_path: str, acquisition_system: str) -> dict[str, Any]:
+    """Loads and validates an experiment configuration YAML against the ``acquisition_system`` schema.
+
+    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     Args:
         file_path: Absolute path to the experiment configuration YAML file.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which experiment-configuration dataclass
+            to validate against.
 
     Returns:
-        A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``trial_count``,
-        ``state_count``, and ``unity_scene_name``) or ``issues`` (a list of validation error messages).
+        A response dict with ``file_path``, ``acquisition_system``, ``valid``, and either ``summary`` (carrying the
+        configuration's trial, state, and scene fields when present) or ``issues`` (a list of validation errors).
     """
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
     configuration_path = Path(file_path)
     if not configuration_path.exists():
         message = f"Unable to validate the experiment configuration at {configuration_path}: the file does not exist."
         return error_response(message=message)
     try:
-        experiment_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=configuration_path)
+        experiment_configuration = resolved.from_yaml(file_path=configuration_path)
     except Exception as exception:
-        return ok_response(valid=False, issues=[str(exception)], file_path=str(configuration_path))
-    summary = {
-        "trial_count": len(experiment_configuration.trial_structures),
-        "state_count": len(experiment_configuration.experiment_states),
-        "unity_scene_name": experiment_configuration.unity_scene_name,
-    }
-    return ok_response(valid=True, file_path=str(configuration_path), summary=summary)
+        return ok_response(
+            valid=False,
+            issues=[str(exception)],
+            file_path=str(configuration_path),
+            acquisition_system=acquisition_system,
+        )
+    # Summary fields are system-specific; include each only when the resolved configuration exposes it.
+    summary: dict[str, Any] = {}
+    trial_structures: Sized | None = getattr(experiment_configuration, "trial_structures", None)
+    if trial_structures is not None:
+        summary["trial_count"] = len(trial_structures)
+    experiment_states: Sized | None = getattr(experiment_configuration, "experiment_states", None)
+    if experiment_states is not None:
+        summary["state_count"] = len(experiment_states)
+    unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
+    if unity_scene_name is not None:
+        summary["unity_scene_name"] = unity_scene_name
+    return ok_response(
+        valid=True,
+        file_path=str(configuration_path),
+        acquisition_system=acquisition_system,
+        summary=summary,
+    )
 
 
 @mcp.tool()
-def describe_experiment_configuration_schema_tool(acquisition_system: str = "mesoscope") -> dict[str, Any]:
+def describe_experiment_configuration_schema_tool(acquisition_system: str) -> dict[str, Any]:
     """Returns the schema for the experiment configuration of a given acquisition system.
 
+    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+
     Args:
-        acquisition_system: The AcquisitionSystems value to describe. Defaults to ``"mesoscope"``.
+        acquisition_system: The ``AcquisitionSystems`` value to describe.
 
     Returns:
         A response dict with ``acquisition_system`` (the resolved acquisition system) and ``schema`` (the
@@ -661,15 +727,36 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str = "mes
 
 
 @mcp.tool()
-def list_supported_session_types_tool() -> dict[str, Any]:
-    """Enumerates the SessionTypes supported by the Sollertia platform.
+def list_supported_session_types_tool(acquisition_system: str | None = None) -> dict[str, Any]:
+    """Enumerates the SessionTypes supported by the platform, optionally scoped to one acquisition system.
+
+    When ``acquisition_system`` is provided, only the session types that system can run are returned (per
+    ``SYSTEM_SESSION_TYPES``); when omitted, every platform session type is returned. Agents operating within a
+    configured acquisition system should pass that system so the result reflects what the local host can actually
+    run. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values, and
+    ``list_session_type_support_tool`` to retrieve the full system-to-session-type mapping at once.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value to scope the result to, or None for every session type.
 
     Returns:
-        A response dict with ``session_types`` (a list of dicts containing ``value``, ``name``,
-        and ``descriptor_class`` for each supported session type). The descriptor filename is
-        always ``session_descriptor.yaml`` regardless of session type and is therefore not
-        returned.
+        A response dict with ``acquisition_system`` (the echoed filter, or None) and ``session_types`` (a list of
+        dicts containing ``value``, ``name``, and ``descriptor_class`` for each session type). The descriptor
+        filename is always ``session_descriptor.yaml`` regardless of session type and is therefore not returned.
     """
+    if acquisition_system is not None:
+        try:
+            system = AcquisitionSystems(acquisition_system)
+        except ValueError:
+            valid = ", ".join(member.value for member in AcquisitionSystems)
+            message = (
+                f"Unable to list the supported session types. The acquisition_system '{acquisition_system}' is not a "
+                f"member of AcquisitionSystems. Valid values: {valid}."
+            )
+            return error_response(message=message)
+        supported = SYSTEM_SESSION_TYPES[system]
+    else:
+        supported = frozenset(SessionTypes)
     entries: list[dict[str, Any]] = [
         {
             "value": session_type.value,
@@ -677,8 +764,30 @@ def list_supported_session_types_tool() -> dict[str, Any]:
             "descriptor_class": DESCRIPTOR_REGISTRY[session_type].__name__,
         }
         for session_type in SessionTypes
+        if session_type in supported
     ]
-    return ok_response(session_types=entries)
+    return ok_response(acquisition_system=acquisition_system, session_types=entries)
+
+
+@mcp.tool()
+def list_session_type_support_tool() -> dict[str, Any]:
+    """Returns the full mapping of acquisition systems to the session types each one can run.
+
+    Use this to retrieve the entire system-to-session-type landscape in a single call; use
+    ``list_supported_session_types_tool`` with an ``acquisition_system`` argument when only one system's session
+    types are needed.
+
+    Returns:
+        A response dict with ``session_type_support`` (a dict mapping each acquisition system value to the list of
+        session type values it supports).
+    """
+    support: dict[str, list[str]] = {
+        system.value: [
+            session_type.value for session_type in SessionTypes if session_type in SYSTEM_SESSION_TYPES[system]
+        ]
+        for system in AcquisitionSystems
+    }
+    return ok_response(session_type_support=support)
 
 
 @mcp.tool()
@@ -694,18 +803,56 @@ def list_supported_acquisition_systems_tool() -> dict[str, Any]:
 
 
 @mcp.tool()
-def list_supported_trial_types_tool() -> dict[str, Any]:
-    """Enumerates the trial classes supported by experiment configurations.
+def list_supported_data_assets_tool() -> dict[str, Any]:
+    """Enumerates the read-asset data formats supported by the Sollertia platform.
+
+    Read assets are external records the platform reads and caches on disk as typed dataclasses. Use the
+    returned ``value`` as the ``data_asset`` argument to ``read_data_asset_tool``,
+    ``write_data_asset_tool``, and ``describe_data_asset_schema_tool``.
 
     Returns:
-        A response dict with ``trial_types`` (a list of dicts containing ``class_name`` and ``schema`` for
-        each supported trial class).
+        A response dict with ``data_assets`` (a list of dicts containing ``value``, ``name``, and
+        ``data_asset_class`` for each supported read asset).
     """
     entries: list[dict[str, Any]] = [
-        {"class_name": class_name, "schema": describe_dataclass(cls=trial_class)}
-        for class_name, trial_class in _TRIAL_CLASSES.items()
+        {
+            "value": read_asset.value,
+            "name": read_asset.name,
+            "data_asset_class": READ_ASSET_REGISTRY[read_asset].__name__,
+        }
+        for read_asset in ReadAssets
     ]
-    return ok_response(trial_types=entries)
+    return ok_response(data_assets=entries)
+
+
+@mcp.tool()
+def list_supported_trial_types_tool(acquisition_system: str) -> dict[str, Any]:
+    """Enumerates the trial classes supported by the ``acquisition_system``'s experiment configuration.
+
+    Trial classes are specific to each acquisition system's experiment configuration, so this tool requires the
+    target system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+
+    Args:
+        acquisition_system: The ``AcquisitionSystems`` value whose trial vocabulary to enumerate.
+
+    Returns:
+        A response dict with ``acquisition_system`` and ``trial_types`` (a list of dicts containing ``class_name``
+        and ``schema`` for each supported trial class).
+    """
+    try:
+        system = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        message = (
+            f"Unable to list the supported trial types. The acquisition_system '{acquisition_system}' is not a member "
+            f"of AcquisitionSystems. Valid values: {valid}."
+        )
+        return error_response(message=message)
+    entries: list[dict[str, Any]] = [
+        {"class_name": class_name, "schema": describe_dataclass(cls=trial_class)}
+        for class_name, trial_class in _TRIAL_CLASSES.get(system, {}).items()
+    ]
+    return ok_response(acquisition_system=acquisition_system, trial_types=entries)
 
 
 @mcp.tool()

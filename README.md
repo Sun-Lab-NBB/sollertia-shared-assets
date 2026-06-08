@@ -42,6 +42,7 @@ ___
 - [Developers](#developers)
   - [Adding New Session Types](#adding-new-session-types)
   - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
+  - [Adding a New Read Asset](#adding-a-new-read-asset)
 - [Versioning](#versioning)
 - [Authors](#authors)
 - [License](#license)
@@ -117,7 +118,6 @@ This library provides the `slsa` CLI that exposes the following commands and com
 | `configure google`     | Sets the path to the Google service account credentials file          |
 | `configure templates`  | Sets the path to the sollertia-unity-tasks task templates directory   |
 | `configure project`    | Creates a project directory structure for data acquisition            |
-| `configure experiment` | Creates an experiment configuration from a task template              |
 
 Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage
 information.
@@ -152,7 +152,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
 | `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                               |
-| `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                   |
+| `describe_data_asset_schema_tool`               | Returns the read-asset dataclass schema for the given data_asset                               |
 | `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment          |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
@@ -168,9 +168,11 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `list_assets_tool`                              | Lists Unity assets of a given type within a search path                                        |
 | `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                  |
 | `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
+| `list_session_type_support_tool`                | Returns the full mapping of each acquisition system to the session types it can run            |
 | `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
-| `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
-| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                            |
+| `list_supported_data_assets_tool`               | Enumerates the read-asset data formats supported by the Sollertia platform                     |
+| `list_supported_session_types_tool`             | Enumerates session types, optionally scoped to one acquisition system                          |
+| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by an acquisition system's experiment configuration     |
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
 | `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                         |
 | `read_data_root_tool`                           | Returns the configured Sollertia platform data root path                                       |
@@ -179,7 +181,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                      |
 | `read_session_descriptor_tool`                  | Loads a session descriptor YAML using the descriptor class for the given session type          |
 | `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system     |
-| `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
+| `read_data_asset_tool`                          | Loads a read-asset YAML, parsing it with the dataclass for the given data_asset                |
 | `read_task_parameters_tool`                     | Reads the Unity Editor's Task Parameters window state, options, and per-control visibility     |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                       |
@@ -194,7 +196,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema         |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
 | `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass     |
-| `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData           |
+| `write_data_asset_tool`                         | Creates or replaces a read-asset YAML, validated against the given data_asset's dataclass      |
 | `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call      |
 | `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory             |
 
@@ -232,14 +234,14 @@ that want to modify the source code of this library.
 ### Installing the Project
 
 ***Note,*** this installation method requires **mamba version 2.3.2 or above**. Currently, all
-Sun lab automation pipelines require that mamba is installed through the
+Sollertia Platform automation pipelines require that mamba is installed through the
 [miniforge3](https://github.com/conda-forge/miniforge) installer.
 
 1. Download this repository to the local machine using the preferred method, such as git-cloning.
 2. If the downloaded distribution is stored as a compressed archive, unpack it using the
    appropriate decompression tool.
 3. `cd` to the root directory of the prepared project distribution.
-4. Install the core Sun lab development dependencies into the ***base*** mamba environment via the
+4. Install the core Sollertia Platform development dependencies into the ***base*** mamba environment via the
    `mamba install tox uv tox-uv` command.
 5. Use the `tox -e create` command to create the project-specific development environment followed
    by `tox -e install` command to install the project into that environment as a library.
@@ -288,7 +290,7 @@ window-checking). Each type has its own descriptor dataclass that captures the t
 outcome metadata, persisted as `session_descriptor.yaml` inside the session's `raw_data` directory. The descriptor
 filename is flat across all types — only the parsing class varies, and is dispatched via `DESCRIPTOR_REGISTRY`.
 
-**Step 1: Extend the SessionTypes enum**
+**Step 1: Extend the SessionTypes enum and pair it with an acquisition system**
 
 In `data_classes/session_data.py`, add a new member to `SessionTypes`:
 
@@ -300,6 +302,10 @@ class SessionTypes(StrEnum):
     WINDOW_CHECKING = "window checking"
     NEW_TYPE = "new type"  # Add new session type here
 ```
+
+Then add the new member to the `SYSTEM_SESSION_TYPES` frozenset of every acquisition system that can run it. The
+import-time parity check (`_assert_registry_coverage`) raises if any session type is claimed by no acquisition
+system, and `SessionData.create()` rejects a session type that is not paired with the session's acquisition system.
 
 **Step 2: Add the descriptor dataclass**
 
@@ -332,8 +338,9 @@ Each system contributes its own hardware-state snapshot, experiment-configuratio
 data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
 by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
 `SYSTEM_RAW_DATA_REGISTRY`. A fourth registry, `_experiment_config_factory_registry`, dispatches `TaskTemplate`-to-
-configuration factories. System-level hardware and software configuration classes live in the acquisition runtime
-package (sollertia-experiment), not in this library.
+configuration factories. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
+System-level hardware and software configuration classes live in the acquisition runtime package
+(sollertia-experiment), not in this library.
 
 **Step 1: Extend the AcquisitionSystems enum**
 
@@ -383,6 +390,10 @@ Three registries need entries for the new system:
 3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
    this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
    new system into session loading.
+4. In `data_classes/session_data.py`, add a `SYSTEM_SESSION_TYPES` entry mapping the new `AcquisitionSystems` key to
+   the `frozenset` of `SessionTypes` the system can run. The parity check raises if a system declares no session
+   types, and `SessionData.create()` uses this set to reject session-type / system pairings the system does not
+   support.
 
 **Step 6: Add the TaskTemplate-to-configuration factory**
 
@@ -400,6 +411,57 @@ In `configuration/configuration_utilities.py`:
 Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
 acquisition runtime) and sollertia-forgery (data processing) as needed.
 
+### Adding a New Read Asset
+
+A **read asset** is metadata the platform reads from an external, human-maintained source (for example, the surgery
+log Google Sheet). The concrete architecture decision is that every read asset is translated by the acquisition
+library (sollertia-experiment) into a typed dataclass and cached on disk in a standardized format. Downstream
+consumers (notably sollertia-forgery) then interact only with that on-disk dataclass and never touch the external
+source. Because the dataclass is the canonical format, it is reusable regardless of the upstream storage — the
+acquisition library translates whatever source it reads (Google Sheets or otherwise) into it.
+
+This applies only to assets the platform **reads**. Assets the platform only **writes** to an external source (for
+example, the water-restriction log) have no on-disk representation to standardize, so they need no dataclass and no
+registry entry — they are owned entirely by the writing library.
+
+`ReadAssets` enumerates the supported read-asset formats and `READ_ASSET_REGISTRY` maps each to its on-disk
+dataclass, both in `data_classes/read_assets.py`. The import-time parity check (`_assert_registry_coverage`)
+enforces that every `ReadAssets` member has a registered dataclass.
+
+**Step 1: Add the dataclass**
+
+In `data_classes/`, add the concrete on-disk representation as a dataclass inheriting from `YamlConfig` (use
+`data_classes/surgery_data.py`'s `SurgeryData` as reference). Export it from `data_classes/__init__.py`.
+
+**Step 2: Extend the ReadAssets enum**
+
+In `data_classes/read_assets.py`, add a new member to `ReadAssets`:
+
+```python
+class ReadAssets(StrEnum):
+    SURGERY_DATA = "surgery_data"
+    NEW_ASSET = "new_asset"  # Add new read-asset format here
+```
+
+**Step 3: Register the dataclass**
+
+In the same file, register it in `READ_ASSET_REGISTRY` under the new `ReadAssets` key:
+
+```python
+READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
+    ReadAssets.SURGERY_DATA: SurgeryData,
+    ReadAssets.NEW_ASSET: NewAsset,
+}
+```
+
+The parity check catches a forgotten registry entry at import time, naming the missing member.
+
+**Step 4: Wire the translation downstream**
+
+Coordinate with sollertia-experiment, which reads the external source, translates it into the new dataclass, and
+caches it on disk for sollertia-forgery to consume. This is the only place that knows the source's storage-specific
+representation; the dataclass keeps every downstream consumer storage-agnostic.
+
 ### AI-Assisted Development
 
 Claude Code skills and AI development assets for this project are distributed through two marketplaces:
@@ -412,8 +474,9 @@ Claude Code skills and AI development assets for this project are distributed th
   - **unity** plugin — Unity Editor skills that drive the `McpBridge` relay tools served by the `slsa mcp` server,
     document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger zone prefabs.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
-  - **automation** plugin — shared development skills that enforce Sun Lab coding conventions (Python style, README
-    style, commit messages, pyproject.toml, tox configuration) and general-purpose codebase exploration tools.
+  - **automation** plugin — shared development skills that enforce Sollertia Platform coding conventions (Python
+    style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose codebase
+    exploration tools.
 
 Install all three plugins to make the full skill set available to compatible AI coding agents. The **unity** plugin
 depends on the **assets** plugin for the backing `slsa mcp` server that drives the Unity Editor relay.
