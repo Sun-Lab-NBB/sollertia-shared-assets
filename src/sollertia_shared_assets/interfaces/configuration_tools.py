@@ -20,7 +20,7 @@ from .mcp_instance import (
     write_yaml_validated,
     resolve_root_directory,
 )
-from ..data_classes import CONFIGURATION_DIRECTORY, SessionTypes
+from ..data_classes import CONFIGURATION_DIRECTORY, ProjectData, SessionTypes
 from ..configuration import (
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
@@ -181,6 +181,43 @@ def set_data_root_tool(directory: str) -> dict[str, Any]:
     except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
     return ok_response(data_root=str(path))
+
+
+@mcp.tool()
+def create_project_tool(project_name: str, root_directory: str | None = None) -> dict[str, Any]:
+    """Creates the on-disk directory structure for a new project under a data root.
+
+    Materializes the project hierarchy so the project becomes visible to directory-based discovery and ready to
+    hold experiment configurations. When ``root_directory`` is omitted, the project is created under the
+    configured Sollertia platform data root.
+
+    Args:
+        project_name: The name of the project to create, used as the project directory name.
+        root_directory: The absolute path to the data root under which to create the project. When None, the
+            configured platform data root is used.
+
+    Returns:
+        A response dict with ``project_name``, ``project_path``, and ``configuration_directory`` containing the
+        created project's resolved paths.
+    """
+    if root_directory is None:
+        try:
+            root_directory = str(get_data_root())
+        except FileNotFoundError as exception:
+            return error_response(message=str(exception))
+
+    root, error = resolve_root_directory(root_directory=root_directory)
+    if error is not None:
+        return error
+    if root is None:
+        return error_response(message=f"Unable to resolve the data root from {root_directory}.")
+
+    project = ProjectData(root=root, project_name=project_name).create()
+    return ok_response(
+        project_name=project_name,
+        project_path=str(project.path),
+        configuration_directory=str(project.configuration_directory),
+    )
 
 
 @mcp.tool()

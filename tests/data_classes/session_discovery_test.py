@@ -11,12 +11,14 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from sollertia_shared_assets.data_classes import (
+    AnimalData,
     SessionData,
     SessionTypes,
     filter_sessions,
     iterate_sessions,
     discover_sessions,
     validate_directory,
+    iter_animal_sessions,
     get_projects_for_animal,
     parse_session_timestamp,
     get_session_root_from_marker,
@@ -145,6 +147,32 @@ def test_iterate_sessions_yields_loaded_session_data(populated_project_tree: Pat
         SessionTypes.MESOSCOPE_EXPERIMENT,
         SessionTypes.WINDOW_CHECKING,
     }
+
+
+def test_iter_animal_sessions_yields_only_session_directories(tmp_path: Path) -> None:
+    """Verifies that iter_animal_sessions yields session-named directories in sorted order and skips others."""
+    animal = AnimalData(root=tmp_path, project_name="proj_a", animal_id="1")
+    animal.path.mkdir(parents=True)
+    animal.session_path(session_name="2026-03-05-12-00-00-000000").mkdir()
+    animal.session_path(session_name="2026-03-01-12-00-00-000000").mkdir()
+    animal.persistent_data_path.mkdir()
+    animal.path.joinpath(".hidden").mkdir()
+    animal.path.joinpath("not_a_session").mkdir()
+
+    sessions = list(iter_animal_sessions(animal=animal))
+
+    assert [session.name for session in sessions] == [
+        "2026-03-01-12-00-00-000000",
+        "2026-03-05-12-00-00-000000",
+    ]
+    assert all(session.parent == animal.path for session in sessions)
+
+
+def test_iter_animal_sessions_missing_animal_directory_yields_nothing(tmp_path: Path) -> None:
+    """Verifies that iter_animal_sessions yields nothing when the animal directory does not exist."""
+    animal = AnimalData(root=tmp_path, project_name="proj_a", animal_id="ghost")
+
+    assert list(iter_animal_sessions(animal=animal)) == []
 
 
 def test_get_projects_for_animal_returns_sorted_membership(tmp_path: Path) -> None:

@@ -141,61 +141,62 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 
 #### Available Tools
 
-| Tool                                            | Description                                                                                     |
-|-------------------------------------------------|-------------------------------------------------------------------------------------------------|
-| `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults                |
-| `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call     |
-| `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root   |
-| `delete_task_tool`                              | Removes a Unity task end-to-end: scene, scene companion, task prefab, and every segment prefab  |
-| `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system               |
-| `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                                |
-| `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                      |
-| `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                                |
-| `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                    |
-| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment           |
-| `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                           |
-| `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                  |
-| `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                            |
-| `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                             |
-| `filter_sessions_tool`                          | Filters discovered session entries by date range and animal- or session-name criteria           |
-| `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy from SessionData and per-session lifecycle status   |
-| `get_platform_environment_status_tool`          | Reports the status of the working directory, data root, templates directory, and Google creds    |
-| `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                               |
-| `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab            |
-| `inspect_scene_tool`                            | Returns the active scene's metadata, dirty flag, and recursive root GameObject hierarchy        |
-| `inspect_sessions_tool`                         | Produces a detailed health and inventory report for one or more sessions                        |
-| `list_assets_tool`                              | Lists Unity assets of a given type within a search path                                         |
-| `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                   |
-| `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                          |
-| `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                          |
-| `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                                |
-| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                             |
-| `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                                |
-| `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                          |
-| `read_data_root_tool`                           | Returns the configured Sollertia platform data root path                                        |
-| `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)          |
-| `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                      |
-| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                       |
-| `read_session_descriptor_tool`                  | Loads a session descriptor YAML using the descriptor class for the given session type           |
-| `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system      |
-| `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot     |
-| `read_task_parameters_tool`                     | Reads the Unity Editor's Task Parameters window state, options, and per-control visibility      |
-| `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                     |
-| `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                        |
-| `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                                |
-| `set_data_root_tool`                            | Sets the local Sollertia platform data root                                                     |
-| `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                    |
-| `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                   |
-| `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                             |
-| `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                        |
-| `validate_template_tool`                        | Validates a TaskTemplate (live or session snapshot) against its schema and constraints          |
-| `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                              |
-| `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema          |
-| `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                     |
-| `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass      |
-| `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData            |
-| `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call       |
-| `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory              |
+| Tool                                            | Description                                                                                    |
+|-------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults               |
+| `create_project_tool`                           | Creates the on-disk directory structure for a new project under a data root                    |
+| `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call    |
+| `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root  |
+| `delete_task_tool`                              | Removes a Unity task end-to-end: scene, scene companion, task prefab, and every segment prefab |
+| `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system              |
+| `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |
+| `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
+| `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                               |
+| `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                   |
+| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment          |
+| `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
+| `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
+| `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
+| `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
+| `filter_sessions_tool`                          | Filters discovered session entries by \date range and animal- or session-name criteria         |
+| `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy and status; optionally surfaces empty directories  |
+| `get_platform_environment_status_tool`          | Reports the status of the working directory, data root, templates directory, and Google creds  |
+| `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
+| `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab           |
+| `inspect_scene_tool`                            | Returns the active scene's metadata, dirty flag, and recursive root GameObject hierarchy       |
+| `inspect_sessions_tool`                         | Produces a detailed health and inventory report for one or more sessions                       |
+| `list_assets_tool`                              | Lists Unity assets of a given type within a search path                                        |
+| `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                  |
+| `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
+| `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
+| `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
+| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                            |
+| `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
+| `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                         |
+| `read_data_root_tool`                           | Returns the configured Sollertia platform data root path                                       |
+| `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)         |
+| `read_google_credentials_tool`                  | Returns the configured path to the Google service account credentials file                     |
+| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                      |
+| `read_session_descriptor_tool`                  | Loads a session descriptor YAML using the descriptor class for the given session type          |
+| `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system     |
+| `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
+| `read_task_parameters_tool`                     | Reads the Unity Editor's Task Parameters window state, options, and per-control visibility     |
+| `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
+| `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                       |
+| `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
+| `set_data_root_tool`                            | Sets the local Sollertia platform data root                                                    |
+| `set_google_credentials_tool`                   | Sets the path to the Google service account credentials file                                   |
+| `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                  |
+| `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                            |
+| `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                       |
+| `validate_template_tool`                        | Validates a TaskTemplate (live or session snapshot) against its schema and constraints         |
+| `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                             |
+| `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema         |
+| `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
+| `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass     |
+| `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData           |
+| `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call      |
+| `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory             |
 
 ***Note,*** tools that interact with Unity (`create_task_tool`, `delete_asset_tool`, `delete_task_tool`,
 `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `inspect_scene_tool`,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from pathlib import Path
 from dataclasses import fields, dataclass
 
@@ -38,6 +38,8 @@ from ..data_classes import (
     ProcedureData,
     ProcessingTrackers,
     filter_sessions,
+    discover_projects,
+    iter_project_animals,
     get_session_root_from_marker,
 )
 from ..configuration import AcquisitionSystems
@@ -64,7 +66,9 @@ class _SessionStatusInfo:
 
 
 @mcp.tool()
-def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
+def get_data_root_overview_tool(
+    root_directory: str, strategy: Literal["markers", "directories"] = "markers"
+) -> dict[str, Any]:
     """Walks the data root and groups loadable ``session_data.yaml`` markers into a project / animal / session tree.
 
     Sessions are bucketed by their SessionData identity fields, not by directory structure, so stray
@@ -72,8 +76,16 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
     ``sessions`` list with ``status="error"`` and an ``error_detail`` field, but do not contribute to
     project or animal aggregation.
 
+    The ``strategy`` argument controls whether empty hierarchies surface. The ``markers`` strategy reports only
+    projects and animals that hold at least one loadable session. The ``directories`` strategy additionally walks
+    the directory layout and merges in any project or animal that holds no sessions as a zero-count entry, so
+    acquisition machines whose sessions have been migrated to long-term storage still expose the project and
+    animal hierarchy they retain for migration.
+
     Args:
         root_directory: Absolute path to the data root to scan.
+        strategy: Whether to report only session-backed hierarchies (``markers``) or to also surface empty
+            project and animal directories from the directory layout (``directories``).
 
     Returns:
         A response dict with top-level keys ``projects``, ``sessions``, ``counts``, ``total_projects``,
@@ -87,13 +99,15 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
+    if root is None:
+        return error_response(message=f"Unable to resolve the data root from {root_directory}.")
 
     flat_sessions: list[dict[str, Any]] = []
     top_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
 
     # Walks every session marker under the root. Broken markers produce error-status entries but do
     # not corrupt the project / animal aggregation because their identity cannot be trusted.
-    markers = sorted(root.rglob(RawDataFiles.SESSION_DATA))  # type: ignore[union-attr]
+    markers = sorted(root.rglob(RawDataFiles.SESSION_DATA))
     for marker in markers:
         session_root = get_session_root_from_marker(marker=marker)
         try:
@@ -131,7 +145,10 @@ def get_data_root_overview_tool(root_directory: str) -> dict[str, Any]:
         flat_sessions.append(entry)
         top_counts[status_info.status] += 1
 
-    projects = _aggregate_projects(root=root, sessions=flat_sessions)  # type: ignore[arg-type]
+    projects = _aggregate_projects(root=root, sessions=flat_sessions)
+
+    if strategy == "directories":
+        projects = _augment_with_directory_hierarchy(root=root, projects=projects)
 
     for project in projects:
         experiment_count, dataset_count = _count_project_artifacts(project_path=Path(project["path"]))
@@ -754,6 +771,52 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
         )
 
     return projects
+
+
+def _augment_with_directory_hierarchy(root: Path, projects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Merges project and animal directories that hold no sessions into a marker-derived project list.
+
+    The marker walk only surfaces projects and animals that contain at least one loadable session, so a
+    hierarchy whose sessions have been migrated to long-term storage is invisible to it. This helper walks the
+    directory layout and adds any missing project or animal as an empty, zero-count entry, so the overview
+    reflects the on-disk hierarchy that acquisition machines retain for migration.
+
+    Args:
+        root: The resolved data root path whose directory layout is enumerated.
+        projects: The marker-derived per-project aggregates to augment.
+
+    Returns:
+        The augmented per-project aggregates, sorted by project name.
+    """
+    projects_by_name = {project["name"]: project for project in projects}
+    for project_view in discover_projects(root_path=root, strategy="directories"):
+        project = projects_by_name.get(project_view.project_name)
+        if project is None:
+            project = {
+                "name": project_view.project_name,
+                "path": str(project_view.path),
+                "animals": [],
+                "session_count": 0,
+                "counts": dict.fromkeys(_STATUS_KEYS, 0),
+                "sessions_by_type": {member.value: 0 for member in SessionTypes},
+            }
+            projects_by_name[project_view.project_name] = project
+
+        existing_animal_ids: set[str] = {animal["id"] for animal in project["animals"]}
+        for animal_view in iter_project_animals(project=project_view):
+            if animal_view.animal_id in existing_animal_ids:
+                continue
+            project["animals"].append(
+                {
+                    "id": animal_view.animal_id,
+                    "session_paths": [],
+                    "session_count": 0,
+                    "counts": dict.fromkeys(_STATUS_KEYS, 0),
+                }
+            )
+        project["animals"].sort(key=lambda entry: entry["id"])
+
+    return [projects_by_name[name] for name in sorted(projects_by_name)]
 
 
 def _count_project_artifacts(project_path: Path) -> tuple[int, int]:

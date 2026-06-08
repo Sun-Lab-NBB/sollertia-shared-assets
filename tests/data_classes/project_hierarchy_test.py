@@ -84,6 +84,22 @@ def test_project_data_exists(tmp_path: Path) -> None:
     assert project.exists()
 
 
+def test_project_data_create(tmp_path: Path) -> None:
+    """Verifies that create materializes the project configuration directory, returns self, and is idempotent."""
+    project = ProjectData(root=tmp_path, project_name="alpha")
+    assert not project.exists()
+
+    returned = project.create()
+
+    assert returned is project
+    assert project.configuration_directory.is_dir()
+    assert project.exists()
+
+    # Calling create again leaves the existing directories untouched.
+    project.create()
+    assert project.configuration_directory.is_dir()
+
+
 def test_animal_data_path_resolution() -> None:
     """Verifies that AnimalData resolves the animal, persistent-data, and session paths under the root."""
     animal = AnimalData(root=_LOCAL_ROOT, project_name="alpha", animal_id="mouse1")

@@ -143,6 +143,29 @@ def iter_project_animals(project: ProjectData) -> Iterator[AnimalData]:
             yield project.animal(animal_id=child.name)
 
 
+def iter_animal_sessions(animal: AnimalData) -> Iterator[Path]:
+    """Discovers the session directories under an animal and yields their root paths.
+
+    Enumeration is directory-based: child directories whose names parse as session timestamps are yielded as
+    session roots, so sessions are surfaced without reading any markers. This complements the marker-based
+    ``discover_sessions`` for callers that already know the animal hierarchy and want to avoid a recursive scan.
+    Non-session children, such as the persistent-data directory and hidden directories, do not parse as session
+    names and are therefore skipped.
+
+    Args:
+        animal: The ``AnimalData`` view whose session directories are discovered.
+
+    Yields:
+        Each session root path under the animal, in sorted order.
+    """
+    animal_path = animal.path
+    if not animal_path.is_dir():
+        return
+    for child in sorted(animal_path.iterdir()):
+        if child.is_dir() and parse_session_timestamp(session_name=child.name) is not None:
+            yield child
+
+
 def get_projects_for_animal(root_path: Path, animal_id: str) -> tuple[str, ...]:
     """Returns the names of all projects under the data root that include the given animal.
 
