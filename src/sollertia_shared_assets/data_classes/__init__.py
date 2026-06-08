@@ -1,5 +1,10 @@
 """Provides assets for storing data acquired through the Sollertia platform."""
 
+from .read_assets import (
+    READ_ASSET_REGISTRY,
+    ReadAssets,
+    resolve_read_asset,
+)
 from .runtime_data import (
     RunTrainingDescriptor,
     LickTrainingDescriptor,
@@ -56,6 +61,7 @@ __all__ = [
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
+    "READ_ASSET_REGISTRY",
     "SYSTEM_RAW_DATA_REGISTRY",
     "AnimalData",
     "Directories",
@@ -74,6 +80,7 @@ __all__ = [
     "ProjectData",
     "RawData",
     "RawDataFiles",
+    "ReadAssets",
     "RunTrainingDescriptor",
     "SessionData",
     "SessionTypes",
@@ -89,5 +96,6 @@ __all__ = [
     "iter_project_animals",
     "iterate_sessions",
     "parse_session_timestamp",
+    "resolve_read_asset",
     "validate_directory",
 ]

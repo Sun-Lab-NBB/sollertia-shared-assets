@@ -153,7 +153,7 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 | Directory                                          | Purpose                                                          |
 |----------------------------------------------------|------------------------------------------------------------------|
 | `src/sollertia_shared_assets/configuration/`       | VR-task and experiment configuration dataclasses (YamlConfig)    |
-| `src/sollertia_shared_assets/data_classes/`        | Session, descriptor, and surgery dataclasses + discovery helpers |
+| `src/sollertia_shared_assets/data_classes/`        | Session, descriptor, and surgery dataclasses, the read-asset registry, and discovery helpers |
 | `src/sollertia_shared_assets/interfaces/`          | `slsa` CLI and FastMCP server with all MCP tool modules          |
 | `tests/`                                           | Test suite (configuration and data-classes only; MCP excluded)   |
 | `docs/`                                            | Sphinx API documentation source                                  |
@@ -180,9 +180,11 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Extension contracts
 
-Five dispatch registries route polymorphic behavior off the two primary enums. Adding a new acquisition system or
-session type means touching every registry below. Use the `/library-extension` skill — it owns the touch list and
-the import-time parity check that fails if any registry is incomplete.
+Six registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
+`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). Adding a new acquisition system or session type means
+touching the relevant primary-enum registries below; adding a new external read asset means touching
+`READ_ASSET_REGISTRY`. Use the `/library-extension` skill — it owns the touch list and the import-time parity check
+that fails if any registry is incomplete.
 
 | Registry                              | File                                       | Keyed by             |
 |---------------------------------------|--------------------------------------------|----------------------|
@@ -190,13 +192,14 @@ the import-time parity check that fails if any registry is incomplete.
 | `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`               | `AcquisitionSystems` |
 | `EXPERIMENT_CONFIGURATION_REGISTRY`   | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 | `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
+| `READ_ASSET_REGISTRY`                 | `data_classes/read_assets.py`              | `ReadAssets`         |
 | `_experiment_config_factory_registry` | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 
-`_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the four
+`_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the five
 public registries is missing entries for a known enum member. `_experiment_config_factory_registry` is **not** covered
 by the parity check (a missing factory only fails at call time, not at import).
 
-A sixth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps trial-class **names** (e.g.,
+A seventh structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps trial-class **names** (e.g.,
 `"WaterRewardTrial"`) to their concrete dataclasses. It is not a dispatch registry and is not parity-checked;
 `list_supported_trial_types_tool` reads it to enumerate the trial vocabulary. Adding a new runtime trial class
 requires a matching entry here, otherwise the new class is silently omitted from the tool's response.

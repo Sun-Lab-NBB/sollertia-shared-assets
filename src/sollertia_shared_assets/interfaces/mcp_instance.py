@@ -14,7 +14,9 @@ from mcp.server.fastmcp import FastMCP
 from ataraxis_base_utilities import console
 
 from ..data_classes import (
+    READ_ASSET_REGISTRY,
     SYSTEM_RAW_DATA_REGISTRY,
+    ReadAssets,
     SessionData,
     RawDataFiles,
     SessionTypes,
@@ -56,8 +58,8 @@ thing that varies is the parsing class. Future acquisition systems register here
 
 
 def _assert_registry_coverage() -> None:
-    """Verifies at import time that every ``SessionTypes`` and ``AcquisitionSystems`` member has an entry in each
-    dispatch registry.
+    """Verifies at import time that every ``SessionTypes``, ``AcquisitionSystems``, and ``ReadAssets`` member has an
+    entry in each dispatch registry.
 
     Raises:
         RuntimeError: If any registry is missing entries for known enum members. The error message names the
@@ -72,6 +74,7 @@ def _assert_registry_coverage() -> None:
             frozenset(EXPERIMENT_CONFIGURATION_REGISTRY),
         ),
         ("SYSTEM_RAW_DATA_REGISTRY", frozenset(AcquisitionSystems), frozenset(SYSTEM_RAW_DATA_REGISTRY)),
+        ("READ_ASSET_REGISTRY", frozenset(ReadAssets), frozenset(READ_ASSET_REGISTRY)),
     )
     for registry_name, expected, actual in coverage_checks:
         missing = expected - actual
@@ -79,8 +82,8 @@ def _assert_registry_coverage() -> None:
             missing_names = ", ".join(sorted(member.name for member in missing))
             message = (
                 f"{registry_name} is missing entries for {missing_names}. Every enum member must have a registered "
-                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' "
-                f"sections for the full extension touch list."
+                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' / "
+                f"'Adding a New Read Asset' sections for the full extension touch list."
             )
             console.error(message=message, error=RuntimeError)
 

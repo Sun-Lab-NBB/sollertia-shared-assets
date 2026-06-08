@@ -42,6 +42,7 @@ ___
 - [Developers](#developers)
   - [Adding New Session Types](#adding-new-session-types)
   - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
+  - [Adding a New Read Asset](#adding-a-new-read-asset)
 - [Versioning](#versioning)
 - [Authors](#authors)
 - [License](#license)
@@ -399,6 +400,57 @@ In `configuration/configuration_utilities.py`:
 
 Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
 acquisition runtime) and sollertia-forgery (data processing) as needed.
+
+### Adding a New Read Asset
+
+A **read asset** is metadata the platform reads from an external, human-maintained source (for example, the surgery
+log Google Sheet). The concrete architecture decision is that every read asset is translated by the acquisition
+library (sollertia-experiment) into a typed dataclass and cached on disk in a standardized format. Downstream
+consumers (notably sollertia-forgery) then interact only with that on-disk dataclass and never touch the external
+source. Because the dataclass is the canonical format, it is reusable regardless of the upstream storage — the
+acquisition library translates whatever source it reads (Google Sheets or otherwise) into it.
+
+This applies only to assets the platform **reads**. Assets the platform only **writes** to an external source (for
+example, the water-restriction log) have no on-disk representation to standardize, so they need no dataclass and no
+registry entry — they are owned entirely by the writing library.
+
+`ReadAssets` enumerates the supported read-asset formats and `READ_ASSET_REGISTRY` maps each to its on-disk
+dataclass, both in `data_classes/read_assets.py`. The import-time parity check (`_assert_registry_coverage`)
+enforces that every `ReadAssets` member has a registered dataclass.
+
+**Step 1: Add the dataclass**
+
+In `data_classes/`, add the concrete on-disk representation as a dataclass inheriting from `YamlConfig` (use
+`data_classes/surgery_data.py`'s `SurgeryData` as reference). Export it from `data_classes/__init__.py`.
+
+**Step 2: Extend the ReadAssets enum**
+
+In `data_classes/read_assets.py`, add a new member to `ReadAssets`:
+
+```python
+class ReadAssets(StrEnum):
+    SURGERY_DATA = "surgery_data"
+    NEW_ASSET = "new_asset"  # Add new read-asset format here
+```
+
+**Step 3: Register the dataclass**
+
+In the same file, register it in `READ_ASSET_REGISTRY` under the new `ReadAssets` key:
+
+```python
+READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
+    ReadAssets.SURGERY_DATA: SurgeryData,
+    ReadAssets.NEW_ASSET: NewAsset,
+}
+```
+
+The parity check catches a forgotten registry entry at import time, naming the missing member.
+
+**Step 4: Wire the translation downstream**
+
+Coordinate with sollertia-experiment, which reads the external source, translates it into the new dataclass, and
+caches it on disk for sollertia-forgery to consume. This is the only place that knows the source's storage-specific
+representation; the dataclass keeps every downstream consumer storage-agnostic.
 
 ### AI-Assisted Development
 
