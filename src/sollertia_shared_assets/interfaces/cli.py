@@ -189,8 +189,7 @@ def configure_task_templates_directory(directory: Path) -> None:  # pragma: no c
 )
 def configure_project(project: str, root_directory: Path) -> None:  # pragma: no cover
     """Creates the data structure for a new project under the provided root data directory."""
-    project_path = root_directory.joinpath(project, CONFIGURATION_DIRECTORY)
-    ensure_directory_exists(path=project_path)
+    ProjectData(root=root_directory, project_name=project).create()
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
 
 

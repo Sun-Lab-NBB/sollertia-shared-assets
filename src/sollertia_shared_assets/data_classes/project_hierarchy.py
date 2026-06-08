@@ -34,7 +34,8 @@ class ProjectData:
 
     Instances are lightweight path-grammar views: they construct paths from the root and project name and do
     not require the project directory to exist on disk. Rebind the same project under a different root with
-    ``for_root`` to resolve its locations on a remote storage root.
+    ``for_root`` to resolve its locations on a remote storage root, or materialize the project's directory
+    structure on the current root with ``create``.
     """
 
     root: Path
@@ -85,6 +86,18 @@ class ProjectData:
         if not configuration_directory.is_dir():
             return ()
         return tuple(sorted(configuration_directory.glob("*.yaml")))
+
+    def create(self) -> ProjectData:
+        """Creates the project's directory structure under the data root.
+
+        Materializes the project's configuration directory, which also creates the project directory itself as
+        a parent. The operation is idempotent, so existing directories are left untouched.
+
+        Returns:
+            This instance, to support call chaining.
+        """
+        self.configuration_directory.mkdir(parents=True, exist_ok=True)
+        return self
 
     def exists(self) -> bool:
         """Returns whether the project directory exists on disk under the data root."""
