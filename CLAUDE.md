@@ -62,33 +62,33 @@ state to prevent integration errors.
 
 The sollertia marketplace ships an `assets` plugin with skills that target this library directly, and a `unity` plugin
 whose Unity Editor skills drive the `McpBridge` relay tools that this library's `slsa mcp` server exposes through
-`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sun Lab
+`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sollertia Platform
 repositories.
 
-| Skill                           | Description                                                                  |
-|---------------------------------|------------------------------------------------------------------------------|
-| `/explore-codebase`             | Perform in-depth codebase exploration at session start                       |
-| `/python-style`                 | Apply Sun Lab Python coding conventions (REQUIRED for Python changes)        |
-| `/readme-style`                 | Apply Sun Lab README conventions (REQUIRED for README changes)               |
-| `/commit`                       | Draft Sun Lab style-compliant git commit messages                            |
-| `/pyproject-style`              | Apply Sun Lab pyproject.toml conventions                                     |
-| `/tox-config`                   | Apply Sun Lab tox.ini conventions                                            |
-| `/api-docs`                     | Apply Sun Lab Sphinx documentation conventions                               |
-| `/project-layout`               | Apply Sun Lab project directory structure conventions                        |
-| `/skill-design`                 | Generate, update, and verify skill files and this CLAUDE.md                  |
-| `/audit-facts`                  | Audit documentation files against source code for factual accuracy           |
-| `/audit-style`                  | Audit files against applicable style skill checklists for compliance         |
-| `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                   |
-| `/working-directory`            | Initialize the working directory, Google credentials, and templates path     |
-| `/project-hierarchy`            | Discover the project / animal / session tree under the data root             |
-| `/session-discovery`            | Discover and filter sessions by date, animal, or name (`session_paths` flow) |
-| `/session-data`                 | Read, write, and validate `session_data.yaml` markers                        |
-| `/session-descriptors`          | Read, write, and validate per-session-type `session_descriptor.yaml` files   |
-| `/session-hardware-state`       | Read, write, and validate `hardware_state.yaml` snapshots                    |
-| `/subject-metadata`             | Read and amend `surgery_metadata.yaml` SurgeryData files                     |
-| `/experiment-configuration`     | Author per-project `MesoscopeExperimentConfiguration` YAMLs                  |
-| `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                      |
-| `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary    |
+| Skill                           | Description                                                                      |
+|---------------------------------|----------------------------------------------------------------------------------|
+| `/explore-codebase`             | Perform in-depth codebase exploration at session start                           |
+| `/python-style`                 | Apply Sollertia Platform Python coding conventions (REQUIRED for Python changes) |
+| `/readme-style`                 | Apply Sollertia Platform README conventions (REQUIRED for README changes)        |
+| `/commit`                       | Draft Sollertia Platform style-compliant git commit messages                     |
+| `/pyproject-style`              | Apply Sollertia Platform pyproject.toml conventions                              |
+| `/tox-config`                   | Apply Sollertia Platform tox.ini conventions                                     |
+| `/api-docs`                     | Apply Sollertia Platform Sphinx documentation conventions                        |
+| `/project-layout`               | Apply Sollertia Platform project directory structure conventions                 |
+| `/skill-design`                 | Generate, update, and verify skill files and this CLAUDE.md                      |
+| `/audit-facts`                  | Audit documentation files against source code for factual accuracy               |
+| `/audit-style`                  | Audit files against applicable style skill checklists for compliance             |
+| `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                       |
+| `/working-directory`            | Initialize the working directory, Google credentials, and templates path         |
+| `/project-hierarchy`            | Discover the project / animal / session tree under the data root                 |
+| `/session-discovery`            | Discover and filter sessions by date, animal, or name (`session_paths` flow)     |
+| `/session-data`                 | Read, write, and validate `session_data.yaml` markers                            |
+| `/session-descriptors`          | Read, write, and validate per-session-type `session_descriptor.yaml` files       |
+| `/session-hardware-state`       | Read, write, and validate `hardware_state.yaml` snapshots                        |
+| `/subject-metadata`             | Read and amend `surgery_metadata.yaml` SurgeryData files                         |
+| `/experiment-configuration`     | Author per-project `MesoscopeExperimentConfiguration` YAMLs                      |
+| `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
+| `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
 member, `SessionTypes` member, runtime trial class (a sibling of `WaterRewardTrial` / `GasPuffTrial`), 
@@ -150,14 +150,14 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Key areas
 
-| Directory                                          | Purpose                                                          |
-|----------------------------------------------------|------------------------------------------------------------------|
-| `src/sollertia_shared_assets/configuration/`       | VR-task and experiment configuration dataclasses (YamlConfig)    |
-| `src/sollertia_shared_assets/data_classes/`        | Session, descriptor, and surgery dataclasses, the read-asset registry, and discovery helpers |
-| `src/sollertia_shared_assets/interfaces/`          | `slsa` CLI and FastMCP server with all MCP tool modules          |
-| `tests/`                                           | Test suite (configuration and data-classes only; MCP excluded)   |
-| `docs/`                                            | Sphinx API documentation source                                  |
-| `envs/`                                            | Conda/mamba development environment specifications               |
+| Directory                                    | Purpose                                                                                      |
+|----------------------------------------------|----------------------------------------------------------------------------------------------|
+| `src/sollertia_shared_assets/configuration/` | VR-task and experiment configuration dataclasses (YamlConfig)                                |
+| `src/sollertia_shared_assets/data_classes/`  | Session, descriptor, and surgery dataclasses, the read-asset registry, and discovery helpers |
+| `src/sollertia_shared_assets/interfaces/`    | `slsa` CLI and FastMCP server with all MCP tool modules                                      |
+| `tests/`                                     | Test suite (configuration and data-classes only; MCP excluded)                               |
+| `docs/`                                      | Sphinx API documentation source                                                              |
+| `envs/`                                      | Conda/mamba development environment specifications                                           |
 
 ### Architecture
 

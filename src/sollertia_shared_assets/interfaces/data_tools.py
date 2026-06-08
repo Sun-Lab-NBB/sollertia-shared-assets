@@ -24,18 +24,14 @@ from .mcp_instance import (
 )
 from ..data_classes import (
     RAW_DATA_DIRECTORY,
+    READ_ASSET_REGISTRY,
     CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
-    DrugData,
-    ImplantData,
+    ReadAssets,
     ProjectData,
     SessionData,
-    SubjectData,
-    SurgeryData,
     RawDataFiles,
     SessionTypes,
-    InjectionData,
-    ProcedureData,
     ProcessingTrackers,
     filter_sessions,
     discover_projects,
@@ -78,8 +74,8 @@ def get_data_root_overview_tool(
 
     The ``strategy`` argument controls whether empty hierarchies surface. The ``markers`` strategy reports only
     projects and animals that hold at least one loadable session. The ``directories`` strategy additionally walks
-    the directory layout and merges in any project or animal that holds no sessions as a zero-count entry, so
-    acquisition machines whose sessions have been migrated to long-term storage still expose the project and
+    the directory layout and merges in any project or animal that holds no sessions as a zero-count entry. This is done
+    so that acquisition machines whose sessions have been migrated to long-term storage still expose the project and
     animal hierarchy they retain for migration.
 
     Args:
@@ -563,11 +559,13 @@ def write_session_hardware_state_tool(
 
 
 @mcp.tool()
-def describe_session_hardware_state_schema_tool(acquisition_system: str = "mesoscope") -> dict[str, Any]:
+def describe_session_hardware_state_schema_tool(acquisition_system: str) -> dict[str, Any]:
     """Returns the schema for the hardware-state dataclass of ``acquisition_system``.
 
+    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+
     Args:
-        acquisition_system: The ``AcquisitionSystems`` value to describe. Defaults to ``"mesoscope"``.
+        acquisition_system: The ``AcquisitionSystems`` value to describe.
 
     Returns:
         A response dict with ``acquisition_system`` (the validated enum value) and ``schema``
@@ -583,69 +581,89 @@ def describe_session_hardware_state_schema_tool(acquisition_system: str = "mesos
 
 
 @mcp.tool()
-def read_surgery_data_tool(file_path: str) -> dict[str, Any]:
-    """Loads a per-session surgery-metadata YAML and returns the full SurgeryData payload.
+def read_data_asset_tool(file_path: str, data_asset: str) -> dict[str, Any]:
+    """Loads a read-asset YAML, parsing it with the dataclass that matches ``data_asset``.
 
-    Surgery metadata is a single monolithic record — callers extract the ``subject``, ``procedure``,
-    ``drugs``, ``implants``, or ``injections`` sections from the returned payload themselves.
+    Read assets are external records the platform reads and caches on disk as typed dataclasses (for
+    example, the surgery log read into ``SurgeryData``). Only the parsing class is selected here, so
+    ``data_asset`` must be supplied. Use ``list_supported_data_assets_tool`` to enumerate valid values.
 
     Args:
-        file_path: Absolute path to the surgery-metadata YAML. Canonical location is
-            ``<session>/raw_data/surgery_metadata.yaml``.
+        file_path: Absolute path to the read-asset YAML file.
+        data_asset: The ``ReadAssets`` value identifying which read-asset dataclass to use.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` (the full SurgeryData payload, with
-        ``subject``, ``procedure``, ``drugs``, ``implants``, and ``injections`` sections).
+        A response dict with ``data`` (the read-asset payload), ``data_asset_class``, ``data_asset``,
+        and ``file_path``.
     """
-    return read_yaml(file_path=Path(file_path), validator_cls=SurgeryData)
+    resolved = _resolve_read_asset_class(data_asset=data_asset)
+    if isinstance(resolved, dict):
+        return resolved
+    response = read_yaml(file_path=Path(file_path), validator_cls=resolved)
+    if response.get("success"):
+        response["data_asset_class"] = resolved.__name__
+        response["data_asset"] = data_asset
+    return response
 
 
 @mcp.tool()
-def write_surgery_data_tool(
+def write_data_asset_tool(
     file_path: str,
-    surgery_payload: dict[str, Any],
+    data_asset: str,
+    data_asset_payload: dict[str, Any],
     *,
     overwrite: bool = True,
 ) -> dict[str, Any]:
-    """Validates ``surgery_payload`` against ``SurgeryData`` and writes it to ``file_path``.
+    """Validates ``data_asset_payload`` against the ``data_asset`` schema and writes it to ``file_path``.
 
-    The payload must include all sections (``subject``, ``procedure``, ``drugs``, ``implants``,
-    ``injections``); surgery metadata is a single monolithic record with no per-section tools.
+    Use ``list_supported_data_assets_tool`` to enumerate valid ``data_asset`` values.
 
     Args:
-        file_path: Absolute path to the destination surgery-metadata YAML. Canonical location is
-            ``<session>/raw_data/surgery_metadata.yaml``.
-        surgery_payload: The complete SurgeryData payload.
+        file_path: Absolute path to the destination read-asset YAML file.
+        data_asset: The ``ReadAssets`` value identifying which read-asset dataclass to validate against.
+        data_asset_payload: The complete read-asset payload.
         overwrite: Determines whether to overwrite an existing file.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` (the validated payload).
+        A response dict with ``file_path``, ``data`` (the validated payload), ``data_asset_class``, and
+        ``data_asset``.
     """
-    return write_yaml_validated(
+    resolved = _resolve_read_asset_class(data_asset=data_asset)
+    if isinstance(resolved, dict):
+        return resolved
+    response = write_yaml_validated(
         file_path=Path(file_path),
-        payload=surgery_payload,
-        validator_cls=SurgeryData,
+        payload=data_asset_payload,
+        validator_cls=resolved,
         overwrite=overwrite,
     )
+    if response.get("success"):
+        response["data_asset_class"] = resolved.__name__
+        response["data_asset"] = data_asset
+    return response
 
 
 @mcp.tool()
-def describe_surgery_data_schema_tool() -> dict[str, Any]:
-    """Returns the schema for SurgeryData and its nested subclasses.
+def describe_data_asset_schema_tool(data_asset: str) -> dict[str, Any]:
+    """Returns the schema for the read-asset dataclass of ``data_asset``.
+
+    Use ``list_supported_data_assets_tool`` to enumerate valid ``data_asset`` values.
+
+    Args:
+        data_asset: The ``ReadAssets`` value to describe.
 
     Returns:
-        A response dict with ``schema`` containing the surgery schema and ``nested_classes`` mapping each
-        nested dataclass (subject, procedure, drugs, implants, and injections) to its individual schema.
+        A response dict with ``data_asset`` (the validated value), ``data_asset_class``, and ``schema``
+        (the read-asset schema, with nested dataclasses recursed inline).
     """
-    schema = describe_dataclass(cls=SurgeryData)
-    schema["nested_classes"] = {
-        "SubjectData": describe_dataclass(cls=SubjectData),
-        "ProcedureData": describe_dataclass(cls=ProcedureData),
-        "DrugData": describe_dataclass(cls=DrugData),
-        "ImplantData": describe_dataclass(cls=ImplantData),
-        "InjectionData": describe_dataclass(cls=InjectionData),
-    }
-    return ok_response(schema=schema)
+    resolved = _resolve_read_asset_class(data_asset=data_asset)
+    if isinstance(resolved, dict):
+        return resolved
+    return ok_response(
+        data_asset=data_asset,
+        data_asset_class=resolved.__name__,
+        schema=describe_dataclass(cls=resolved),
+    )
 
 
 def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
@@ -792,7 +810,7 @@ def _augment_with_directory_hierarchy(root: Path, projects: list[dict[str, Any]]
     for project_view in discover_projects(root_path=root, strategy="directories"):
         project = projects_by_name.get(project_view.project_name)
         if project is None:
-            project = {
+            new_project: dict[str, Any] = {
                 "name": project_view.project_name,
                 "path": str(project_view.path),
                 "animals": [],
@@ -800,7 +818,8 @@ def _augment_with_directory_hierarchy(root: Path, projects: list[dict[str, Any]]
                 "counts": dict.fromkeys(_STATUS_KEYS, 0),
                 "sessions_by_type": {member.value: 0 for member in SessionTypes},
             }
-            projects_by_name[project_view.project_name] = project
+            projects_by_name[project_view.project_name] = new_project
+            project = new_project
 
         existing_animal_ids: set[str] = {animal["id"] for animal in project["animals"]}
         for animal_view in iter_project_animals(project=project_view):
@@ -1046,6 +1065,40 @@ def _resolve_hardware_state_class(acquisition_system: str) -> type[YamlConfig] |
         )
         return error_response(message=message)
     return hardware_state_class
+
+
+def _resolve_read_asset_class(data_asset: str) -> type[YamlConfig] | dict[str, Any]:
+    """Resolves a ``data_asset`` string to its registered read-asset dataclass.
+
+    Validates the value against the ``ReadAssets`` enum and then looks up the corresponding class in
+    ``READ_ASSET_REGISTRY``. Returns an error response dict when the value is not a valid read asset or
+    when no dataclass has been registered for it yet.
+
+    Args:
+        data_asset: The ``ReadAssets`` value supplied by the caller.
+
+    Returns:
+        The resolved read-asset dataclass on success, or an error response dict on failure. Callers
+        discriminate via ``isinstance(result, dict)``.
+    """
+    try:
+        read_asset_enum = ReadAssets(data_asset)
+    except ValueError:
+        valid = ", ".join(member.value for member in ReadAssets)
+        message = (
+            f"Unable to resolve the read-asset class. The data_asset '{data_asset}' is not a member of "
+            f"ReadAssets. Valid values: {valid}."
+        )
+        return error_response(message=message)
+    read_asset_class = READ_ASSET_REGISTRY.get(read_asset_enum)
+    if read_asset_class is None:
+        registered = ", ".join(member.value for member in READ_ASSET_REGISTRY)
+        message = (
+            f"Unable to resolve the read-asset class. No class is registered for '{data_asset}'. "
+            f"Registered read assets: {registered}."
+        )
+        return error_response(message=message)
+    return read_asset_class
 
 
 def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any] | None]:

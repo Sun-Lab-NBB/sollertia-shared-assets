@@ -153,7 +153,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |
 | `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
 | `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                               |
-| `describe_surgery_data_schema_tool`             | Returns the schema for SurgeryData and its nested subclasses                                   |
+| `describe_data_asset_schema_tool`               | Returns the read-asset dataclass schema for the given data_asset                               |
 | `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment          |
 | `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
@@ -170,6 +170,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                  |
 | `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
 | `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
+| `list_supported_data_assets_tool`               | Enumerates the read-asset data formats supported by the Sollertia platform                     |
 | `list_supported_session_types_tool`             | Enumerates the session types supported by the Sollertia platform                               |
 | `list_supported_trial_types_tool`               | Enumerates the trial classes supported by experiment configurations                            |
 | `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
@@ -180,7 +181,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                      |
 | `read_session_descriptor_tool`                  | Loads a session descriptor YAML using the descriptor class for the given session type          |
 | `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system     |
-| `read_surgery_data_tool`                        | Loads the full SurgeryData payload from a session's raw_data/surgery_metadata.yaml snapshot    |
+| `read_data_asset_tool`                          | Loads a read-asset YAML, parsing it with the dataclass for the given data_asset                |
 | `read_task_parameters_tool`                     | Reads the Unity Editor's Task Parameters window state, options, and per-control visibility     |
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                       |
@@ -195,7 +196,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema         |
 | `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
 | `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass     |
-| `write_surgery_data_tool`                       | Creates or replaces a session's surgery_metadata.yaml, validated against SurgeryData           |
+| `write_data_asset_tool`                         | Creates or replaces a read-asset YAML, validated against the given data_asset's dataclass      |
 | `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call      |
 | `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory             |
 
@@ -233,14 +234,14 @@ that want to modify the source code of this library.
 ### Installing the Project
 
 ***Note,*** this installation method requires **mamba version 2.3.2 or above**. Currently, all
-Sun lab automation pipelines require that mamba is installed through the
+Sollertia Platform automation pipelines require that mamba is installed through the
 [miniforge3](https://github.com/conda-forge/miniforge) installer.
 
 1. Download this repository to the local machine using the preferred method, such as git-cloning.
 2. If the downloaded distribution is stored as a compressed archive, unpack it using the
    appropriate decompression tool.
 3. `cd` to the root directory of the prepared project distribution.
-4. Install the core Sun lab development dependencies into the ***base*** mamba environment via the
+4. Install the core Sollertia Platform development dependencies into the ***base*** mamba environment via the
    `mamba install tox uv tox-uv` command.
 5. Use the `tox -e create` command to create the project-specific development environment followed
    by `tox -e install` command to install the project into that environment as a library.
@@ -464,8 +465,9 @@ Claude Code skills and AI development assets for this project are distributed th
   - **unity** plugin — Unity Editor skills that drive the `McpBridge` relay tools served by the `slsa mcp` server,
     document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger zone prefabs.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
-  - **automation** plugin — shared development skills that enforce Sun Lab coding conventions (Python style, README
-    style, commit messages, pyproject.toml, tox configuration) and general-purpose codebase exploration tools.
+  - **automation** plugin — shared development skills that enforce Sollertia Platform coding conventions (Python
+    style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose codebase
+    exploration tools.
 
 Install all three plugins to make the full skill set available to compatible AI coding agents. The **unity** plugin
 depends on the **assets** plugin for the backing `slsa mcp` server that drives the Unity Editor relay.
