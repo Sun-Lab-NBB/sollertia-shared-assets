@@ -29,13 +29,7 @@ class ReadAssets(StrEnum):
 READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
     ReadAssets.SURGERY_DATA: SurgeryData,
 }
-"""Maps each read-asset format to the dataclass that represents it on disk.
-
-This is the single extension point for the read-asset system: register a new format by adding its ``ReadAssets``
-member and the dataclass it resolves to here. The import-time parity check (``_assert_registry_coverage`` in
-``interfaces/mcp_instance.py``) enforces that every ``ReadAssets`` member has a registered dataclass, so a half-wired
-extension fails fast at import.
-"""
+"""Maps each read-asset format to the dataclass that represents it on disk."""
 
 
 def resolve_read_asset(read_asset: str | ReadAssets) -> type[YamlConfig]:

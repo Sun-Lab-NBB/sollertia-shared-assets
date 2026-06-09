@@ -8,7 +8,6 @@ from .vr_configuration import (
     TrialStructure,
 )
 from .configuration_utilities import (
-    VR_TEMPLATE_CONFIG_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
     AcquisitionSystems,
     get_data_root,
@@ -29,7 +28,6 @@ from .experiment_configuration import (
 
 __all__ = [
     "EXPERIMENT_CONFIGURATION_REGISTRY",
-    "VR_TEMPLATE_CONFIG_REGISTRY",
     "AcquisitionSystems",
     "Cue",
     "ExperimentState",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 from pathlib import Path
 
 import platformdirs
@@ -14,50 +14,25 @@ from .mesoscope_configuration import MesoscopeExperimentConfiguration
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
-    from .vr_configuration import TaskTemplate
-
 
 class AcquisitionSystems(StrEnum):
-    """Defines the data acquisition systems currently supported by the Sollertia platform.
+    """Defines the data acquisition systems supported by the Sollertia platform.
 
-    Each acquisition runtime package owns its own system configuration classes; this enum remains the shared
+    Every Sollertia acquisition system runs in Virtual Reality, presenting a Unity task in the linear infinite
+    corridor. Each acquisition runtime package owns its own system configuration classes; this enum remains the shared
     vocabulary that identifies which runtime a session or dataset was acquired on.
     """
 
     MESOSCOPE_VR = "mesoscope"
-    """Uses the 2-Photon Random Access Mesoscope (2P-RAM) with Virtual Reality (VR) environments running in Unity game
-    engine to conduct experiments."""
+    """Uses the 2-Photon Random Access Mesoscope (2P-RAM) from Thor-Labs and a heavily modified Janelia / Allen 
+    hardware harness."""
 
 
 EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
 }
-"""Maps each acquisition system to its experiment configuration dataclass. Every registered dataclass provides the
-shared experiment-configuration contract: an ``experiment_states`` mapping (the experiment state machine) and a
-``trial_structures`` mapping (the trials the experiment runs); fields beyond the contract are system-specific. The
-configuration schema, read, and write tools dispatch through this registry to the correct dataclass for the requested
-acquisition system. ``SessionData.create()`` also consults it when caching the per-session experiment configuration
-snapshot, and for a configuration that declares ``unity_scene_name`` it caches the matching task template."""
-
-
-class SupportsTaskTemplate(Protocol):
-    """Structural type for an experiment configuration built from a Unity VR task template."""
-
-    @classmethod
-    def from_task_template(cls, template: TaskTemplate, unity_scene_name: str, state_count: int = 1) -> YamlConfig:
-        """Builds the experiment configuration from a Unity VR task template and the embedded Unity scene name."""
-        ...  # pragma: no cover
-
-
-# noinspection PyTypeChecker
-VR_TEMPLATE_CONFIG_REGISTRY: dict[AcquisitionSystems, type[SupportsTaskTemplate]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
-}
-"""Maps each acquisition system whose experiment configuration is built from a Unity VR task template to its
-configuration class. ``create_experiment_from_vr_template_tool`` dispatches through this registry to the registered
-class's ``from_task_template`` classmethod. The import-time consistency check that this registry agrees with
-``EXPERIMENT_CONFIGURATION_REGISTRY`` lives with the other extension-point checks in
-``data_classes/extensions.py``."""
+"""Maps each acquisition system to its experiment configuration dataclass. Every registered class satisfies the
+experiment-configuration contract; the configuration and template-creation tools dispatch through this registry."""
 
 
 def set_working_directory(path: Path) -> None:
