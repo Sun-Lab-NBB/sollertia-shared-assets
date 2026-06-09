@@ -317,16 +317,19 @@ reference. Export the new class from `data_classes/__init__.py`.
 
 **Step 3: Register the descriptor**
 
-In `interfaces/mcp_instance.py`:
+In `data_classes/extensions.py` (the extension-point hub):
 
 1. Import the new descriptor class.
 2. Register it in `DESCRIPTOR_REGISTRY` under the new `SessionTypes` key.
 
 **Step 4: Update required-asset checks (if applicable)**
 
-If the new session type requires assets beyond the universal `session_descriptor.yaml` and `system_configuration.yaml`
-(for example, an experiment configuration), extend `_required_asset_inventory` in `interfaces/data_tools.py` to add
-the relevant `if session_type == SessionTypes.NEW_TYPE` branch.
+The required-asset policy lives in `SessionData.required_raw_assets` (`data_classes/session_data.py`), and the session
+inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
+requires `session_descriptor.yaml` and `system_configuration.yaml`; `experiment_configuration.yaml` is required
+whenever the session has an `experiment_name`; and `vr_configuration.yaml` is required for any session type listed in
+`SESSION_TYPES_USING_VR_TASK` (`data_classes/session_data.py`). If the new session type runs a Unity VR task, add it
+to that frozenset; if it requires some other extra asset, extend `required_raw_assets` accordingly.
 
 **Step 5: Update downstream libraries**
 
@@ -340,6 +343,9 @@ Each system contributes its own hardware-state snapshot, experiment-configuratio
 data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
 by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
 `SYSTEM_RAW_DATA_REGISTRY`. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
+These registries, the `SYSTEM_SESSION_TYPES` association, and the import-time checks that guard them are collected in
+the extension-point hub `data_classes/extensions.py` (defined there for `DESCRIPTOR_REGISTRY` and
+`HARDWARE_STATE_REGISTRY`, re-exported there for the rest, which stay beside the classes that consume them).
 System-level hardware and software configuration classes live in the acquisition runtime package
 (sollertia-experiment).
 
@@ -388,7 +394,8 @@ In `data_classes/session_data.py`:
 
 Three registries need entries for the new system:
 
-1. In `interfaces/mcp_instance.py`, import `<System>HardwareState` and add it to `HARDWARE_STATE_REGISTRY`.
+1. In `data_classes/extensions.py` (the extension-point hub), import `<System>HardwareState` and add it to
+   `HARDWARE_STATE_REGISTRY`.
 2. In `configuration/configuration_utilities.py`, import `<System>ExperimentConfiguration` and add it to
    `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this registry to load the per-session
    experiment configuration snapshot and (if the configuration declares a `unity_scene_name`) cache the matching VR
