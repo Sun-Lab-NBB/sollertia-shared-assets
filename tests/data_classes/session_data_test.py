@@ -115,6 +115,7 @@ def _make_session_with_paths(raw: Path, processed: Path) -> SessionData:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
         raw_data_path=raw,
@@ -147,6 +148,7 @@ def test_session_data_default_path_fields() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
@@ -453,6 +455,7 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type="lick training",
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
@@ -549,6 +552,7 @@ def test_session_data_paths_on_default_instance() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
@@ -571,6 +575,7 @@ def test_session_data_sub_dataclass_attributes_unset_without_build() -> None:
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )
@@ -599,6 +604,7 @@ def test_session_data_build_sub_dataclasses_unsupported_system_raises_error(
         animal_id="test_animal",
         session_name="2024-01-15-12-30-45-123456",
         session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         python_version=_DEFAULT_PYTHON_VERSION,
         sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
     )

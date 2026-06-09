@@ -422,7 +422,7 @@ class SessionData(YamlConfig):
     """The unique identifier (name) of the session."""
     session_type: str | SessionTypes
     """The type of the session."""
-    acquisition_system: str | AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR
+    acquisition_system: str | AcquisitionSystems
     """The name of the data acquisition system used to acquire the session's data."""
     experiment_name: str | None = None
     """The name of the experiment performed during the session or Null (None), if the session is not an experiment
