@@ -163,9 +163,13 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 - **Configuration layer**: `TaskTemplate` (system-agnostic Unity template) and `MesoscopeExperimentConfiguration`
   (Mesoscope-VR experiment config) are independent siblings — both inherit directly from `YamlConfig`, neither
-  inherits from the other. `create_experiment_configuration` converts a `TaskTemplate` into a
+  inherits from the other. `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
   `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
-  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`).
+  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool` and
+  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks — a VR system reuses them by adding a
+  `from_task_template` classmethod to its own configuration class. `write_experiment_configuration_tool` authors any
+  system's configuration from a full payload. See the README's "Adding New Acquisition Systems" Step 6 for the full
+  experiment-configuration creation-path recipe.
 - **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
   session, `SessionData.load()` rehydrates one. Both build runtime-only `raw_data`, `processed_data`, and
   `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`. Descriptor and hardware-state classes are
@@ -180,8 +184,8 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Extension contracts
 
-Six registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
-`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). A seventh structure, `SYSTEM_SESSION_TYPES`, is an
+Five registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
+`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). A sixth structure, `SYSTEM_SESSION_TYPES`, is an
 association keyed by `AcquisitionSystems` that records which session types each acquisition system can run. Adding a
 new acquisition system or session type means touching the relevant registries below and `SYSTEM_SESSION_TYPES`;
 adding a new external read asset means touching `READ_ASSET_REGISTRY`. Use the `/library-extension` skill — it owns
@@ -195,15 +199,12 @@ the touch list and the import-time parity check that fails if any registry is in
 | `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
 | `SYSTEM_SESSION_TYPES`                | `data_classes/session_data.py`             | `AcquisitionSystems` |
 | `READ_ASSET_REGISTRY`                 | `data_classes/read_assets.py`              | `ReadAssets`         |
-| `_experiment_config_factory_registry` | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 
 `_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the five
-public dispatch registries is missing entries for a known enum member, or if `SYSTEM_SESSION_TYPES` leaves an
+public dispatch registries is missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an
 acquisition system with no session types or a session type unclaimed by any system.
-`_experiment_config_factory_registry` is **not** covered by the parity check (a missing factory only fails at call
-time, not at import).
 
-An eighth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps each `AcquisitionSystems` member to
+A seventh structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps each `AcquisitionSystems` member to
 its trial-class **names** (e.g., `"WaterRewardTrial"`) and their concrete dataclasses. It is not a dispatch registry
 and is not parity-checked; `list_supported_trial_types_tool(acquisition_system)` reads it to enumerate a system's
 trial vocabulary. Adding a new runtime trial class requires a matching entry under the relevant system, otherwise the

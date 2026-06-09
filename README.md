@@ -143,7 +143,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `create_experiment_configuration_tool`          | Creates an experiment configuration for an acquisition system using sensible defaults          |
+| `create_experiment_from_vr_template_tool`       | Creates an experiment configuration from a Unity VR task template using sensible defaults      |
 | `create_project_tool`                           | Creates the on-disk directory structure for a new project under a data root                    |
 | `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call    |
 | `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root  |
@@ -337,8 +337,7 @@ An acquisition system identifies a hardware platform that can produce a session 
 Each system contributes its own hardware-state snapshot, experiment-configuration schema, and a system-specific raw
 data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
 by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
-`SYSTEM_RAW_DATA_REGISTRY`. A fourth registry, `_experiment_config_factory_registry`, dispatches `TaskTemplate`-to-
-configuration factories. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
+`SYSTEM_RAW_DATA_REGISTRY`. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
 System-level hardware and software configuration classes live in the acquisition runtime package
 (sollertia-experiment), not in this library.
 
@@ -395,16 +394,27 @@ Three registries need entries for the new system:
    types, and `SessionData.create()` uses this set to reject session-type / system pairings the system does not
    support.
 
-**Step 6: Add the TaskTemplate-to-configuration factory**
+**Step 6: Add a system-specific experiment-configuration creation path (optional)**
 
-In `configuration/configuration_utilities.py`:
+Experiment configurations are minted two ways. The generic `write_experiment_configuration_tool` validates and writes
+a full payload for any system and is always available. A system may additionally support a convenience tool that seeds
+a configuration from system-specific inputs. There are two cases:
 
-1. Widen the `ExperimentConfigFactory` type alias's return type into a union that includes the new experiment
-   configuration class (e.g., `MesoscopeExperimentConfiguration | NewSystemExperimentConfiguration`).
-2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) with the signature
-   `(unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial])` that returns the new
-   experiment configuration dataclass. Use `_create_mesoscope_experiment_config` as reference.
-3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key.
+- **The new system uses Unity VR tasks.** It reuses the shared `TaskTemplate` asset and the existing
+  `create_experiment_from_vr_template_tool` — no new tool is needed. Add a `from_task_template` classmethod to the
+  system's `<System>ExperimentConfiguration` dataclass that maps the template's trial structures to the system's
+  runtime trials and seeds the default runtime states; the tool dispatches to it automatically by resolving the
+  configuration class from `EXPERIMENT_CONFIGURATION_REGISTRY` and checking for the classmethod. Use
+  `MesoscopeExperimentConfiguration.from_task_template` in `mesoscope_configuration.py` as reference.
+- **The new system creates configurations from different inputs.** Add a dedicated `@mcp.tool()` function in
+  `interfaces/configuration_tools.py` (e.g., `create_experiment_from_<inputs>_tool`) that resolves the configuration
+  class from `EXPERIMENT_CONFIGURATION_REGISTRY`, loads the system-specific inputs, calls a matching creation
+  classmethod on the configuration dataclass, and writes the validated result. Mirror
+  `create_experiment_from_vr_template_tool` and its `from_task_template` classmethod, then document the new tool in the
+  MCP-tool table above and the `/experiment-configuration` skill.
+
+A system that needs no convenience path skips this step entirely — its configurations are authored directly with
+`write_experiment_configuration_tool`.
 
 **Step 7: Update downstream libraries**
 
