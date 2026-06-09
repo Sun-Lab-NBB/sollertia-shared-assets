@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import Enum, StrEnum
 import uuid
-from typing import TYPE_CHECKING, Any, get_type_hints
+from typing import TYPE_CHECKING, Any, get_args, get_type_hints
 from pathlib import Path
 import contextlib
 from dataclasses import MISSING, fields, is_dataclass
@@ -30,6 +30,8 @@ from ..data_classes import (
 from ..configuration import EXPERIMENT_CONFIGURATION_REGISTRY, AcquisitionSystems
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from ataraxis_data_structures import YamlConfig
 
 UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
@@ -218,6 +220,44 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
         return schema
 
     return _describe_inner(target=cls, seen=frozenset())
+
+
+def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> dict[str, type]:
+    """Returns the dataclass types referenced by a dataclass's fields, keyed by class name.
+
+    Walks each field's type hint one level deep, unwrapping container and union arguments (for example, the value
+    type of a ``dict`` or the members of an ``A | B`` union) to collect the dataclass types it references. When
+    ``field_name`` is provided, only that field is inspected, and an absent field yields no types. Schema
+    introspection tools use this to describe a configuration's actual nested structure instead of hardcoding it.
+
+    Args:
+        cls: The dataclass type to inspect.
+        field_name: When provided, restricts the inspection to the single named field.
+
+    Returns:
+        A mapping of class name to dataclass type for every dataclass referenced by the inspected field(s).
+    """
+
+    def _iter(type_hint: Any) -> Iterator[type]:  # noqa: ANN401 - introspection recurses over arbitrary type hints.
+        if isinstance(type_hint, type):
+            if is_dataclass(type_hint):
+                yield type_hint
+            return
+        for argument in get_args(type_hint):
+            yield from _iter(type_hint=argument)
+
+    # noinspection PyBroadException
+    try:
+        hints = get_type_hints(cls)
+    except Exception:
+        return {}
+    if field_name is not None:
+        hints = {field_name: hints[field_name]} if field_name in hints else {}
+    collected: dict[str, type] = {}
+    for hint in hints.values():
+        for candidate in _iter(type_hint=hint):
+            collected.setdefault(candidate.__name__, candidate)
+    return collected
 
 
 def write_yaml_validated(

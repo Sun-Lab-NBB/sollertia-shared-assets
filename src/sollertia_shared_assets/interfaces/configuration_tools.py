@@ -21,6 +21,7 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
+    collect_field_dataclasses,
 )
 from ..data_classes import (
     READ_ASSET_REGISTRY,
@@ -34,12 +35,9 @@ from ..configuration import (
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
-    GasPuffTrial,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
-    ExperimentState,
-    WaterRewardTrial,
     AcquisitionSystems,
     get_data_root,
     set_data_root,
@@ -50,15 +48,6 @@ from ..configuration import (
     get_task_templates_directory,
     set_task_templates_directory,
 )
-
-_TRIAL_CLASSES: dict[AcquisitionSystems, dict[str, type[WaterRewardTrial | GasPuffTrial]]] = {
-    AcquisitionSystems.MESOSCOPE_VR: {
-        "WaterRewardTrial": WaterRewardTrial,
-        "GasPuffTrial": GasPuffTrial,
-    },
-}
-"""Maps each acquisition system to the trial classes its experiment configuration supports, keyed by trial class
-name. ``list_supported_trial_types_tool`` reads this per acquisition system."""
 
 
 @mcp.tool()
@@ -706,25 +695,28 @@ def validate_experiment_configuration_tool(file_path: str, acquisition_system: s
 def describe_experiment_configuration_schema_tool(acquisition_system: str) -> dict[str, Any]:
     """Returns the schema for the experiment configuration of a given acquisition system.
 
-    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+    Every experiment configuration shares one contract: an ``experiment_states`` field (the experiment state
+    machine, a mapping of ``ExperimentState``) and a ``trial_structures`` field (the trials the experiment runs).
+    The concrete trial classes, and any fields beyond the contract (for example the ``unity_scene_name`` that systems
+    using Unity VR tasks add), are system-specific. The returned ``nested_classes`` are derived from the resolved
+    configuration class, so they reflect that system's actual nested dataclasses rather than any one system's. Use
+    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value to describe.
 
     Returns:
-        A response dict with ``acquisition_system`` (the resolved acquisition system) and ``schema`` (the
-        experiment configuration schema for the resolved acquisition system). The ``schema`` carries a
-        ``nested_classes`` sub-mapping of each nested dataclass name (including the supported trial classes)
-        to its individual schema.
+        A response dict with ``acquisition_system`` (the resolved acquisition system) and ``schema`` (the experiment
+        configuration schema). The ``schema`` carries a ``nested_classes`` sub-mapping of each nested dataclass name
+        to its individual schema, derived from the resolved configuration class.
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
         return resolved
     schema = describe_dataclass(cls=resolved)
     schema["nested_classes"] = {
-        "ExperimentState": describe_dataclass(cls=ExperimentState),
-        "WaterRewardTrial": describe_dataclass(cls=WaterRewardTrial),
-        "GasPuffTrial": describe_dataclass(cls=GasPuffTrial),
+        name: describe_dataclass(cls=nested_class)
+        for name, nested_class in collect_field_dataclasses(cls=resolved).items()
     }
     return ok_response(acquisition_system=acquisition_system, schema=schema)
 
@@ -832,28 +824,24 @@ def list_supported_data_assets_tool() -> dict[str, Any]:
 def list_supported_trial_types_tool(acquisition_system: str) -> dict[str, Any]:
     """Enumerates the trial classes supported by the ``acquisition_system``'s experiment configuration.
 
-    Trial classes are specific to each acquisition system's experiment configuration, so this tool requires the
-    target system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+    Trial classes are derived from the system's experiment-configuration ``trial_structures`` field, so each system
+    reports its own trial vocabulary. ``trial_structures`` is part of the shared experiment-configuration contract;
+    the concrete trial classes vary per system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid
+    ``acquisition_system`` values.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value whose trial vocabulary to enumerate.
 
     Returns:
         A response dict with ``acquisition_system`` and ``trial_types`` (a list of dicts containing ``class_name``
-        and ``schema`` for each supported trial class).
+        and ``schema`` for each trial class the system's configuration declares).
     """
-    try:
-        system = AcquisitionSystems(acquisition_system)
-    except ValueError:
-        valid = ", ".join(member.value for member in AcquisitionSystems)
-        message = (
-            f"Unable to list the supported trial types. The acquisition_system '{acquisition_system}' is not a member "
-            f"of AcquisitionSystems. Valid values: {valid}."
-        )
-        return error_response(message=message)
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
     entries: list[dict[str, Any]] = [
-        {"class_name": class_name, "schema": describe_dataclass(cls=trial_class)}
-        for class_name, trial_class in _TRIAL_CLASSES.get(system, {}).items()
+        {"class_name": name, "schema": describe_dataclass(cls=trial_class)}
+        for name, trial_class in collect_field_dataclasses(cls=resolved, field_name="trial_structures").items()
     ]
     return ok_response(acquisition_system=acquisition_system, trial_types=entries)
 
