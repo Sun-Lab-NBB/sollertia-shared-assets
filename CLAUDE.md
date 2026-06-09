@@ -214,7 +214,7 @@ checks that guard them are collected in the extension-point hub `data_classes/ex
 `DESCRIPTOR_REGISTRY` and `HARDWARE_STATE_REGISTRY` directly and re-exports the rest from the modules that consume
 them. `_assert_registry_coverage()` there runs on a bare `import sollertia_shared_assets` (the hub lives in the data
 layer, so it loads without the MCP server) and raises `RuntimeError` if any of the five public dispatch registries is
-missing entries for a known enum member, or if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session
+missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session
 types or a session type unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()` (every
 registered descriptor must declare the `incomplete` field the inspection tooling reads) and
 `_assert_vr_template_registry_consistency()` (see below).
@@ -225,7 +225,7 @@ typed by the `SupportsTaskTemplate` protocol, and `create_experiment_from_vr_tem
 Only systems that build a configuration from a task template register here, so the dispatch-registry coverage check
 does not require an entry for every system. The `_assert_vr_template_registry_consistency()` check in
 `data_classes/extensions.py` does, however, verify at import that every experiment configuration providing a
-`from_task_template` builder is registered here (and that every registered system provides that builder), so a
+`from_task_template` builder is registered here (and that every registered system provides that builder). A
 half-wired VR system fails fast instead of having its template-creation tool silently refuse it.
 
 Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
