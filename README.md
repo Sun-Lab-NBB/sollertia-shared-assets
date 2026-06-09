@@ -361,8 +361,12 @@ Export the new class from `data_classes/__init__.py`.
 
 Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a
 `<System>ExperimentConfiguration` dataclass inheriting from `YamlConfig` that captures the runtime experiment
-parameters for the new system. Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference.
-Export the new class from `configuration/__init__.py`.
+parameters for the new system. Every `<System>ExperimentConfiguration` shares one contract: it provides an
+`experiment_states` field (a mapping of `ExperimentState`, the experiment state machine that every experiment runs as)
+and a `trial_structures` field (the trials the experiment runs, whose concrete trial classes vary per system). Fields
+beyond that contract are system-specific (for example, `unity_scene_name` is added by systems that use Unity VR tasks).
+Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference. Export the new class from
+`configuration/__init__.py`.
 
 **Step 4: Add the system-specific raw-data dataclass**
 

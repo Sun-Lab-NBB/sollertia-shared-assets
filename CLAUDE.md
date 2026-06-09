@@ -163,11 +163,16 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 - **Configuration layer**: `TaskTemplate` (system-agnostic Unity template) and `MesoscopeExperimentConfiguration`
   (Mesoscope-VR experiment config) are independent siblings — both inherit directly from `YamlConfig`, neither
-  inherits from the other. `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
+  inherits from the other. Every `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field
+  (a mapping of `ExperimentState`, the experiment state machine; every experiment is a state machine, so this is
+  required) and a `trial_structures` field (the trials the experiment runs; required, with the concrete trial classes
+  varying per system). Fields beyond the contract are system-specific. `unity_scene_name` is Mesoscope-VR's addition
+  as a system that uses Unity VR tasks; systems that do not use Unity VR tasks omit it.
+  `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
   `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
   `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool` and
-  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks — a VR system reuses them by adding a
-  `from_task_template` classmethod to its own configuration class. `write_experiment_configuration_tool` authors any
+  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks — such a system reuses them by adding
+  a `from_task_template` classmethod to its own configuration class. `write_experiment_configuration_tool` authors any
   system's configuration from a full payload. See the README's "Adding New Acquisition Systems" Step 6 for the full
   experiment-configuration creation-path recipe.
 - **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
@@ -204,11 +209,8 @@ the touch list and the import-time parity check that fails if any registry is in
 public dispatch registries is missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an
 acquisition system with no session types or a session type unclaimed by any system.
 
-A seventh structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps each `AcquisitionSystems` member to
-its trial-class **names** (e.g., `"WaterRewardTrial"`) and their concrete dataclasses. It is not a dispatch registry
-and is not parity-checked; `list_supported_trial_types_tool(acquisition_system)` reads it to enumerate a system's
-trial vocabulary. Adding a new runtime trial class requires a matching entry under the relevant system, otherwise the
-new class is silently omitted from the tool's response.
+Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
+introspection from that system's `<System>ExperimentConfiguration` dataclass.
 
 ### Code standards
 

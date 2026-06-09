@@ -30,11 +30,12 @@ class AcquisitionSystems(StrEnum):
 EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
 }
-"""Maps each acquisition system to its experiment configuration dataclass. Future acquisition systems register here so
-that the configuration schema, read, and write tools can dispatch to the correct dataclass without hard-coding any
-single system. ``SessionData.create()`` also consults this registry when caching the per-session experiment
-configuration snapshot, so future ExperimentConfiguration classes whose schema omits ``unity_scene_name`` can opt out
-of VR template export without modifying the session-creation logic."""
+"""Maps each acquisition system to its experiment configuration dataclass. Every registered dataclass provides the
+shared experiment-configuration contract: an ``experiment_states`` mapping (the experiment state machine) and a
+``trial_structures`` mapping (the trials the experiment runs); fields beyond the contract are system-specific. The
+configuration schema, read, and write tools dispatch through this registry to the correct dataclass for the requested
+acquisition system. ``SessionData.create()`` also consults it when caching the per-session experiment configuration
+snapshot, and for a configuration that declares ``unity_scene_name`` it caches the matching task template."""
 
 
 def set_working_directory(path: Path) -> None:
