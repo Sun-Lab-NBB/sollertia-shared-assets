@@ -47,9 +47,8 @@ class RawDataFiles(StrEnum):
     EXPERIMENT_CONFIGURATION = "experiment_configuration.yaml"
     """The experiment configuration YAML copied into the session for experiment sessions only."""
     VR_CONFIGURATION = "vr_configuration.yaml"
-    """The Virtual Reality (VR) task template YAML cached into the session at acquisition time. Records the Unity task
-    template (cues, VR environment, trial structures) that was active when the session was acquired. Optional: only
-    acquisition systems that use the Unity VR task system write this file."""
+    """The linear infinite corridor task template YAML (cues, VR environment, trial structures) cached into the
+    session at acquisition time. Written only for sessions that run the corridor task."""
     SYSTEM_CONFIGURATION = "system_configuration.yaml"
     """The system configuration YAML copied into the session by the acquisition runtime."""
     CHECKSUM = "ax_checksum.txt"
@@ -186,12 +185,9 @@ class RawData:
     sessions; callers should check ``.exists()`` before reading. The concrete parsing class is determined by the
     session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
-    """Stores the Virtual Reality (VR) task template (cues, VR environment, trial structures) that was active when the
-    session was acquired. Optional: only acquisition systems that use the Unity VR task system populate this file —
-    systems that do not use VR never write it. Populated by ``SessionData.create()`` for experiment sessions by
-    copying the template YAML that matches the experiment configuration's ``unity_scene_name`` out of the task
-    templates directory; for non-experiment sessions, the acquisition runtime writes this file when a VR task is used.
-    Callers should check ``.exists()`` before reading. Parsed via ``TaskTemplate``."""
+    """Stores the linear infinite corridor task template (cues, VR environment, trial structures) active when the
+    session was acquired. Written only for sessions that run the corridor task, so callers should check ``.exists()``
+    before reading. Parsed via ``TaskTemplate``."""
     checksum_path: Path
     """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
     accidental modification of raw assets after acquisition."""
@@ -370,11 +366,9 @@ class _SystemRawDataBuilder(Protocol):
 SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
 }
-"""Maps each acquisition system to the dataclass that captures its system-specific raw assets. The registered
-class must expose a ``build(root: Path) -> Self`` classmethod that resolves all system-specific paths under the
-session's ``raw_data`` directory. ``SessionData._build_sub_dataclasses`` consults this registry to dispatch the
-``system_raw_data`` sub-dataclass without per-system branching, so future acquisition systems register their
-``<System>RawData`` builder here."""
+"""Maps each acquisition system to the dataclass that captures its system-specific raw assets. The registered class
+exposes a ``build(root: Path) -> Self`` classmethod that resolves all system-specific paths under the session's
+``raw_data`` directory."""
 
 
 SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
@@ -388,15 +382,13 @@ SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
     ),
 }
 """Maps each acquisition system to the set of session types it can run. ``SessionData.create()`` rejects a session
-type that is not paired with the session's acquisition system, and ``_assert_registry_coverage`` verifies that every
-acquisition system declares at least one session type and that every session type is claimed by at least one system.
-Future acquisition systems register the session types they support here."""
+type that is not paired with the session's acquisition system."""
 
 
 SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
-"""The session types that run a Unity VR task and therefore write a ``vr_configuration.yaml`` task-template snapshot.
-``_required_asset_inventory`` consults this set to decide whether a session of a given type requires the VR
-configuration snapshot."""
+"""The session types that run the linear infinite corridor task and therefore write a ``vr_configuration.yaml``
+task-template snapshot. ``required_raw_assets`` consults this set to decide whether a session of a given type requires
+the snapshot. Training and window-checking sessions run no task and are absent here."""
 
 
 @dataclass
@@ -580,18 +572,15 @@ class SessionData(YamlConfig):
                 file_path=instance.raw_data.experiment_configuration_path,
             )
 
-            # Caches the VR task template that the experiment runs against alongside the experiment configuration,
-            # but only when the experiment configuration declares a unity_scene_name. Acquisition systems that do
-            # not use Unity-based Virtual Reality omit this field entirely, so the gate below skips template export
-            # for non-VR sessions without requiring an explicit per-system branch.
+            # Caches the corridor task template the experiment runs against alongside the experiment configuration.
+            # unity_scene_name is a contract field, so every experiment names a task and its template is always cached.
             unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
-            if unity_scene_name:
-                templates_directory = get_task_templates_directory()
-                vr_template_path = templates_directory.joinpath(f"{unity_scene_name}.yaml")
-                shutil.copy2(
-                    src=vr_template_path,
-                    dst=instance.raw_data.vr_configuration_path,
-                )
+            templates_directory = get_task_templates_directory()
+            vr_template_path = templates_directory.joinpath(f"{unity_scene_name}.yaml")
+            shutil.copy2(
+                src=vr_template_path,
+                dst=instance.raw_data.vr_configuration_path,
+            )
 
         # Marks the session as 'uninitialized' by writing the 'nk.bin' file into raw_data. The acquisition
         # runtime removes this marker once it has finished creating snapshots and initializing instruments
@@ -649,7 +638,7 @@ class SessionData(YamlConfig):
 
         Every session requires the session descriptor and the system configuration snapshot. Experiment sessions
         (those with an ``experiment_name``) additionally require the experiment configuration snapshot, and sessions
-        whose type runs a Unity VR task (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
+        whose type runs the corridor task (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
         configuration snapshot. The session-inspection tooling pairs each returned path with its on-disk presence to
         report missing required assets, so this method is the single source of truth for the required-asset policy.
 

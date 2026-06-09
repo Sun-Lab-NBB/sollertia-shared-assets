@@ -34,10 +34,10 @@ _DEFAULT_RECOVERY_GUIDED_TRIALS: int = 3
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Defines an experiment session that uses the Mesoscope-VR data acquisition system.
 
-    Implements the experiment-configuration contract — the ``experiment_states`` state machine and the
-    ``trial_structures`` table — and adds ``unity_scene_name`` because Mesoscope-VR runs a Unity VR task. The
-    configuration is consumed by the acquisition runtime (sollertia-experiment) and the analysis pipeline
-    (sollertia-forgery).
+    Implements the full experiment-configuration contract shared by every Sollertia acquisition system: the
+    ``experiment_states`` state machine, the ``trial_structures`` table, the ``unity_scene_name`` of the linear
+    infinite corridor task the experiment runs, and the ``from_task_template`` builder. The configuration is consumed
+    by the acquisition runtime (sollertia-experiment) and the analysis pipeline (sollertia-forgery).
     """
 
     trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
@@ -47,8 +47,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     """The experiment state machine, keyed by state name. This contract field is required by every experiment
     configuration."""
     unity_scene_name: str
-    """The Unity scene (VR task) the experiment runs, identifying the paired task template by filename stem.
-    Mesoscope-VR carries this field because it runs a Unity VR task."""
+    """The Unity scene (VR task) the experiment runs in the linear infinite corridor, identifying the paired task
+    template by filename stem. This contract field is required by every experiment configuration."""
 
     @classmethod
     def from_task_template(

@@ -328,8 +328,9 @@ The required-asset policy lives in `SessionData.required_raw_assets` (`data_clas
 inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
 requires `session_descriptor.yaml` and `system_configuration.yaml`; `experiment_configuration.yaml` is required
 whenever the session has an `experiment_name`; and `vr_configuration.yaml` is required for any session type listed in
-`SESSION_TYPES_USING_VR_TASK` (`data_classes/session_data.py`). If the new session type runs a Unity VR task, add it
-to that frozenset; if it requires some other extra asset, extend `required_raw_assets` accordingly.
+`SESSION_TYPES_USING_VR_TASK` (`data_classes/session_data.py`). If the new session type runs the linear infinite
+corridor task, add it to that frozenset; if it requires some other extra asset, extend `required_raw_assets`
+accordingly.
 
 **Step 5: Update downstream libraries**
 
@@ -371,10 +372,11 @@ hardware module on the new system. The same module later holds the system's per-
 
 Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a
 `<System>ExperimentConfiguration` dataclass inheriting from `YamlConfig` that captures the runtime experiment
-parameters for the new system. Every `<System>ExperimentConfiguration` shares one contract: it provides an
-`experiment_states` field (a mapping of `ExperimentState`, the experiment state machine that every experiment runs as)
-and a `trial_structures` field (the trials the experiment runs, whose concrete trial classes vary per system). Fields
-beyond that contract are system-specific (for example, `unity_scene_name` is added by systems that use Unity VR tasks).
+parameters for the new system. Every `<System>ExperimentConfiguration` shares one contract: an `experiment_states`
+field (a mapping of `ExperimentState`, the experiment state machine that every experiment runs as), a
+`trial_structures` field (the trials the experiment runs, whose concrete trial classes vary per system), a
+`unity_scene_name` field (the linear infinite corridor task the experiment runs), and a `from_task_template`
+classmethod that builds the configuration from a task template. Fields beyond that contract are system-specific.
 Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference. Export the new class from
 `configuration/__init__.py`.
 
@@ -398,8 +400,7 @@ Three registries need entries for the new system:
    `HARDWARE_STATE_REGISTRY`.
 2. In `configuration/configuration_utilities.py`, import `<System>ExperimentConfiguration` and add it to
    `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this registry to load the per-session
-   experiment configuration snapshot and (if the configuration declares a `unity_scene_name`) cache the matching VR
-   task template. Only a system that uses Unity VR tasks declares `unity_scene_name` in its schema.
+   experiment configuration snapshot and cache the matching corridor task template.
 3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
    this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
    new system into session loading.
@@ -408,29 +409,16 @@ Three registries need entries for the new system:
    types, and `SessionData.create()` uses this set to reject session-type / system pairings the system does not
    support.
 
-**Step 6: Add a system-specific experiment-configuration creation path (optional)**
+**Step 6: Implement the experiment-configuration creation path**
 
-Experiment configurations are minted two ways. The generic `write_experiment_configuration_tool` validates and writes
-a full payload for any system and is always available. A system may additionally support a convenience tool that seeds
-a configuration from system-specific inputs. There are two cases:
-
-- **The new system uses Unity VR tasks.** It reuses the shared `TaskTemplate` asset and the existing
-  `create_experiment_from_vr_template_tool` — no new tool is needed. Add a `from_task_template` classmethod to the
-  system's `<System>ExperimentConfiguration` dataclass that maps the template's trial structures to the system's
-  runtime trials and seeds the default runtime states. Then register the configuration class under the new
-  `AcquisitionSystems` key in `VR_TEMPLATE_CONFIG_REGISTRY` (`configuration/configuration_utilities.py`);
-  `create_experiment_from_vr_template_tool` dispatches through that registry to the registered class's
-  `from_task_template`. Only systems that use Unity VR tasks register here, so the registry stays partial by design.
-  Use `MesoscopeExperimentConfiguration.from_task_template` and its `VR_TEMPLATE_CONFIG_REGISTRY` entry as reference.
-- **The new system creates configurations from different inputs.** Add a dedicated `@mcp.tool()` function in
-  `interfaces/configuration_tools.py` (e.g., `create_experiment_from_<inputs>_tool`) that resolves the configuration
-  class from `EXPERIMENT_CONFIGURATION_REGISTRY`, loads the system-specific inputs, calls a matching creation
-  classmethod on the configuration dataclass, and writes the validated result. Mirror
-  `create_experiment_from_vr_template_tool` and its `from_task_template` classmethod, then document the new tool in the
-  MCP-tool table above and the `/experiment-configuration` skill.
-
-A system that needs no convenience path skips this step entirely — its configurations are authored directly with
-`write_experiment_configuration_tool`.
+Every Sollertia acquisition system builds its experiment configuration from a Unity VR task template through the shared
+`create_experiment_from_vr_template_tool`, so no new tool is needed. Add a `from_task_template` classmethod to the
+system's `<System>ExperimentConfiguration` dataclass that maps the template's trial structures to the system's runtime
+trials and seeds the default runtime states. The tool dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the
+registered class's `from_task_template`, and the import-time `_assert_experiment_configuration_contract` check fails
+fast if the builder or any contract field is missing. Use `MesoscopeExperimentConfiguration.from_task_template` as
+reference. The generic `write_experiment_configuration_tool` remains available to author or repair a full payload
+directly.
 
 **Step 7: Update downstream libraries**
 

@@ -25,12 +25,9 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
-"""Marker file present in ``raw_data`` while a session is uninitialized — the acquisition runtime has
-not yet finished creating hardware / experiment snapshots or initializing instruments. A session with this
-marker holds no data of value and is a valid target for purging. The acquisition runtime removes the marker
-once initialization completes. This is distinct from the descriptor's ``incomplete`` field (see
-``read_descriptor_incomplete``), which signals that an initialized session encountered a runtime issue but
-still holds usable data."""
+"""Marker file present in ``raw_data`` while a session is uninitialized and holds no data of value, making it a valid
+purge target. Distinct from the descriptor's ``incomplete`` field, which marks an initialized session that hit a
+runtime issue but still holds usable data."""
 
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 """The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""

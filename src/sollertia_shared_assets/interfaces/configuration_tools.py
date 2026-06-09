@@ -32,7 +32,6 @@ from ..data_classes import (
     SessionTypes,
 )
 from ..configuration import (
-    VR_TEMPLATE_CONFIG_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
@@ -569,12 +568,9 @@ def create_experiment_from_vr_template_tool(
 
     Loads the task template at ``template_path`` and builds the experiment configuration through the acquisition
     system's experiment-configuration class, which maps the template's trial structures to runtime trials and seeds
-    ``state_count`` default-valued runtime states. Then writes the result to ``file_path``. This tool serves only
-    acquisition systems whose experiment configuration is built from a Unity VR task template; a system that builds
-    its configuration from different inputs is authored directly with ``write_experiment_configuration_tool`` or
-    another specialized skill. The embedded Unity scene name is inferred from the template filename, mirroring how
-    sollertia-unity-tasks derives the scene name at task creation. Use ``list_supported_acquisition_systems_tool`` to
-    enumerate valid ``acquisition_system`` values.
+    ``state_count`` default-valued runtime states. Then writes the result to ``file_path``. The embedded Unity scene
+    name is inferred from the template filename, mirroring how sollertia-unity-tasks derives the scene name at task
+    creation. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
@@ -601,14 +597,7 @@ def create_experiment_from_vr_template_tool(
         )
         return error_response(message=message)
 
-    config_class = VR_TEMPLATE_CONFIG_REGISTRY.get(acquisition_enum)
-    if config_class is None:
-        message = (
-            f"Unable to create an experiment configuration for acquisition system '{acquisition_system}' from a Unity "
-            f"VR task template: its experiment configuration is not built from a task template. Author it directly "
-            f"with write_experiment_configuration_tool instead."
-        )
-        return error_response(message=message)
+    config_class = EXPERIMENT_CONFIGURATION_REGISTRY[acquisition_enum]
 
     destination = Path(file_path)
     if destination.exists() and not overwrite:
@@ -627,7 +616,9 @@ def create_experiment_from_vr_template_tool(
 
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_file)
-        experiment_configuration = config_class.from_task_template(
+        # The import-time contract check guarantees every registered configuration provides this builder.
+        build_from_template: Any = getattr(config_class, "from_task_template", None)
+        experiment_configuration = build_from_template(
             template=task_template,
             unity_scene_name=resolved_scene_name,
             state_count=state_count,
@@ -676,17 +667,14 @@ def validate_experiment_configuration_tool(file_path: str, acquisition_system: s
             file_path=str(configuration_path),
             acquisition_system=acquisition_system,
         )
-    # Summary fields are system-specific; include each only when the resolved configuration exposes it.
-    summary: dict[str, Any] = {}
-    trial_structures: Sized | None = getattr(experiment_configuration, "trial_structures", None)
-    if trial_structures is not None:
-        summary["trial_count"] = len(trial_structures)
-    experiment_states: Sized | None = getattr(experiment_configuration, "experiment_states", None)
-    if experiment_states is not None:
-        summary["state_count"] = len(experiment_states)
-    unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
-    if unity_scene_name is not None:
-        summary["unity_scene_name"] = unity_scene_name
+    # Every experiment configuration declares these contract fields, so the summary always carries them.
+    trial_structures: Sized = getattr(experiment_configuration, "trial_structures", ())
+    experiment_states: Sized = getattr(experiment_configuration, "experiment_states", ())
+    summary: dict[str, Any] = {
+        "trial_count": len(trial_structures),
+        "state_count": len(experiment_states),
+        "unity_scene_name": getattr(experiment_configuration, "unity_scene_name", ""),
+    }
     return ok_response(
         valid=True,
         file_path=str(configuration_path),
@@ -699,12 +687,11 @@ def validate_experiment_configuration_tool(file_path: str, acquisition_system: s
 def describe_experiment_configuration_schema_tool(acquisition_system: str) -> dict[str, Any]:
     """Returns the schema for the experiment configuration of a given acquisition system.
 
-    Every experiment configuration shares one contract: an ``experiment_states`` field (the experiment state
-    machine, a mapping of ``ExperimentState``) and a ``trial_structures`` field (the trials the experiment runs).
-    The concrete trial classes, and any fields beyond the contract (for example the ``unity_scene_name`` that systems
-    using Unity VR tasks add), are system-specific. The returned ``nested_classes`` are derived from the resolved
-    configuration class, so they reflect that system's actual nested dataclasses rather than any one system's. Use
-    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+    Every experiment configuration shares one contract: the ``experiment_states`` state machine, the
+    ``trial_structures`` table, and the ``unity_scene_name`` of the corridor task. The concrete trial classes and any
+    fields beyond the contract are system-specific, so the returned ``nested_classes`` are derived from the resolved
+    configuration class. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system``
+    values.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value to describe.
@@ -793,22 +780,11 @@ def list_session_type_support_tool() -> dict[str, Any]:
 def list_supported_acquisition_systems_tool() -> dict[str, Any]:
     """Enumerates the AcquisitionSystems supported by the Sollertia platform.
 
-    The ``supports_template_creation`` flag marks systems that build their experiment configuration from a Unity
-    VR task template through ``create_experiment_from_vr_template_tool``. Systems without the flag persist their
-    experiment configuration through ``write_experiment_configuration_tool`` instead.
-
     Returns:
-        A response dict with ``acquisition_systems`` (a list of dicts containing ``value``, ``name``, and
-        ``supports_template_creation`` for each supported acquisition system).
+        A response dict with ``acquisition_systems`` (a list of dicts containing ``value`` and ``name`` for each
+        supported acquisition system).
     """
-    entries: list[dict[str, Any]] = [
-        {
-            "value": member.value,
-            "name": member.name,
-            "supports_template_creation": member in VR_TEMPLATE_CONFIG_REGISTRY,
-        }
-        for member in AcquisitionSystems
-    ]
+    entries: list[dict[str, Any]] = [{"value": member.value, "name": member.name} for member in AcquisitionSystems]
     return ok_response(acquisition_systems=entries)
 
 

@@ -65,15 +65,47 @@ def test_assert_descriptor_contract_raises_on_missing_incomplete(monkeypatch: py
         extensions._assert_descriptor_contract()
 
 
-def test_assert_vr_template_registry_consistency_passes_for_current_state() -> None:
-    """Verifies the VR-template registry consistency check passes for the current wiring."""
-    extensions._assert_vr_template_registry_consistency()
+def test_assert_experiment_configuration_contract_passes_for_current_state() -> None:
+    """Verifies every registered experiment configuration satisfies the contract."""
+    extensions._assert_experiment_configuration_contract()
 
 
-def test_assert_vr_template_registry_consistency_raises_on_unregistered_builder(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Verifies the consistency check raises when a from_task_template builder is not registered for its system."""
-    monkeypatch.setattr(extensions, "VR_TEMPLATE_CONFIG_REGISTRY", {})
-    with pytest.raises(RuntimeError, match=r"VR_TEMPLATE_CONFIG_REGISTRY is missing an entry"):
-        extensions._assert_vr_template_registry_consistency()
+def test_assert_experiment_configuration_contract_raises_on_missing_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies the contract check raises when a registered configuration omits a contract field."""
+
+    @dataclass
+    class _ConfigurationMissingScene:
+        experiment_states: dict[str, object]
+        trial_structures: dict[str, object]
+
+        @classmethod
+        def from_task_template(cls) -> object:
+            """Stub builder so only the missing field trips the check; the contract check only verifies it is
+            callable and never invokes it."""
+            return cls(experiment_states={}, trial_structures={})
+
+    monkeypatch.setattr(
+        extensions,
+        "EXPERIMENT_CONFIGURATION_REGISTRY",
+        {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingScene},
+    )
+    with pytest.raises(RuntimeError, match=r"do not satisfy the experiment-configuration contract"):
+        extensions._assert_experiment_configuration_contract()
+
+
+def test_assert_experiment_configuration_contract_raises_on_missing_builder(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies the contract check raises when a registered configuration omits the from_task_template builder."""
+
+    @dataclass
+    class _ConfigurationMissingBuilder:
+        experiment_states: dict[str, object]
+        trial_structures: dict[str, object]
+        unity_scene_name: str
+
+    monkeypatch.setattr(
+        extensions,
+        "EXPERIMENT_CONFIGURATION_REGISTRY",
+        {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingBuilder},
+    )
+    with pytest.raises(RuntimeError, match=r"from_task_template builder"):
+        extensions._assert_experiment_configuration_contract()

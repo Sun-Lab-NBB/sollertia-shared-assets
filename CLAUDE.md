@@ -91,9 +91,8 @@ repositories.
 | `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
-member, `SessionTypes` member, runtime trial class (a sibling of `WaterRewardTrial` / `GasPuffTrial`), 
-`TriggerType` member, or extending the template vocabulary beyond the infinite corridor. The skill owns the touch list 
-and the import-time parity check.
+member, `SessionTypes` member, runtime trial class (a sibling of `WaterRewardTrial` / `GasPuffTrial`), or
+`TriggerType` member. The skill owns the touch list and the import-time parity check.
 
 ## MCP server
 
@@ -161,22 +160,18 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Architecture
 
-- **Configuration layer**: `TaskTemplate` (system-agnostic Unity template) and `MesoscopeExperimentConfiguration`
+- **Configuration layer**: `TaskTemplate` (the Unity corridor template) and `MesoscopeExperimentConfiguration`
   (Mesoscope-VR experiment config) are independent siblings — both inherit directly from `YamlConfig`, neither
-  inherits from the other. Every `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field
-  (a mapping of `ExperimentState`, the experiment state machine; every experiment is a state machine, so this is
-  required) and a `trial_structures` field (the trials the experiment runs; required, with the concrete trial classes
-  varying per system). Fields beyond the contract are system-specific. `unity_scene_name` is Mesoscope-VR's addition
-  as a system that uses Unity VR tasks.
-  `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
-  `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
-  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool` and
-  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks. Such a system reuses them by adding a
-  `from_task_template` classmethod to its own configuration class and registering that class under its
-  `AcquisitionSystems` member in `VR_TEMPLATE_CONFIG_REGISTRY` (typed by the `SupportsTaskTemplate` protocol);
-  `create_experiment_from_vr_template_tool` dispatches through that registry.
-  `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
-  "Adding New Acquisition Systems" Step 6 for the full experiment-configuration creation-path recipe.
+  inherits from the other. Every Sollertia acquisition system runs a Unity VR task in the linear infinite corridor, so
+  every `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field (the experiment state
+  machine), a `trial_structures` field (the trials the experiment runs, with concrete trial classes varying per
+  system), a `unity_scene_name` field (the corridor task the experiment runs), and a `from_task_template` classmethod.
+  Fields beyond the contract are system-specific. `MesoscopeExperimentConfiguration.from_task_template` converts a
+  `TaskTemplate` into a `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a
+  `WaterRewardTrial` (for `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`).
+  `create_experiment_from_vr_template_tool` dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered
+  class's `from_task_template`, and `write_experiment_configuration_tool` authors any system's configuration from a
+  full payload. See the README's "Adding New Acquisition Systems" Step 6 for the creation-path recipe.
 - **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
   session, `SessionData.load()` rehydrates one. Both build runtime-only `raw_data`, `processed_data`, and
   `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`. Descriptor and hardware-state classes are
@@ -217,16 +212,10 @@ layer, so it loads without the MCP server) and raises `RuntimeError` if any of t
 missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session
 types or a session type unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()` (every
 registered descriptor must declare the `incomplete` field the inspection tooling reads) and
-`_assert_vr_template_registry_consistency()` (see below).
-
-`VR_TEMPLATE_CONFIG_REGISTRY` in `configuration/configuration_utilities.py` is a separate, optional registry keyed by
-`AcquisitionSystems`. It maps each acquisition system that uses Unity VR tasks to its experiment-configuration class,
-typed by the `SupportsTaskTemplate` protocol, and `create_experiment_from_vr_template_tool` dispatches through it.
-Only systems that build a configuration from a task template register here, so the dispatch-registry coverage check
-does not require an entry for every system. The `_assert_vr_template_registry_consistency()` check in
-`data_classes/extensions.py` does, however, verify at import that every experiment configuration providing a
-`from_task_template` builder is registered here (and that every registered system provides that builder). A
-half-wired VR system fails fast instead of having its template-creation tool silently refuse it.
+`_assert_experiment_configuration_contract()` (every registered experiment configuration must declare the
+`experiment_states`, `trial_structures`, and `unity_scene_name` contract fields and provide a `from_task_template`
+classmethod, so a half-wired acquisition system fails fast instead of having its template-creation tool refuse it at
+runtime).
 
 Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
 introspection from that system's `<System>ExperimentConfiguration` dataclass.
@@ -273,7 +262,7 @@ Invoke `/library-extension`. It enumerates every registry and sibling-skill upda
 2. New canonical filenames require an entry in `RawDataFiles` or a system-specific `*RawDataFiles` enum
 3. New canonical subdirectories require an entry in `Directories` or a system-specific `*Directories` enum
 4. New required `raw_data` assets require updating `SessionData.required_raw_assets` in `data_classes/session_data.py`
-   (for a Unity-VR session type, add it to the `SESSION_TYPES_USING_VR_TASK` gate consumed there)
+   (for a session type that runs the corridor task, add it to the `SESSION_TYPES_USING_VR_TASK` gate consumed there)
 
 **Adding or modifying MCP tools:**
 
