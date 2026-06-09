@@ -105,7 +105,7 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 |---------------------|-------------------------------------|--------------------------------------------------------------------|
 | CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands        |
 | Server bootstrap    | `interfaces/mcp_server.py`          | Imports tool modules to trigger registration; exposes `run_server` |
-| Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, registries, response helpers, validators         |
+| Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, response helpers, serialization, validators      |
 | Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, Google creds, templates dir, experiments   |
 | Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, surgery, etc.          |
 | Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                      |
@@ -163,15 +163,28 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 - **Configuration layer**: `TaskTemplate` (system-agnostic Unity template) and `MesoscopeExperimentConfiguration`
   (Mesoscope-VR experiment config) are independent siblings — both inherit directly from `YamlConfig`, neither
-  inherits from the other. `create_experiment_configuration` converts a `TaskTemplate` into a
+  inherits from the other. Every `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field
+  (a mapping of `ExperimentState`, the experiment state machine; every experiment is a state machine, so this is
+  required) and a `trial_structures` field (the trials the experiment runs; required, with the concrete trial classes
+  varying per system). Fields beyond the contract are system-specific. `unity_scene_name` is Mesoscope-VR's addition
+  as a system that uses Unity VR tasks.
+  `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
   `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
-  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`).
+  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool` and
+  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks. Such a system reuses them by adding a
+  `from_task_template` classmethod to its own configuration class and registering that class under its
+  `AcquisitionSystems` member in `VR_TEMPLATE_CONFIG_REGISTRY` (typed by the `SupportsTaskTemplate` protocol);
+  `create_experiment_from_vr_template_tool` dispatches through that registry.
+  `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
+  "Adding New Acquisition Systems" Step 6 for the full experiment-configuration creation-path recipe.
 - **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
   session, `SessionData.load()` rehydrates one. Both build runtime-only `raw_data`, `processed_data`, and
   `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`. Descriptor and hardware-state classes are
   dispatched by `SessionTypes` and `AcquisitionSystems` enum membership.
 - **Interface layer**: A single `FastMCP` instance lives in `interfaces/mcp_instance.py` with shared serialization,
-  validation, and registry helpers. Tool modules import the instance and register `@mcp.tool()` functions. The CLI
+  validation, and dataclass-introspection helpers; the dispatch registries and their import-time checks live in the
+  data layer's extension-point hub (`data_classes/extensions.py`), not here. Tool modules import the instance and
+  register `@mcp.tool()` functions. The CLI
   (`slsa`) starts the server and exposes `configure {directory,data-root,google,templates,project}` and
   `get {directory,data-root,google,templates,projects,experiments}` command groups.
 - **Persistent host settings**: Four independent `platformdirs`-backed settings — working directory, data root,
@@ -180,8 +193,8 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Extension contracts
 
-Six registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
-`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). A seventh structure, `SYSTEM_SESSION_TYPES`, is an
+Five registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
+`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). A sixth structure, `SYSTEM_SESSION_TYPES`, is an
 association keyed by `AcquisitionSystems` that records which session types each acquisition system can run. Adding a
 new acquisition system or session type means touching the relevant registries below and `SYSTEM_SESSION_TYPES`;
 adding a new external read asset means touching `READ_ASSET_REGISTRY`. Use the `/library-extension` skill — it owns
@@ -189,25 +202,34 @@ the touch list and the import-time parity check that fails if any registry is in
 
 | Registry                              | File                                       | Keyed by             |
 |---------------------------------------|--------------------------------------------|----------------------|
-| `DESCRIPTOR_REGISTRY`                 | `interfaces/mcp_instance.py`               | `SessionTypes`       |
-| `HARDWARE_STATE_REGISTRY`             | `interfaces/mcp_instance.py`               | `AcquisitionSystems` |
+| `DESCRIPTOR_REGISTRY`                 | `data_classes/extensions.py`               | `SessionTypes`       |
+| `HARDWARE_STATE_REGISTRY`             | `data_classes/extensions.py`               | `AcquisitionSystems` |
 | `EXPERIMENT_CONFIGURATION_REGISTRY`   | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 | `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
 | `SYSTEM_SESSION_TYPES`                | `data_classes/session_data.py`             | `AcquisitionSystems` |
 | `READ_ASSET_REGISTRY`                 | `data_classes/read_assets.py`              | `ReadAssets`         |
-| `_experiment_config_factory_registry` | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
 
-`_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the five
-public dispatch registries is missing entries for a known enum member, or if `SYSTEM_SESSION_TYPES` leaves an
-acquisition system with no session types or a session type unclaimed by any system.
-`_experiment_config_factory_registry` is **not** covered by the parity check (a missing factory only fails at call
-time, not at import).
+These registries, the `SYSTEM_SESSION_TYPES` association, the `SESSION_TYPES_USING_VR_TASK` gate, and the import-time
+checks that guard them are collected in the extension-point hub `data_classes/extensions.py`, which defines
+`DESCRIPTOR_REGISTRY` and `HARDWARE_STATE_REGISTRY` directly and re-exports the rest from the modules that consume
+them. `_assert_registry_coverage()` there runs on a bare `import sollertia_shared_assets` (the hub lives in the data
+layer, so it loads without the MCP server) and raises `RuntimeError` if any of the five public dispatch registries is
+missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session
+types or a session type unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()` (every
+registered descriptor must declare the `incomplete` field the inspection tooling reads) and
+`_assert_vr_template_registry_consistency()` (see below).
 
-An eighth structure, `_TRIAL_CLASSES` in `interfaces/configuration_tools.py`, maps each `AcquisitionSystems` member to
-its trial-class **names** (e.g., `"WaterRewardTrial"`) and their concrete dataclasses. It is not a dispatch registry
-and is not parity-checked; `list_supported_trial_types_tool(acquisition_system)` reads it to enumerate a system's
-trial vocabulary. Adding a new runtime trial class requires a matching entry under the relevant system, otherwise the
-new class is silently omitted from the tool's response.
+`VR_TEMPLATE_CONFIG_REGISTRY` in `configuration/configuration_utilities.py` is a separate, optional registry keyed by
+`AcquisitionSystems`. It maps each acquisition system that uses Unity VR tasks to its experiment-configuration class,
+typed by the `SupportsTaskTemplate` protocol, and `create_experiment_from_vr_template_tool` dispatches through it.
+Only systems that build a configuration from a task template register here, so the dispatch-registry coverage check
+does not require an entry for every system. The `_assert_vr_template_registry_consistency()` check in
+`data_classes/extensions.py` does, however, verify at import that every experiment configuration providing a
+`from_task_template` builder is registered here (and that every registered system provides that builder). A
+half-wired VR system fails fast instead of having its template-creation tool silently refuse it.
+
+Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
+introspection from that system's `<System>ExperimentConfiguration` dataclass.
 
 ### Code standards
 
@@ -250,7 +272,8 @@ Invoke `/library-extension`. It enumerates every registry and sibling-skill upda
 1. Read the relevant module under `src/sollertia_shared_assets/data_classes/`
 2. New canonical filenames require an entry in `RawDataFiles` or a system-specific `*RawDataFiles` enum
 3. New canonical subdirectories require an entry in `Directories` or a system-specific `*Directories` enum
-4. New required `raw_data` assets require updating `_required_asset_inventory` in `interfaces/data_tools.py`
+4. New required `raw_data` assets require updating `SessionData.required_raw_assets` in `data_classes/session_data.py`
+   (for a Unity-VR session type, add it to the `SESSION_TYPES_USING_VR_TASK` gate consumed there)
 
 **Adding or modifying MCP tools:**
 

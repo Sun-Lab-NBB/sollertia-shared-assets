@@ -1,22 +1,20 @@
 """Provides assets for storing data acquired through the Sollertia platform."""
 
+from .extensions import (
+    DESCRIPTOR_REGISTRY,
+    HARDWARE_STATE_REGISTRY,
+)
 from .read_assets import (
     READ_ASSET_REGISTRY,
     ReadAssets,
     resolve_read_asset,
-)
-from .runtime_data import (
-    RunTrainingDescriptor,
-    LickTrainingDescriptor,
-    MesoscopeHardwareState,
-    WindowCheckingDescriptor,
-    MesoscopeExperimentDescriptor,
 )
 from .session_data import (
     RAW_DATA_DIRECTORY,
     SYSTEM_SESSION_TYPES,
     PROCESSED_DATA_DIRECTORY,
     SYSTEM_RAW_DATA_REGISTRY,
+    SESSION_TYPES_USING_VR_TASK,
     RawData,
     Directories,
     SessionData,
@@ -55,14 +53,24 @@ from .session_discovery import (
     parse_session_timestamp,
     get_session_root_from_marker,
 )
+from .mesoscope_runtime_data import (
+    RunTrainingDescriptor,
+    LickTrainingDescriptor,
+    MesoscopeHardwareState,
+    WindowCheckingDescriptor,
+    MesoscopeExperimentDescriptor,
+)
 
 __all__ = [
     "CONFIGURATION_DIRECTORY",
     "DATASET_MARKER_FILENAME",
+    "DESCRIPTOR_REGISTRY",
+    "HARDWARE_STATE_REGISTRY",
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
     "READ_ASSET_REGISTRY",
+    "SESSION_TYPES_USING_VR_TASK",
     "SYSTEM_RAW_DATA_REGISTRY",
     "SYSTEM_SESSION_TYPES",
     "AnimalData",

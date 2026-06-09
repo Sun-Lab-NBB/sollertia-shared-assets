@@ -393,6 +393,12 @@ acquisition system declares at least one session type and that every session typ
 Future acquisition systems register the session types they support here."""
 
 
+SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
+"""The session types that run a Unity VR task and therefore write a ``vr_configuration.yaml`` task-template snapshot.
+``_required_asset_inventory`` consults this set to decide whether a session of a given type requires the VR
+configuration snapshot."""
+
+
 @dataclass
 class SessionData(YamlConfig):
     """Defines the structure and the metadata of a data acquisition session.
@@ -422,7 +428,7 @@ class SessionData(YamlConfig):
     """The unique identifier (name) of the session."""
     session_type: str | SessionTypes
     """The type of the session."""
-    acquisition_system: str | AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR
+    acquisition_system: str | AcquisitionSystems
     """The name of the data acquisition system used to acquire the session's data."""
     experiment_name: str | None = None
     """The name of the experiment performed during the session or Null (None), if the session is not an experiment
@@ -637,6 +643,28 @@ class SessionData(YamlConfig):
         instance._build_sub_dataclasses()
 
         return instance
+
+    def required_raw_assets(self) -> list[tuple[str, Path]]:
+        """Returns the canonical filename and absolute path of every raw asset this session is required to contain.
+
+        Every session requires the session descriptor and the system configuration snapshot. Experiment sessions
+        (those with an ``experiment_name``) additionally require the experiment configuration snapshot, and sessions
+        whose type runs a Unity VR task (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
+        configuration snapshot. The session-inspection tooling pairs each returned path with its on-disk presence to
+        report missing required assets, so this method is the single source of truth for the required-asset policy.
+
+        Returns:
+            A list of ``(canonical_filename, absolute_path)`` tuples, one per raw asset the session must contain.
+        """
+        required: list[tuple[str, Path]] = [
+            (RawDataFiles.SESSION_DESCRIPTOR.value, self.raw_data.session_descriptor_path),
+            (RawDataFiles.SYSTEM_CONFIGURATION.value, self.raw_data.system_configuration_path),
+        ]
+        if self.experiment_name is not None:
+            required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, self.raw_data.experiment_configuration_path))
+        if SessionTypes(self.session_type) in SESSION_TYPES_USING_VR_TASK:
+            required.append((RawDataFiles.VR_CONFIGURATION.value, self.raw_data.vr_configuration_path))
+        return required
 
     def mark_runtime_initialized(self) -> None:
         """Removes the 'nk.bin' uninitialized-session marker after acquisition-runtime initialization completes.

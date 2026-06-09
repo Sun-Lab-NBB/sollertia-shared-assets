@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
-    DESCRIPTOR_REGISTRY,
     mcp,
     read_yaml,
     serialize,
@@ -21,8 +20,10 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
+    collect_field_dataclasses,
 )
 from ..data_classes import (
+    DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
     SYSTEM_SESSION_TYPES,
     CONFIGURATION_DIRECTORY,
@@ -31,15 +32,13 @@ from ..data_classes import (
     SessionTypes,
 )
 from ..configuration import (
+    VR_TEMPLATE_CONFIG_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
-    GasPuffTrial,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
-    ExperimentState,
-    WaterRewardTrial,
     AcquisitionSystems,
     get_data_root,
     set_data_root,
@@ -49,18 +48,7 @@ from ..configuration import (
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
-    create_experiment_configuration,
-    populate_default_experiment_states,
 )
-
-_TRIAL_CLASSES: dict[AcquisitionSystems, dict[str, type[WaterRewardTrial | GasPuffTrial]]] = {
-    AcquisitionSystems.MESOSCOPE_VR: {
-        "WaterRewardTrial": WaterRewardTrial,
-        "GasPuffTrial": GasPuffTrial,
-    },
-}
-"""Maps each acquisition system to the trial classes its experiment configuration supports, keyed by trial class
-name. ``list_supported_trial_types_tool`` reads this per acquisition system."""
 
 
 @mcp.tool()
@@ -569,71 +557,79 @@ def write_experiment_configuration_tool(
 
 
 @mcp.tool()
-def create_experiment_configuration_tool(
+def create_experiment_from_vr_template_tool(
     file_path: str,
     acquisition_system: str,
     template_path: str,
     state_count: int = 1,
-    unity_scene_name: str | None = None,
     *,
     overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Creates an experiment configuration for ``acquisition_system`` from a task template using sensible defaults.
+    """Creates an experiment configuration for ``acquisition_system`` from a Unity VR task template.
 
-    Loads the template at ``template_path``, builds an experiment configuration via
-    ``create_experiment_configuration`` (which dispatches to the ``acquisition_system``'s factory), populates the
-    requested number of default-valued runtime states, and writes the result to ``file_path``. Use
-    ``write_experiment_configuration_tool`` instead when full control over the payload is required, and
-    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
-
-    Notes:
-        ``template_path`` and ``unity_scene_name`` are the creation inputs for any acquisition system that uses the
-        Unity VR task system (sollertia-unity-tasks, driven through sle's VR task driver) — Mesoscope-VR is the
-        current such system, and any future system that interfaces with the same VR task driver reuses these exact
-        fields. A system that does not use the Unity VR task system builds its configuration from different inputs;
-        extend this tool's parameters alongside that system's factory when one is added.
+    Loads the task template at ``template_path`` and builds the experiment configuration through the acquisition
+    system's experiment-configuration class, which maps the template's trial structures to runtime trials and seeds
+    ``state_count`` default-valued runtime states. Then writes the result to ``file_path``. This tool serves only
+    acquisition systems whose experiment configuration is built from a Unity VR task template; a system that builds
+    its configuration from different inputs is authored directly with ``write_experiment_configuration_tool`` or
+    another specialized skill. The embedded Unity scene name is inferred from the template filename, mirroring how
+    sollertia-unity-tasks derives the scene name at task creation. Use ``list_supported_acquisition_systems_tool`` to
+    enumerate valid ``acquisition_system`` values.
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
             location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
             implicitly by the sollertia-experiment session-creation flow; this tool does not create them.
-        acquisition_system: The ``AcquisitionSystems`` value whose factory builds the configuration.
-        template_path: Absolute path to the TaskTemplate YAML to instantiate.
+        acquisition_system: The ``AcquisitionSystems`` value whose experiment configuration is built from the
+            template.
+        template_path: Absolute path to the Unity VR task template YAML to instantiate. The embedded Unity scene
+            name is inferred from this file's stem (the filename without the ``.yaml`` extension).
         state_count: Number of default-valued runtime states to generate.
-        unity_scene_name: The Unity scene name to embed in the experiment configuration. Defaults to the template
-            file's stem (the filename without the ``.yaml`` extension), which is the convention most projects follow.
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
         A response dict with ``file_path``, ``acquisition_system``, ``template_path``, and ``data`` (the generated
         experiment configuration payload).
     """
-    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
-    if isinstance(resolved, dict):
-        return resolved
+    try:
+        acquisition_enum = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        message = (
+            f"Unable to create an experiment configuration. The acquisition_system '{acquisition_system}' is not a "
+            f"member of AcquisitionSystems. Valid values: {valid}."
+        )
+        return error_response(message=message)
+
+    config_class = VR_TEMPLATE_CONFIG_REGISTRY.get(acquisition_enum)
+    if config_class is None:
+        message = (
+            f"Unable to create an experiment configuration for acquisition system '{acquisition_system}' from a Unity "
+            f"VR task template: its experiment configuration is not built from a task template. Author it directly "
+            f"with write_experiment_configuration_tool instead."
+        )
+        return error_response(message=message)
+
     destination = Path(file_path)
-    template_file = Path(template_path)
     if destination.exists() and not overwrite:
         message = (
             f"Unable to write the experiment configuration to {destination}: a file already exists at this path. "
             f"Pass overwrite=True to replace it."
         )
         return error_response(message=message)
+
+    template_file = Path(template_path)
     if not template_file.exists():
         message = f"Unable to load the task template from {template_file}: the file does not exist."
         return error_response(message=message)
 
-    resolved_scene_name = unity_scene_name if unity_scene_name is not None else template_file.stem
+    resolved_scene_name = template_file.stem
 
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_file)
-        experiment_configuration = create_experiment_configuration(
+        experiment_configuration = config_class.from_task_template(
             template=task_template,
-            system=AcquisitionSystems(acquisition_system),
             unity_scene_name=resolved_scene_name,
-        )
-        populate_default_experiment_states(
-            experiment_configuration=experiment_configuration,
             state_count=state_count,
         )
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -703,25 +699,28 @@ def validate_experiment_configuration_tool(file_path: str, acquisition_system: s
 def describe_experiment_configuration_schema_tool(acquisition_system: str) -> dict[str, Any]:
     """Returns the schema for the experiment configuration of a given acquisition system.
 
-    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+    Every experiment configuration shares one contract: an ``experiment_states`` field (the experiment state
+    machine, a mapping of ``ExperimentState``) and a ``trial_structures`` field (the trials the experiment runs).
+    The concrete trial classes, and any fields beyond the contract (for example the ``unity_scene_name`` that systems
+    using Unity VR tasks add), are system-specific. The returned ``nested_classes`` are derived from the resolved
+    configuration class, so they reflect that system's actual nested dataclasses rather than any one system's. Use
+    ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value to describe.
 
     Returns:
-        A response dict with ``acquisition_system`` (the resolved acquisition system) and ``schema`` (the
-        experiment configuration schema for the resolved acquisition system). The ``schema`` carries a
-        ``nested_classes`` sub-mapping of each nested dataclass name (including the supported trial classes)
-        to its individual schema.
+        A response dict with ``acquisition_system`` (the resolved acquisition system) and ``schema`` (the experiment
+        configuration schema). The ``schema`` carries a ``nested_classes`` sub-mapping of each nested dataclass name
+        to its individual schema, derived from the resolved configuration class.
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
         return resolved
     schema = describe_dataclass(cls=resolved)
     schema["nested_classes"] = {
-        "ExperimentState": describe_dataclass(cls=ExperimentState),
-        "WaterRewardTrial": describe_dataclass(cls=WaterRewardTrial),
-        "GasPuffTrial": describe_dataclass(cls=GasPuffTrial),
+        name: describe_dataclass(cls=nested_class)
+        for name, nested_class in collect_field_dataclasses(cls=resolved).items()
     }
     return ok_response(acquisition_system=acquisition_system, schema=schema)
 
@@ -794,11 +793,22 @@ def list_session_type_support_tool() -> dict[str, Any]:
 def list_supported_acquisition_systems_tool() -> dict[str, Any]:
     """Enumerates the AcquisitionSystems supported by the Sollertia platform.
 
+    The ``supports_template_creation`` flag marks systems that build their experiment configuration from a Unity
+    VR task template through ``create_experiment_from_vr_template_tool``. Systems without the flag persist their
+    experiment configuration through ``write_experiment_configuration_tool`` instead.
+
     Returns:
-        A response dict with ``acquisition_systems`` (a list of dicts containing ``value`` and ``name`` for
-        each supported acquisition system).
+        A response dict with ``acquisition_systems`` (a list of dicts containing ``value``, ``name``, and
+        ``supports_template_creation`` for each supported acquisition system).
     """
-    entries: list[dict[str, Any]] = [{"value": member.value, "name": member.name} for member in AcquisitionSystems]
+    entries: list[dict[str, Any]] = [
+        {
+            "value": member.value,
+            "name": member.name,
+            "supports_template_creation": member in VR_TEMPLATE_CONFIG_REGISTRY,
+        }
+        for member in AcquisitionSystems
+    ]
     return ok_response(acquisition_systems=entries)
 
 
@@ -829,28 +839,24 @@ def list_supported_data_assets_tool() -> dict[str, Any]:
 def list_supported_trial_types_tool(acquisition_system: str) -> dict[str, Any]:
     """Enumerates the trial classes supported by the ``acquisition_system``'s experiment configuration.
 
-    Trial classes are specific to each acquisition system's experiment configuration, so this tool requires the
-    target system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
+    Trial classes are derived from the system's experiment-configuration ``trial_structures`` field, so each system
+    reports its own trial vocabulary. ``trial_structures`` is part of the shared experiment-configuration contract;
+    the concrete trial classes vary per system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid
+    ``acquisition_system`` values.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value whose trial vocabulary to enumerate.
 
     Returns:
         A response dict with ``acquisition_system`` and ``trial_types`` (a list of dicts containing ``class_name``
-        and ``schema`` for each supported trial class).
+        and ``schema`` for each trial class the system's configuration declares).
     """
-    try:
-        system = AcquisitionSystems(acquisition_system)
-    except ValueError:
-        valid = ", ".join(member.value for member in AcquisitionSystems)
-        message = (
-            f"Unable to list the supported trial types. The acquisition_system '{acquisition_system}' is not a member "
-            f"of AcquisitionSystems. Valid values: {valid}."
-        )
-        return error_response(message=message)
+    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
+    if isinstance(resolved, dict):
+        return resolved
     entries: list[dict[str, Any]] = [
-        {"class_name": class_name, "schema": describe_dataclass(cls=trial_class)}
-        for class_name, trial_class in _TRIAL_CLASSES.get(system, {}).items()
+        {"class_name": name, "schema": describe_dataclass(cls=trial_class)}
+        for name, trial_class in collect_field_dataclasses(cls=resolved, field_name="trial_structures").items()
     ]
     return ok_response(acquisition_system=acquisition_system, trial_types=entries)
 

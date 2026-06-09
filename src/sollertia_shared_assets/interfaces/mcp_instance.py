@@ -2,34 +2,26 @@
 
 from __future__ import annotations
 
-from enum import Enum, StrEnum
+from enum import Enum
 import uuid
-from typing import TYPE_CHECKING, Any, get_type_hints
+from typing import TYPE_CHECKING, Any, get_args, get_type_hints
 from pathlib import Path
 import contextlib
 from dataclasses import MISSING, fields, is_dataclass
 
 import yaml
 from mcp.server.fastmcp import FastMCP
-from ataraxis_base_utilities import console
 
 from ..data_classes import (
-    READ_ASSET_REGISTRY,
-    SYSTEM_SESSION_TYPES,
-    SYSTEM_RAW_DATA_REGISTRY,
-    ReadAssets,
+    DESCRIPTOR_REGISTRY,
     SessionData,
     RawDataFiles,
     SessionTypes,
-    RunTrainingDescriptor,
-    LickTrainingDescriptor,
-    MesoscopeHardwareState,
-    WindowCheckingDescriptor,
-    MesoscopeExperimentDescriptor,
 )
-from ..configuration import EXPERIMENT_CONFIGURATION_REGISTRY, AcquisitionSystems
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from ataraxis_data_structures import YamlConfig
 
 UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
@@ -39,82 +31,6 @@ marker holds no data of value and is a valid target for purging. The acquisition
 once initialization completes. This is distinct from the descriptor's ``incomplete`` field (see
 ``read_descriptor_incomplete``), which signals that an initialized session encountered a runtime issue but
 still holds usable data."""
-
-DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
-    SessionTypes.LICK_TRAINING: LickTrainingDescriptor,
-    SessionTypes.RUN_TRAINING: RunTrainingDescriptor,
-    SessionTypes.MESOSCOPE_EXPERIMENT: MesoscopeExperimentDescriptor,
-    SessionTypes.WINDOW_CHECKING: WindowCheckingDescriptor,
-}
-"""Maps each session type to its descriptor dataclass. The canonical on-disk filename is always the
-flat ``session_descriptor.yaml`` (``RawDataFiles.SESSION_DESCRIPTOR``) regardless of session type —
-the only thing that varies per type is the parsing class."""
-
-HARDWARE_STATE_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeHardwareState,
-}
-"""Maps each acquisition system to its hardware-state dataclass. The canonical on-disk filename is
-always ``hardware_state.yaml`` (``RawDataFiles.HARDWARE_STATE``) regardless of system — the only
-thing that varies is the parsing class. Future acquisition systems register here."""
-
-
-def _assert_registry_coverage() -> None:
-    """Verifies at import time that every ``SessionTypes``, ``AcquisitionSystems``, and ``ReadAssets`` member has an
-    entry in each dispatch registry. Also verifies that ``SYSTEM_SESSION_TYPES`` pairs every acquisition system with
-    at least one session type and claims every session type under at least one system.
-
-    Raises:
-        RuntimeError: If any registry is missing entries for known enum members, or if ``SYSTEM_SESSION_TYPES`` leaves
-            an acquisition system or a session type unpaired. The error message names the offending registry and the
-            missing members so extenders can immediately locate the unwired touch point.
-    """
-    coverage_checks: tuple[tuple[str, frozenset[StrEnum], frozenset[StrEnum]], ...] = (
-        ("DESCRIPTOR_REGISTRY", frozenset(SessionTypes), frozenset(DESCRIPTOR_REGISTRY)),
-        ("HARDWARE_STATE_REGISTRY", frozenset(AcquisitionSystems), frozenset(HARDWARE_STATE_REGISTRY)),
-        (
-            "EXPERIMENT_CONFIGURATION_REGISTRY",
-            frozenset(AcquisitionSystems),
-            frozenset(EXPERIMENT_CONFIGURATION_REGISTRY),
-        ),
-        ("SYSTEM_RAW_DATA_REGISTRY", frozenset(AcquisitionSystems), frozenset(SYSTEM_RAW_DATA_REGISTRY)),
-        ("READ_ASSET_REGISTRY", frozenset(ReadAssets), frozenset(READ_ASSET_REGISTRY)),
-    )
-    for registry_name, expected, actual in coverage_checks:
-        missing = expected - actual
-        if missing:
-            missing_names = ", ".join(sorted(member.name for member in missing))
-            message = (
-                f"{registry_name} is missing entries for {missing_names}. Every enum member must have a registered "
-                f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' / "
-                f"'Adding a New Read Asset' sections for the full extension touch list."
-            )
-            console.error(message=message, error=RuntimeError)
-
-    # SYSTEM_SESSION_TYPES is an association (system -> session-type set), not a dispatch registry, so it is checked
-    # separately. Every acquisition system must declare at least one session type, and every session type must be
-    # claimed by at least one system; either gap would let SessionData.create reject a legitimate session or admit an
-    # unrunnable one.
-    systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(SYSTEM_SESSION_TYPES)
-    if systems_missing_session_types:
-        missing_names = ", ".join(sorted(member.name for member in systems_missing_session_types))
-        message = (
-            f"SYSTEM_SESSION_TYPES is missing entries for {missing_names}. Every acquisition system must declare the "
-            f"session types it can run. See the README's 'Adding New Acquisition Systems' section."
-        )
-        console.error(message=message, error=RuntimeError)
-    claimed_session_types: frozenset[SessionTypes] = frozenset().union(*SYSTEM_SESSION_TYPES.values())
-    orphan_session_types = frozenset(SessionTypes) - claimed_session_types
-    if orphan_session_types:
-        orphan_names = ", ".join(sorted(member.name for member in orphan_session_types))
-        message = (
-            f"SYSTEM_SESSION_TYPES does not claim {orphan_names}. Every session type must be supported by at least one "
-            f"acquisition system. See the README's 'Adding New Session Types' section."
-        )
-        console.error(message=message, error=RuntimeError)
-
-
-_assert_registry_coverage()
-
 
 mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 """The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
@@ -218,6 +134,44 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
         return schema
 
     return _describe_inner(target=cls, seen=frozenset())
+
+
+def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> dict[str, type]:
+    """Returns the dataclass types referenced by a dataclass's fields, keyed by class name.
+
+    Walks each field's type hint one level deep, unwrapping container and union arguments (for example, the value
+    type of a ``dict`` or the members of an ``A | B`` union) to collect the dataclass types it references. When
+    ``field_name`` is provided, only that field is inspected, and an absent field yields no types. Schema
+    introspection tools use this to describe a configuration's actual nested structure instead of hardcoding it.
+
+    Args:
+        cls: The dataclass type to inspect.
+        field_name: When provided, restricts the inspection to the single named field.
+
+    Returns:
+        A mapping of class name to dataclass type for every dataclass referenced by the inspected field(s).
+    """
+
+    def _iter(type_hint: Any) -> Iterator[type]:  # noqa: ANN401 - introspection recurses over arbitrary type hints.
+        if isinstance(type_hint, type):
+            if is_dataclass(type_hint):
+                yield type_hint
+            return
+        for argument in get_args(type_hint):
+            yield from _iter(type_hint=argument)
+
+    # noinspection PyBroadException
+    try:
+        hints = get_type_hints(cls)
+    except Exception:
+        return {}
+    if field_name is not None:
+        hints = {field_name: hints[field_name]} if field_name in hints else {}
+    collected: dict[str, type] = {}
+    for hint in hints.values():
+        for candidate in _iter(type_hint=hint):
+            collected.setdefault(candidate.__name__, candidate)
+    return collected
 
 
 def write_yaml_validated(

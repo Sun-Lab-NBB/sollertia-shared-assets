@@ -143,7 +143,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `create_experiment_configuration_tool`          | Creates an experiment configuration from a task template using sensible defaults               |
+| `create_experiment_from_vr_template_tool`       | Creates an experiment configuration from a Unity VR task template using sensible defaults      |
 | `create_project_tool`                           | Creates the on-disk directory structure for a new project under a data root                    |
 | `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call    |
 | `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root  |
@@ -309,22 +309,27 @@ system, and `SessionData.create()` rejects a session type that is not paired wit
 
 **Step 2: Add the descriptor dataclass**
 
-In `data_classes/runtime_data.py`, add a `<Type>Descriptor` dataclass inheriting from `YamlConfig` that captures
-the task parameters and outcome metadata for the new session type. Use `LickTrainingDescriptor` or
-`RunTrainingDescriptor` as reference. Export the new class from `data_classes/__init__.py`.
+Add a `<Type>Descriptor` dataclass inheriting from `YamlConfig` that captures the task parameters and outcome
+metadata for the new session type. Each acquisition system keeps its runtime dataclasses in its own
+`data_classes/<system>_runtime_data.py` module; add the descriptor to the module of the system that runs the new
+session type. Use `LickTrainingDescriptor` or `RunTrainingDescriptor` in `data_classes/mesoscope_runtime_data.py` as
+reference. Export the new class from `data_classes/__init__.py`.
 
 **Step 3: Register the descriptor**
 
-In `interfaces/mcp_instance.py`:
+In `data_classes/extensions.py` (the extension-point hub):
 
 1. Import the new descriptor class.
 2. Register it in `DESCRIPTOR_REGISTRY` under the new `SessionTypes` key.
 
 **Step 4: Update required-asset checks (if applicable)**
 
-If the new session type requires assets beyond the universal `session_descriptor.yaml` and `system_configuration.yaml`
-(for example, an experiment configuration), extend `_required_asset_inventory` in `interfaces/data_tools.py` to add
-the relevant `if session_type == SessionTypes.NEW_TYPE` branch.
+The required-asset policy lives in `SessionData.required_raw_assets` (`data_classes/session_data.py`), and the session
+inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
+requires `session_descriptor.yaml` and `system_configuration.yaml`; `experiment_configuration.yaml` is required
+whenever the session has an `experiment_name`; and `vr_configuration.yaml` is required for any session type listed in
+`SESSION_TYPES_USING_VR_TASK` (`data_classes/session_data.py`). If the new session type runs a Unity VR task, add it
+to that frozenset; if it requires some other extra asset, extend `required_raw_assets` accordingly.
 
 **Step 5: Update downstream libraries**
 
@@ -337,10 +342,12 @@ An acquisition system identifies a hardware platform that can produce a session 
 Each system contributes its own hardware-state snapshot, experiment-configuration schema, and a system-specific raw
 data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
 by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
-`SYSTEM_RAW_DATA_REGISTRY`. A fourth registry, `_experiment_config_factory_registry`, dispatches `TaskTemplate`-to-
-configuration factories. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
+`SYSTEM_RAW_DATA_REGISTRY`. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
+These registries, the `SYSTEM_SESSION_TYPES` association, and the import-time checks that guard them are collected in
+the extension-point hub `data_classes/extensions.py` (defined there for `DESCRIPTOR_REGISTRY` and
+`HARDWARE_STATE_REGISTRY`, re-exported there for the rest, which stay beside the classes that consume them).
 System-level hardware and software configuration classes live in the acquisition runtime package
-(sollertia-experiment), not in this library.
+(sollertia-experiment).
 
 **Step 1: Extend the AcquisitionSystems enum**
 
@@ -354,16 +361,22 @@ class AcquisitionSystems(StrEnum):
 
 **Step 2: Add the hardware-state dataclass**
 
-In `data_classes/runtime_data.py`, add a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records
-the configuration of every active hardware module on the new system. Use `MesoscopeHardwareState` as reference.
-Export the new class from `data_classes/__init__.py`.
+Create a new `data_classes/<system>_runtime_data.py` module to hold the new system's runtime dataclasses. In it, add
+a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records the configuration of every active
+hardware module on the new system. The same module later holds the system's per-session-type descriptors. Use
+`MesoscopeHardwareState` in `data_classes/mesoscope_runtime_data.py` as reference. Export the new class from
+`data_classes/__init__.py`.
 
 **Step 3: Add the experiment-configuration module**
 
 Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a
 `<System>ExperimentConfiguration` dataclass inheriting from `YamlConfig` that captures the runtime experiment
-parameters for the new system. Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference.
-Export the new class from `configuration/__init__.py`.
+parameters for the new system. Every `<System>ExperimentConfiguration` shares one contract: it provides an
+`experiment_states` field (a mapping of `ExperimentState`, the experiment state machine that every experiment runs as)
+and a `trial_structures` field (the trials the experiment runs, whose concrete trial classes vary per system). Fields
+beyond that contract are system-specific (for example, `unity_scene_name` is added by systems that use Unity VR tasks).
+Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference. Export the new class from
+`configuration/__init__.py`.
 
 **Step 4: Add the system-specific raw-data dataclass**
 
@@ -381,12 +394,12 @@ In `data_classes/session_data.py`:
 
 Three registries need entries for the new system:
 
-1. In `interfaces/mcp_instance.py`, import `<System>HardwareState` and add it to `HARDWARE_STATE_REGISTRY`.
+1. In `data_classes/extensions.py` (the extension-point hub), import `<System>HardwareState` and add it to
+   `HARDWARE_STATE_REGISTRY`.
 2. In `configuration/configuration_utilities.py`, import `<System>ExperimentConfiguration` and add it to
    `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this registry to load the per-session
    experiment configuration snapshot and (if the configuration declares a `unity_scene_name`) cache the matching VR
-   task template. Acquisition systems that do not use Unity-based VR omit `unity_scene_name` from their schema, and
-   the VR template export is skipped automatically.
+   task template. Only a system that uses Unity VR tasks declares `unity_scene_name` in its schema.
 3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
    this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
    new system into session loading.
@@ -395,16 +408,29 @@ Three registries need entries for the new system:
    types, and `SessionData.create()` uses this set to reject session-type / system pairings the system does not
    support.
 
-**Step 6: Add the TaskTemplate-to-configuration factory**
+**Step 6: Add a system-specific experiment-configuration creation path (optional)**
 
-In `configuration/configuration_utilities.py`:
+Experiment configurations are minted two ways. The generic `write_experiment_configuration_tool` validates and writes
+a full payload for any system and is always available. A system may additionally support a convenience tool that seeds
+a configuration from system-specific inputs. There are two cases:
 
-1. Widen the `ExperimentConfigFactory` type alias's return type into a union that includes the new experiment
-   configuration class (e.g., `MesoscopeExperimentConfiguration | NewSystemExperimentConfiguration`).
-2. Implement a private factory function (e.g., `_create_new_system_experiment_config`) with the signature
-   `(unity_scene_name: str, trial_structures: dict[str, WaterRewardTrial | GasPuffTrial])` that returns the new
-   experiment configuration dataclass. Use `_create_mesoscope_experiment_config` as reference.
-3. Register the factory in `_experiment_config_factory_registry` under the new `AcquisitionSystems` key.
+- **The new system uses Unity VR tasks.** It reuses the shared `TaskTemplate` asset and the existing
+  `create_experiment_from_vr_template_tool` — no new tool is needed. Add a `from_task_template` classmethod to the
+  system's `<System>ExperimentConfiguration` dataclass that maps the template's trial structures to the system's
+  runtime trials and seeds the default runtime states. Then register the configuration class under the new
+  `AcquisitionSystems` key in `VR_TEMPLATE_CONFIG_REGISTRY` (`configuration/configuration_utilities.py`);
+  `create_experiment_from_vr_template_tool` dispatches through that registry to the registered class's
+  `from_task_template`. Only systems that use Unity VR tasks register here, so the registry stays partial by design.
+  Use `MesoscopeExperimentConfiguration.from_task_template` and its `VR_TEMPLATE_CONFIG_REGISTRY` entry as reference.
+- **The new system creates configurations from different inputs.** Add a dedicated `@mcp.tool()` function in
+  `interfaces/configuration_tools.py` (e.g., `create_experiment_from_<inputs>_tool`) that resolves the configuration
+  class from `EXPERIMENT_CONFIGURATION_REGISTRY`, loads the system-specific inputs, calls a matching creation
+  classmethod on the configuration dataclass, and writes the validated result. Mirror
+  `create_experiment_from_vr_template_tool` and its `from_task_template` classmethod, then document the new tool in the
+  MCP-tool table above and the `/experiment-configuration` skill.
+
+A system that needs no convenience path skips this step entirely — its configurations are authored directly with
+`write_experiment_configuration_tool`.
 
 **Step 7: Update downstream libraries**
 

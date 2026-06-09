@@ -11,15 +11,7 @@ import pytest
 import platformdirs
 
 from sollertia_shared_assets.configuration import (
-    Cue,
-    TriggerType,
-    GasPuffTrial,
-    TaskTemplate,
-    VREnvironment,
-    TrialStructure,
-    WaterRewardTrial,
     AcquisitionSystems,
-    MesoscopeExperimentConfiguration,
     get_data_root,
     set_data_root,
     get_working_directory,
@@ -28,46 +20,10 @@ from sollertia_shared_assets.configuration import (
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
-    create_experiment_configuration,
-    populate_default_experiment_states,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-def _create_base_task_template(
-    cues: list[Cue] | None = None,
-    trial_structures: dict[str, TrialStructure] | None = None,
-) -> TaskTemplate:
-    """Builds a TaskTemplate populated with defaults suitable for tests."""
-    if cues is None:
-        cues = [
-            Cue(name="A", code=1, length_cm=50.0),
-            Cue(name="B", code=2, length_cm=50.0),
-        ]
-    if trial_structures is None:
-        trial_structures = {
-            "trial1": TrialStructure(
-                cue_sequence=["A", "B"],
-                stimulus_trigger_zone_start_cm=80.0,
-                stimulus_trigger_zone_end_cm=100.0,
-                stimulus_location_cm=90.0,
-                show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.LICK,
-            ),
-        }
-    return TaskTemplate(
-        cues=cues,
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-            cue_offset_cm=0.0,
-        ),
-        trial_structures=trial_structures,
-    )
 
 
 def test_acquisition_systems_mesoscope_vr_value() -> None:
@@ -371,102 +327,3 @@ def test_get_task_templates_directory_raises_error_if_directory_missing(
 
     with pytest.raises(FileNotFoundError, match=r"does not exist"):
         get_task_templates_directory()
-
-
-def test_create_experiment_configuration_mesoscope_vr() -> None:
-    """Verifies that create_experiment_configuration creates a valid MesoscopeExperimentConfiguration."""
-    template = _create_base_task_template()
-
-    config = create_experiment_configuration(
-        template=template,
-        system=AcquisitionSystems.MESOSCOPE_VR,
-        unity_scene_name="TestScene",
-    )
-
-    assert isinstance(config, MesoscopeExperimentConfiguration)
-    assert config.unity_scene_name == "TestScene"
-    assert len(config.trial_structures) == 1
-    trial = config.trial_structures["trial1"]
-    assert isinstance(trial, WaterRewardTrial)
-    assert trial.reward_size_ul == 5.0
-
-
-def test_create_experiment_configuration_with_occupancy_trial() -> None:
-    """Verifies that create_experiment_configuration handles occupancy (gas puff) trials."""
-    template = _create_base_task_template(
-        trial_structures={
-            "occ_trial": TrialStructure(
-                cue_sequence=["A", "B"],
-                stimulus_trigger_zone_start_cm=80.0,
-                stimulus_trigger_zone_end_cm=100.0,
-                stimulus_location_cm=90.0,
-                show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.OCCUPANCY,
-            ),
-        }
-    )
-
-    config = create_experiment_configuration(
-        template=template,
-        system=AcquisitionSystems.MESOSCOPE_VR,
-        unity_scene_name="OccScene",
-        default_puff_duration_ms=200,
-        default_occupancy_duration_ms=2000,
-    )
-
-    assert isinstance(config, MesoscopeExperimentConfiguration)
-    trial = config.trial_structures["occ_trial"]
-    assert isinstance(trial, GasPuffTrial)
-    assert trial.puff_duration_ms == 200
-    assert trial.occupancy_duration_ms == 2000
-
-
-def test_create_experiment_configuration_invalid_system_raises_error() -> None:
-    """Verifies that create_experiment_configuration raises ValueError for unsupported systems."""
-    template = _create_base_task_template()
-
-    with pytest.raises(ValueError, match=r"not supported"):
-        create_experiment_configuration(
-            template=template,
-            system="nonexistent_system",
-            unity_scene_name="Test",
-        )
-
-
-def test_populate_default_experiment_states_with_water_reward() -> None:
-    """Verifies that populate_default_experiment_states adds states with water reward guidance."""
-    config = MesoscopeExperimentConfiguration(
-        trial_structures={"test_trial": WaterRewardTrial()},
-        experiment_states={},
-        unity_scene_name="TestScene",
-    )
-
-    populate_default_experiment_states(experiment_configuration=config, state_count=3)
-
-    assert "state_1" in config.experiment_states
-    assert "state_2" in config.experiment_states
-    assert "state_3" in config.experiment_states
-
-    state_1 = config.experiment_states["state_1"]
-    assert state_1.experiment_state_code == 1
-    assert state_1.state_duration_s == 60
-    assert state_1.supports_trials is True
-    assert state_1.reinforcing_initial_guided_trials == 3
-    assert state_1.aversive_initial_guided_trials == 0
-
-
-def test_populate_default_experiment_states_with_gas_puff() -> None:
-    """Verifies that populate_default_experiment_states adds states with gas puff guidance."""
-    config = MesoscopeExperimentConfiguration(
-        trial_structures={"test_trial": GasPuffTrial()},
-        experiment_states={},
-        unity_scene_name="TestScene",
-    )
-
-    populate_default_experiment_states(experiment_configuration=config, state_count=2)
-
-    state_1 = config.experiment_states["state_1"]
-    assert state_1.reinforcing_initial_guided_trials == 0
-    assert state_1.aversive_initial_guided_trials == 3
-    assert state_1.aversive_recovery_failed_threshold == 9
-    assert state_1.aversive_recovery_guided_trials == 3

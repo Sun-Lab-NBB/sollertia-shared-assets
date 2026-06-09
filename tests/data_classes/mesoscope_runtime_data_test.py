@@ -1,4 +1,4 @@
-"""Contains tests for the descriptor and hardware-state dataclasses in ``data_classes.runtime_data``."""
+"""Contains tests for the descriptor and hardware-state dataclasses in ``data_classes.mesoscope_runtime_data``."""
 
 from __future__ import annotations
 

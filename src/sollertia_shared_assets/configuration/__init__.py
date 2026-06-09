@@ -8,6 +8,7 @@ from .vr_configuration import (
     TrialStructure,
 )
 from .configuration_utilities import (
+    VR_TEMPLATE_CONFIG_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
     AcquisitionSystems,
     get_data_root,
@@ -18,8 +19,6 @@ from .configuration_utilities import (
     set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
-    create_experiment_configuration,
-    populate_default_experiment_states,
 )
 from .mesoscope_configuration import MesoscopeExperimentConfiguration
 from .experiment_configuration import (
@@ -30,6 +29,7 @@ from .experiment_configuration import (
 
 __all__ = [
     "EXPERIMENT_CONFIGURATION_REGISTRY",
+    "VR_TEMPLATE_CONFIG_REGISTRY",
     "AcquisitionSystems",
     "Cue",
     "ExperimentState",
@@ -40,12 +40,10 @@ __all__ = [
     "TriggerType",
     "VREnvironment",
     "WaterRewardTrial",
-    "create_experiment_configuration",
     "get_data_root",
     "get_google_credentials_path",
     "get_task_templates_directory",
     "get_working_directory",
-    "populate_default_experiment_states",
     "set_data_root",
     "set_google_credentials_path",
     "set_task_templates_directory",

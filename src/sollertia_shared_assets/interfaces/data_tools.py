@@ -10,8 +10,6 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
-    DESCRIPTOR_REGISTRY,
-    HARDWARE_STATE_REGISTRY,
     mcp,
     read_yaml,
     serialize,
@@ -24,9 +22,11 @@ from .mcp_instance import (
 )
 from ..data_classes import (
     RAW_DATA_DIRECTORY,
+    DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
     CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
+    HARDWARE_STATE_REGISTRY,
     ReadAssets,
     ProjectData,
     SessionData,
@@ -976,10 +976,10 @@ def _inventory_entry(scope: str, field_name: str, path: Path) -> dict[str, Any]:
 
 
 def _required_asset_inventory(instance: SessionData, session_type: SessionTypes) -> list[dict[str, Any]]:
-    """Returns the existence of each asset required for the session's type.
+    """Returns the existence of each asset required for the session.
 
-    Every session requires the descriptor and the system configuration snapshot; ``mesoscope experiment``
-    sessions additionally require the experiment configuration and VR configuration snapshots.
+    Delegates the required-asset policy to ``SessionData.required_raw_assets`` (the single source of truth for which
+    assets a session must contain) and pairs each required asset with its on-disk presence.
 
     Args:
         instance: The loaded ``SessionData`` instance.
@@ -988,13 +988,6 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
     Returns:
         A list of ``{name, path, present, required_for_session_type}`` dicts.
     """
-    required: list[tuple[str, Path]] = [
-        (RawDataFiles.SESSION_DESCRIPTOR.value, instance.raw_data.session_descriptor_path),
-        (RawDataFiles.SYSTEM_CONFIGURATION.value, instance.raw_data.system_configuration_path),
-    ]
-    if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
-        required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, instance.raw_data.experiment_configuration_path))
-        required.append((RawDataFiles.VR_CONFIGURATION.value, instance.raw_data.vr_configuration_path))
     return [
         {
             "name": name,
@@ -1002,7 +995,7 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
             "present": path.exists(),
             "required_for_session_type": session_type.value,
         }
-        for name, path in required
+        for name, path in instance.required_raw_assets()
     ]
 
 
