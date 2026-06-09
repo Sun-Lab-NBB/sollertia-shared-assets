@@ -644,6 +644,28 @@ class SessionData(YamlConfig):
 
         return instance
 
+    def required_raw_assets(self) -> list[tuple[str, Path]]:
+        """Returns the canonical filename and absolute path of every raw asset this session is required to contain.
+
+        Every session requires the session descriptor and the system configuration snapshot. Experiment sessions
+        (those with an ``experiment_name``) additionally require the experiment configuration snapshot, and sessions
+        whose type runs a Unity VR task (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
+        configuration snapshot. The session-inspection tooling pairs each returned path with its on-disk presence to
+        report missing required assets, so this method is the single source of truth for the required-asset policy.
+
+        Returns:
+            A list of ``(canonical_filename, absolute_path)`` tuples, one per raw asset the session must contain.
+        """
+        required: list[tuple[str, Path]] = [
+            (RawDataFiles.SESSION_DESCRIPTOR.value, self.raw_data.session_descriptor_path),
+            (RawDataFiles.SYSTEM_CONFIGURATION.value, self.raw_data.system_configuration_path),
+        ]
+        if self.experiment_name is not None:
+            required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, self.raw_data.experiment_configuration_path))
+        if SessionTypes(self.session_type) in SESSION_TYPES_USING_VR_TASK:
+            required.append((RawDataFiles.VR_CONFIGURATION.value, self.raw_data.vr_configuration_path))
+        return required
+
     def mark_runtime_initialized(self) -> None:
         """Removes the 'nk.bin' uninitialized-session marker after acquisition-runtime initialization completes.
 

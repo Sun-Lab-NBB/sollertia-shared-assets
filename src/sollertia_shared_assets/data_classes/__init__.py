@@ -1,5 +1,9 @@
 """Provides assets for storing data acquired through the Sollertia platform."""
 
+from .extensions import (
+    DESCRIPTOR_REGISTRY,
+    HARDWARE_STATE_REGISTRY,
+)
 from .read_assets import (
     READ_ASSET_REGISTRY,
     ReadAssets,
@@ -60,6 +64,8 @@ from .mesoscope_runtime_data import (
 __all__ = [
     "CONFIGURATION_DIRECTORY",
     "DATASET_MARKER_FILENAME",
+    "DESCRIPTOR_REGISTRY",
+    "HARDWARE_STATE_REGISTRY",
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",

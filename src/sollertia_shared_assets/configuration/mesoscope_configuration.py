@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
+from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
 from .vr_configuration import TriggerType
@@ -94,6 +95,14 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                     puff_duration_ms=default_puff_duration_ms,
                     occupancy_duration_ms=default_occupancy_duration_ms,
                 )
+            else:
+                message = (
+                    f"Unable to build a MesoscopeExperimentConfiguration from the task template. Trial '{trial_name}' "
+                    f"uses trigger type '{trial_structure.trigger_type}', which is not mapped to a runtime trial class "
+                    f"in MesoscopeExperimentConfiguration.from_task_template. Every TriggerType the template can carry "
+                    f"must have a matching branch here."
+                )
+                console.error(message=message, error=ValueError)
 
         has_water_reward = any(isinstance(trial, WaterRewardTrial) for trial in trial_structures.values())
         has_gas_puff = any(isinstance(trial, GasPuffTrial) for trial in trial_structures.values())

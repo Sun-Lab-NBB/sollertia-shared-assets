@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
 from .mcp_instance import (
-    DESCRIPTOR_REGISTRY,
     mcp,
     read_yaml,
     serialize,
@@ -24,6 +23,7 @@ from .mcp_instance import (
     collect_field_dataclasses,
 )
 from ..data_classes import (
+    DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
     SYSTEM_SESSION_TYPES,
     CONFIGURATION_DIRECTORY,

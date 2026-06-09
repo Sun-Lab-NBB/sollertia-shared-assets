@@ -125,6 +125,52 @@ def _make_session_with_paths(raw: Path, processed: Path) -> SessionData:
     return session
 
 
+def _make_session(session_type: SessionTypes, experiment_name: str | None, raw: Path) -> SessionData:
+    """Builds a SessionData of the given type and experiment name with the runtime sub-dataclasses populated."""
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=session_type,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        experiment_name=experiment_name,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        raw_data_path=raw,
+    )
+    session._build_sub_dataclasses()
+    return session
+
+
+def test_required_raw_assets_training_session(tmp_path: Path) -> None:
+    """Verifies a non-experiment training session requires only the descriptor and the system configuration."""
+    session = _make_session(SessionTypes.LICK_TRAINING, None, tmp_path / "raw_data")
+
+    names = [name for name, _ in session.required_raw_assets()]
+
+    assert names == [RawDataFiles.SESSION_DESCRIPTOR.value, RawDataFiles.SYSTEM_CONFIGURATION.value]
+
+
+def test_required_raw_assets_vr_experiment_session(tmp_path: Path) -> None:
+    """Verifies a VR experiment session also requires the experiment and VR configuration snapshots."""
+    session = _make_session(SessionTypes.MESOSCOPE_EXPERIMENT, "visual_discrimination", tmp_path / "raw_data")
+
+    names = [name for name, _ in session.required_raw_assets()]
+
+    assert RawDataFiles.EXPERIMENT_CONFIGURATION.value in names
+    assert RawDataFiles.VR_CONFIGURATION.value in names
+
+
+def test_required_raw_assets_gates_experiment_and_vr_independently(tmp_path: Path) -> None:
+    """Verifies the experiment-config gate (experiment_name) and the VR-config gate (session type) are independent."""
+    session = _make_session(SessionTypes.LICK_TRAINING, "some_experiment", tmp_path / "raw_data")
+
+    names = [name for name, _ in session.required_raw_assets()]
+
+    assert RawDataFiles.EXPERIMENT_CONFIGURATION.value in names
+    assert RawDataFiles.VR_CONFIGURATION.value not in names
+
+
 def test_session_types_values() -> None:
     """Verifies all SessionTypes enumeration values."""
     assert SessionTypes.LICK_TRAINING == "lick training"

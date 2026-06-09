@@ -55,7 +55,9 @@ VR_TEMPLATE_CONFIG_REGISTRY: dict[AcquisitionSystems, type[SupportsTaskTemplate]
 }
 """Maps each acquisition system whose experiment configuration is built from a Unity VR task template to its
 configuration class. ``create_experiment_from_vr_template_tool`` dispatches through this registry to the registered
-class's ``from_task_template`` classmethod."""
+class's ``from_task_template`` classmethod. The import-time consistency check that this registry agrees with
+``EXPERIMENT_CONFIGURATION_REGISTRY`` lives with the other extension-point checks in
+``data_classes/extensions.py``."""
 
 
 def set_working_directory(path: Path) -> None:
