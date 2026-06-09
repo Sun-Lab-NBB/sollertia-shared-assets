@@ -167,14 +167,16 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   (a mapping of `ExperimentState`, the experiment state machine; every experiment is a state machine, so this is
   required) and a `trial_structures` field (the trials the experiment runs; required, with the concrete trial classes
   varying per system). Fields beyond the contract are system-specific. `unity_scene_name` is Mesoscope-VR's addition
-  as a system that uses Unity VR tasks; systems that do not use Unity VR tasks omit it.
+  as a system that uses Unity VR tasks.
   `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
   `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
   `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool` and
-  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks — such a system reuses them by adding
-  a `from_task_template` classmethod to its own configuration class. `write_experiment_configuration_tool` authors any
-  system's configuration from a full payload. See the README's "Adding New Acquisition Systems" Step 6 for the full
-  experiment-configuration creation-path recipe.
+  `TaskTemplate` are shared by every acquisition system that uses Unity VR tasks. Such a system reuses them by adding a
+  `from_task_template` classmethod to its own configuration class and registering that class under its
+  `AcquisitionSystems` member in `VR_TEMPLATE_CONFIG_REGISTRY` (typed by the `SupportsTaskTemplate` protocol);
+  `create_experiment_from_vr_template_tool` dispatches through that registry.
+  `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
+  "Adding New Acquisition Systems" Step 6 for the full experiment-configuration creation-path recipe.
 - **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
   session, `SessionData.load()` rehydrates one. Both build runtime-only `raw_data`, `processed_data`, and
   `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`. Descriptor and hardware-state classes are
@@ -208,6 +210,12 @@ the touch list and the import-time parity check that fails if any registry is in
 `_assert_registry_coverage()` in `mcp_instance.py` runs at import time and raises `RuntimeError` if any of the five
 public dispatch registries is missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an
 acquisition system with no session types or a session type unclaimed by any system.
+
+`VR_TEMPLATE_CONFIG_REGISTRY` in `configuration/configuration_utilities.py` is a separate, optional registry keyed by
+`AcquisitionSystems`. It maps each acquisition system that uses Unity VR tasks to its experiment-configuration class,
+typed by the `SupportsTaskTemplate` protocol, and `create_experiment_from_vr_template_tool` dispatches through it.
+Only systems that build a configuration from a task template register here, so it stays partial and sits outside the
+import-time parity check.
 
 Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
 introspection from that system's `<System>ExperimentConfiguration` dataclass.
