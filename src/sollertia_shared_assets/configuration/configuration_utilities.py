@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 from pathlib import Path
 
 import platformdirs
@@ -13,6 +13,8 @@ from .mesoscope_configuration import MesoscopeExperimentConfiguration
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
+
+    from .vr_configuration import TaskTemplate
 
 
 class AcquisitionSystems(StrEnum):
@@ -36,6 +38,24 @@ shared experiment-configuration contract: an ``experiment_states`` mapping (the 
 configuration schema, read, and write tools dispatch through this registry to the correct dataclass for the requested
 acquisition system. ``SessionData.create()`` also consults it when caching the per-session experiment configuration
 snapshot, and for a configuration that declares ``unity_scene_name`` it caches the matching task template."""
+
+
+class SupportsTaskTemplate(Protocol):
+    """Structural type for an experiment configuration built from a Unity VR task template."""
+
+    @classmethod
+    def from_task_template(cls, template: TaskTemplate, unity_scene_name: str, state_count: int = 1) -> YamlConfig:
+        """Builds the experiment configuration from a Unity VR task template and the embedded Unity scene name."""
+        ...  # pragma: no cover
+
+
+# noinspection PyTypeChecker
+VR_TEMPLATE_CONFIG_REGISTRY: dict[AcquisitionSystems, type[SupportsTaskTemplate]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
+}
+"""Maps each acquisition system whose experiment configuration is built from a Unity VR task template to its
+configuration class. ``create_experiment_from_vr_template_tool`` dispatches through this registry to the registered
+class's ``from_task_template`` classmethod."""
 
 
 def set_working_directory(path: Path) -> None:

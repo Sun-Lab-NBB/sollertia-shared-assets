@@ -27,6 +27,7 @@ from ..data_classes import (
     READ_ASSET_REGISTRY,
     CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
+    SESSION_TYPES_USING_VR_TASK,
     ReadAssets,
     ProjectData,
     SessionData,
@@ -976,10 +977,11 @@ def _inventory_entry(scope: str, field_name: str, path: Path) -> dict[str, Any]:
 
 
 def _required_asset_inventory(instance: SessionData, session_type: SessionTypes) -> list[dict[str, Any]]:
-    """Returns the existence of each asset required for the session's type.
+    """Returns the existence of each asset required for the session.
 
-    Every session requires the descriptor and the system configuration snapshot; ``mesoscope experiment``
-    sessions additionally require the experiment configuration and VR configuration snapshots.
+    Every session requires the descriptor and the system configuration snapshot. Experiment sessions additionally
+    require the experiment configuration snapshot, and sessions whose type runs a Unity VR task additionally require
+    the VR configuration snapshot.
 
     Args:
         instance: The loaded ``SessionData`` instance.
@@ -992,8 +994,9 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
         (RawDataFiles.SESSION_DESCRIPTOR.value, instance.raw_data.session_descriptor_path),
         (RawDataFiles.SYSTEM_CONFIGURATION.value, instance.raw_data.system_configuration_path),
     ]
-    if session_type == SessionTypes.MESOSCOPE_EXPERIMENT:
+    if instance.experiment_name is not None:
         required.append((RawDataFiles.EXPERIMENT_CONFIGURATION.value, instance.raw_data.experiment_configuration_path))
+    if session_type in SESSION_TYPES_USING_VR_TASK:
         required.append((RawDataFiles.VR_CONFIGURATION.value, instance.raw_data.vr_configuration_path))
     return [
         {

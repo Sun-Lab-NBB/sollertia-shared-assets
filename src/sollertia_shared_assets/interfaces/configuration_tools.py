@@ -32,6 +32,7 @@ from ..data_classes import (
     SessionTypes,
 )
 from ..configuration import (
+    VR_TEMPLATE_CONFIG_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
@@ -590,15 +591,18 @@ def create_experiment_from_vr_template_tool(
         A response dict with ``file_path``, ``acquisition_system``, ``template_path``, and ``data`` (the generated
         experiment configuration payload).
     """
-    resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
-    if isinstance(resolved, dict):
-        return resolved
+    try:
+        acquisition_enum = AcquisitionSystems(acquisition_system)
+    except ValueError:
+        valid = ", ".join(member.value for member in AcquisitionSystems)
+        message = (
+            f"Unable to create an experiment configuration. The acquisition_system '{acquisition_system}' is not a "
+            f"member of AcquisitionSystems. Valid values: {valid}."
+        )
+        return error_response(message=message)
 
-    # Dispatches to the acquisition system's own experiment-configuration class, which owns the template-to-config
-    # translation. A system whose configuration is not built from a VR task template does not expose from_task_template
-    # and is authored through write_experiment_configuration_tool instead.
-    template_factory = getattr(resolved, "from_task_template", None)
-    if template_factory is None:
+    config_class = VR_TEMPLATE_CONFIG_REGISTRY.get(acquisition_enum)
+    if config_class is None:
         message = (
             f"Unable to create an experiment configuration for acquisition system '{acquisition_system}' from a Unity "
             f"VR task template: its experiment configuration is not built from a task template. Author it directly "
@@ -623,7 +627,7 @@ def create_experiment_from_vr_template_tool(
 
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_file)
-        experiment_configuration = template_factory(
+        experiment_configuration = config_class.from_task_template(
             template=task_template,
             unity_scene_name=resolved_scene_name,
             state_count=state_count,
@@ -789,11 +793,22 @@ def list_session_type_support_tool() -> dict[str, Any]:
 def list_supported_acquisition_systems_tool() -> dict[str, Any]:
     """Enumerates the AcquisitionSystems supported by the Sollertia platform.
 
+    The ``supports_template_creation`` flag marks systems that build their experiment configuration from a Unity
+    VR task template through ``create_experiment_from_vr_template_tool``. Systems without the flag persist their
+    experiment configuration through ``write_experiment_configuration_tool`` instead.
+
     Returns:
-        A response dict with ``acquisition_systems`` (a list of dicts containing ``value`` and ``name`` for
-        each supported acquisition system).
+        A response dict with ``acquisition_systems`` (a list of dicts containing ``value``, ``name``, and
+        ``supports_template_creation`` for each supported acquisition system).
     """
-    entries: list[dict[str, Any]] = [{"value": member.value, "name": member.name} for member in AcquisitionSystems]
+    entries: list[dict[str, Any]] = [
+        {
+            "value": member.value,
+            "name": member.name,
+            "supports_template_creation": member in VR_TEMPLATE_CONFIG_REGISTRY,
+        }
+        for member in AcquisitionSystems
+    ]
     return ok_response(acquisition_systems=entries)
 
 

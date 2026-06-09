@@ -1,4 +1,4 @@
-"""Provides assets for storing runtime data acquired by data acquisition systems."""
+"""Provides the Mesoscope-VR runtime dataclasses: the hardware-state snapshot and the per-session-type descriptors."""
 
 from __future__ import annotations
 

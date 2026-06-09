@@ -393,6 +393,12 @@ acquisition system declares at least one session type and that every session typ
 Future acquisition systems register the session types they support here."""
 
 
+SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
+"""The session types that run a Unity VR task and therefore write a ``vr_configuration.yaml`` task-template snapshot.
+``_required_asset_inventory`` consults this set to decide whether a session of a given type requires the VR
+configuration snapshot."""
+
+
 @dataclass
 class SessionData(YamlConfig):
     """Defines the structure and the metadata of a data acquisition session.
