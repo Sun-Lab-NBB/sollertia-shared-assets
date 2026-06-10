@@ -55,13 +55,19 @@ def _create_base_task_template(
 def test_trigger_type_values() -> None:
     """Verifies the supported TriggerType enumeration values."""
     assert TriggerType.INTERACTION == "interaction"
+    assert TriggerType.COLLISION == "collision"
     assert TriggerType.OCCUPANCY_DISARM == "occupancy_disarm"
+    assert TriggerType.OCCUPANCY_ARM == "occupancy_arm"
+    assert TriggerType.OCCUPANCY_TRIGGER == "occupancy_trigger"
 
 
 def test_trigger_type_is_string_enum() -> None:
     """Verifies that TriggerType inherits from StrEnum."""
     assert isinstance(TriggerType.INTERACTION, str)
+    assert isinstance(TriggerType.COLLISION, str)
     assert isinstance(TriggerType.OCCUPANCY_DISARM, str)
+    assert isinstance(TriggerType.OCCUPANCY_ARM, str)
+    assert isinstance(TriggerType.OCCUPANCY_TRIGGER, str)
 
 
 def test_cue_code_above_uint8_raises_error() -> None:
@@ -395,6 +401,74 @@ def test_task_template_duplicate_cue_sequence_raises_error() -> None:
         ),
     }
     with pytest.raises(ValueError, match=r"share an identical cue sequence"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_collision_trial_skips_trigger_zone_validation() -> None:
+    """Verifies that a collision trial ignores trigger-zone bounds but still validates the boundary location."""
+    # Reversed zone bounds (end < start) are accepted because collision validates only the boundary location.
+    trial_structures = {
+        "trial1": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=100.0,
+            stimulus_trigger_zone_end_cm=80.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.COLLISION,
+        ),
+    }
+    template = _create_base_task_template(trial_structures=trial_structures)
+    assert template.trial_structures["trial1"].trigger_type == TriggerType.COLLISION
+
+
+def test_collision_trial_validates_boundary_location() -> None:
+    """Verifies that a collision trial still rejects a stimulus_location outside the trial bounds."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=150.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.COLLISION,
+        ),
+    }
+    with pytest.raises(ValueError, match=r"stimulus_location_cm.*must be within"):
+        _create_base_task_template(trial_structures=trial_structures)
+
+
+def test_occupancy_trigger_trial_skips_boundary_validation() -> None:
+    """Verifies that an occupancy_trigger trial ignores the boundary location but still validates the zone."""
+    # An out-of-bounds stimulus_location is accepted because occupancy_trigger fires on occupancy, with no boundary.
+    trial_structures = {
+        "trial1": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=20.0,
+            stimulus_trigger_zone_end_cm=80.0,
+            stimulus_location_cm=500.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.OCCUPANCY_TRIGGER,
+            occupancy_duration_ms=1000.0,
+        ),
+    }
+    template = _create_base_task_template(trial_structures=trial_structures)
+    assert template.trial_structures["trial1"].trigger_type == TriggerType.OCCUPANCY_TRIGGER
+
+
+def test_occupancy_trigger_trial_validates_zone() -> None:
+    """Verifies that an occupancy_trigger trial still rejects a trigger zone outside the trial bounds."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=150.0,
+            stimulus_trigger_zone_end_cm=160.0,
+            stimulus_location_cm=0.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.OCCUPANCY_TRIGGER,
+            occupancy_duration_ms=1000.0,
+        ),
+    }
+    with pytest.raises(ValueError, match=r"stimulus_trigger_zone_start_cm.*must be within"):
         _create_base_task_template(trial_structures=trial_structures)
 
 

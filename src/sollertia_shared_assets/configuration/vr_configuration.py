@@ -32,17 +32,28 @@ class TriggerType(StrEnum):
     """Defines the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
-        All Sollertia platform acquisition systems share these core trigger types. INTERACTION maps to the
-        StimulusTriggerZone prefab (with a GuidanceZone child) in Unity, and OCCUPANCY_DISARM maps to the
-        OccupancyTriggerZone prefab (with OccupancyZone and OccupancyGuidanceZone children).
+        These are the platform-wide trigger mechanisms; each acquisition system supports the subset it can resolve
+        to its own stimuli (Mesoscope-VR supports INTERACTION and OCCUPANCY_DISARM, and leaves the rest unmapped).
+        INTERACTION maps to the StimulusTriggerZone prefab (GuidanceZone child) and the three occupancy types to the
+        OccupancyTriggerZone prefab (OccupancyZone + OccupancyGuidanceZone children) in Unity; COLLISION reuses the
+        StimulusTriggerZone prefab as a bare boundary wall.
     """
 
     INTERACTION = "interaction"
     """Indicates an interaction-triggered trial where the animal must engage an interaction sensor (lick port, button,
     lever, pressure plate) inside the stimulus trigger zone to elicit stimulus delivery."""
+    COLLISION = "collision"
+    """Indicates a collision-triggered trial where crossing the invisible boundary wall elicits stimulus delivery
+    unconditionally, with no sensor or occupancy requirement."""
     OCCUPANCY_DISARM = "occupancy_disarm"
-    """Indicates an occupancy-disarm trial where the animal must occupy the trigger zone for a specified duration to
-    disarm the stimulus delivery boundary."""
+    """Indicates an occupancy-disarm trial where occupying the zone disarms the boundary; colliding with the still-armed
+    boundary (occupancy not met) elicits stimulus delivery."""
+    OCCUPANCY_ARM = "occupancy_arm"
+    """Indicates an occupancy-arm trial where occupying the zone arms the boundary; colliding with the now-armed
+    boundary (occupancy met) elicits stimulus delivery."""
+    OCCUPANCY_TRIGGER = "occupancy_trigger"
+    """Indicates an occupancy-trigger trial where occupying the zone for the required duration elicits stimulus
+    delivery immediately, with no boundary collision."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,13 +322,38 @@ class TaskTemplate(YamlConfig):
 
     @staticmethod
     def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, trial_length_cm: float) -> None:
-        """Validates that zone positions are within the trial's segment bounds.
+        """Validates the trial's zone positions within its segment bounds, per trigger type.
+
+        Collision trials validate only the boundary location; occupancy_trigger trials validate only the trigger
+        zone; the other trigger types validate the zone, the boundary, and their relative ordering.
 
         Args:
             trial_name: The name of the trial structure being validated.
             trial_structure: The trial structure to validate.
             trial_length_cm: The total length of the trial's segment in centimeters.
         """
+        trigger_value = (
+            trial_structure.trigger_type.value
+            if isinstance(trial_structure.trigger_type, TriggerType)
+            else trial_structure.trigger_type
+        )
+        validates_zone = trigger_value != TriggerType.COLLISION.value
+        validates_boundary = trigger_value != TriggerType.OCCUPANCY_TRIGGER.value
+
+        if validates_zone:
+            TaskTemplate._validate_trigger_zone_bounds(
+                trial_name=trial_name, trial_structure=trial_structure, trial_length_cm=trial_length_cm
+            )
+        if validates_boundary:
+            TaskTemplate._validate_stimulus_location_bounds(
+                trial_name=trial_name, trial_structure=trial_structure, trial_length_cm=trial_length_cm
+            )
+        if validates_zone and validates_boundary:
+            TaskTemplate._validate_location_not_before_zone(trial_name=trial_name, trial_structure=trial_structure)
+
+    @staticmethod
+    def _validate_trigger_zone_bounds(trial_name: str, trial_structure: TrialStructure, trial_length_cm: float) -> None:
+        """Validates that the trigger zone start and end are ordered and within the trial's segment bounds."""
         if trial_structure.stimulus_trigger_zone_end_cm < trial_structure.stimulus_trigger_zone_start_cm:
             message = (
                 f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_trigger_zone_end_cm must "
@@ -343,6 +379,11 @@ class TaskTemplate(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
+    @staticmethod
+    def _validate_stimulus_location_bounds(
+        trial_name: str, trial_structure: TrialStructure, trial_length_cm: float
+    ) -> None:
+        """Validates that the stimulus (boundary) location is within the trial's segment bounds."""
         if not 0 <= trial_structure.stimulus_location_cm <= trial_length_cm:
             message = (
                 f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_location_cm must be "
@@ -351,6 +392,9 @@ class TaskTemplate(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
+    @staticmethod
+    def _validate_location_not_before_zone(trial_name: str, trial_structure: TrialStructure) -> None:
+        """Validates that the stimulus location does not precede the trigger zone start."""
         if trial_structure.stimulus_location_cm < trial_structure.stimulus_trigger_zone_start_cm:
             message = (
                 f"Unable to validate zone positions for trial '{trial_name}'. The stimulus_location_cm must not "

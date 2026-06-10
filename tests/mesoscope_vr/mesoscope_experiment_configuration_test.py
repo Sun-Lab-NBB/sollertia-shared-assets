@@ -179,9 +179,11 @@ def test_from_task_template_seeds_gas_puff_guided_states() -> None:
     assert state_1.aversive_recovery_guided_trials == 3
 
 
-def test_from_task_template_maps_every_trigger_type() -> None:
-    """Verifies that from_task_template produces a runtime trial for every TriggerType a template can carry."""
-    for trigger_type in TriggerType:
+def test_from_task_template_maps_supported_trigger_types() -> None:
+    """Verifies from_task_template maps the trigger types Mesoscope-VR supports and rejects the rest as unmapped."""
+    supported = {TriggerType.INTERACTION, TriggerType.OCCUPANCY_DISARM}
+
+    for trigger_type in supported:
         template = _create_base_task_template(
             trial_structures={
                 "trial": TrialStructure(
@@ -194,10 +196,24 @@ def test_from_task_template_maps_every_trigger_type() -> None:
                 ),
             }
         )
-
         config = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="Scene")
-
         assert "trial" in config.trial_structures
+
+    for trigger_type in set(TriggerType) - supported:
+        template = _create_base_task_template(
+            trial_structures={
+                "trial": TrialStructure(
+                    cue_sequence=["A", "B"],
+                    stimulus_trigger_zone_start_cm=80.0,
+                    stimulus_trigger_zone_end_cm=100.0,
+                    stimulus_location_cm=90.0,
+                    show_stimulus_collision_boundary=False,
+                    trigger_type=trigger_type,
+                ),
+            }
+        )
+        with pytest.raises(ValueError, match=r"not mapped to a runtime trial class"):
+            MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="Scene")
 
 
 def test_from_task_template_raises_on_unmapped_trigger() -> None:
