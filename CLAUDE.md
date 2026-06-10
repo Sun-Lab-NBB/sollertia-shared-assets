@@ -150,74 +150,92 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Key areas
 
-| Directory                                    | Purpose                                                                                      |
-|----------------------------------------------|----------------------------------------------------------------------------------------------|
-| `src/sollertia_shared_assets/configuration/` | VR-task and experiment configuration dataclasses (YamlConfig)                                |
-| `src/sollertia_shared_assets/data_classes/`  | Session, descriptor, and surgery dataclasses, the read-asset registry, and discovery helpers |
-| `src/sollertia_shared_assets/interfaces/`    | `slsa` CLI and FastMCP server with all MCP tool modules                                      |
-| `tests/`                                     | Test suite (configuration and data-classes only; MCP excluded)                               |
-| `docs/`                                      | Sphinx API documentation source                                                              |
-| `envs/`                                      | Conda/mamba development environment specifications                                           |
+| Directory or module                           | Purpose                                                                                                                              |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| `src/sollertia_shared_assets/enums.py`        | Cross-system vocabulary enums (`AcquisitionSystems`, `SessionTypes`, `ReadAssets`, `CredentialsTypes`); a leaf with no local imports |
+| `src/sollertia_shared_assets/registries.py`   | Every dispatch registry as a fully populated literal, plus the import-time checks and `resolve_read_asset`                           |
+| `src/sollertia_shared_assets/credentials.py`  | Credentials toolset (`resolve_credentials_file`, `set_credentials`, `get_credentials`)                                               |
+| `src/sollertia_shared_assets/configuration/`  | Persistent host settings and the shared VR-task / experiment configuration primitives                                                |
+| `src/sollertia_shared_assets/data_classes/`   | Read-asset contract dataclasses (currently `surgery_data.py`); registry-free by design                                               |
+| `src/sollertia_shared_assets/data_hierarchy/` | `SessionData`, the project/animal hierarchy views, and the session-discovery helpers                                                 |
+| `src/sollertia_shared_assets/mesoscope_vr/`   | Mesoscope-VR system subpackage: experiment configuration, runtime data, raw-data layout                                              |
+| `src/sollertia_shared_assets/interfaces/`     | `slsa` CLI and FastMCP server with all MCP tool modules                                                                              |
+| `tests/`                                      | Test suite mirroring the source layout (MCP tools excluded)                                                                          |
+| `docs/`                                       | Sphinx API documentation source                                                                                                      |
+| `envs/`                                       | Conda/mamba development environment specifications                                                                                   |
 
 ### Architecture
 
-- **Configuration layer**: `TaskTemplate` (the Unity corridor template) and `MesoscopeExperimentConfiguration`
-  (Mesoscope-VR experiment config) are independent siblings — both inherit directly from `YamlConfig`, neither
-  inherits from the other. Every Sollertia acquisition system runs a Unity VR task in the linear infinite corridor, so
-  every `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field (the experiment state
-  machine), a `trial_structures` field (the trials the experiment runs, with concrete trial classes varying per
-  system), a `unity_scene_name` field (the corridor task the experiment runs), and a `from_task_template` classmethod.
-  Fields beyond the contract are system-specific. `MesoscopeExperimentConfiguration.from_task_template` converts a
-  `TaskTemplate` into a `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a
-  `WaterRewardTrial` (for `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`).
-  `create_experiment_from_vr_template_tool` dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered
-  class's `from_task_template`, and `write_experiment_configuration_tool` authors any system's configuration from a
-  full payload. See the README's "Adding New Acquisition Systems" Step 6 for the creation-path recipe.
-- **Data layer**: `SessionData` is the entry point for every session on disk. `SessionData.create()` mints a new
-  session, `SessionData.load()` rehydrates one. Both build runtime-only `raw_data`, `processed_data`, and
-  `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`. Descriptor and hardware-state classes are
-  dispatched by `SessionTypes` and `AcquisitionSystems` enum membership.
+- **Vocabulary and wiring**: The keying enums live in the leaf `enums.py` module, and every dispatch registry is
+  defined — fully populated — in the top-level `registries.py` module, which imports each system subpackage and the
+  contract dataclasses. The import graph is a strict DAG: `enums`, `data_classes`, and `configuration` are leaves;
+  `mesoscope_vr` imports `configuration`; `registries` imports the leaves and the system subpackages; `credentials`
+  and `data_hierarchy` sit above `registries`; `interfaces` sits on top. Shared modules never import from a system
+  subpackage — only `registries.py` does.
+- **Configuration layer**: `TaskTemplate` (the Unity corridor template, in `configuration/`) and
+  `MesoscopeExperimentConfiguration` (Mesoscope-VR experiment config, in `mesoscope_vr/`) are independent siblings —
+  both inherit directly from `YamlConfig`, neither inherits from the other. Every Sollertia acquisition system runs a
+  Unity VR task in the linear infinite corridor, so every `<System>ExperimentConfiguration` shares one contract: an
+  `experiment_states` field (the experiment state machine), a `trial_structures` field (the trials the experiment
+  runs, with concrete trial classes varying per system), a `unity_scene_name` field (the corridor task the experiment
+  runs), and a `from_task_template` classmethod. Fields beyond the contract are system-specific; the shared building
+  blocks (`ExperimentState`, `WaterRewardTrial`, `GasPuffTrial`) stay in `configuration/`.
+  `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
+  `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
+  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool`
+  dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered class's `from_task_template`, and
+  `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
+  "Adding New Acquisition Systems" Step 4 for the creation-path recipe.
+- **Data layer**: `SessionData` (in `data_hierarchy/session_data.py`) is the entry point for every session on disk.
+  `SessionData.create()` mints a new session, `SessionData.load()` rehydrates one. Both build runtime-only
+  `raw_data`, `processed_data`, and `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`.
+  Descriptor and hardware-state classes are dispatched by `SessionTypes` and `AcquisitionSystems` enum membership.
+  The `data_classes/` package holds only read-asset contract dataclasses; contract modules export plain dataclasses
+  and never consume the registries.
 - **Interface layer**: A single `FastMCP` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and dataclass-introspection helpers; the dispatch registries and their import-time checks live in the
-  data layer's extension-point hub (`data_classes/extensions.py`), not here. Tool modules import the instance and
-  register `@mcp.tool()` functions. The CLI
-  (`slsa`) starts the server and exposes `configure {directory,data-root,credentials,templates,project}` and
+  top-level `registries.py` module, not here. Tool modules import the instance and register `@mcp.tool()` functions.
+  The CLI (`slsa`) starts the server and exposes `configure {directory,data-root,credentials,templates,project}` and
   `get {directory,data-root,credentials,templates,projects,experiments}` command groups.
 - **Persistent host settings**: Three independent `platformdirs`-backed settings — working directory, data root,
-  templates directory — are managed in `configuration/configuration_utilities.py`, alongside the credentials toolset
-  that copies each category's credentials file into the working directory's `credentials/` subdirectory under its
-  canonical filename. Only the working directory is required for `slsa mcp` to function.
+  templates directory — are managed in `configuration/configuration_utilities.py`. The credentials toolset that
+  copies each category's credentials file into the working directory's `credentials/` subdirectory under its
+  canonical filename lives in the top-level `credentials.py` module, downstream of `registries.py`, because its
+  functions consume `CREDENTIALS_FILE_REGISTRY` at runtime. Only the working directory is required for `slsa mcp` to
+  function.
 
 ### Extension contracts
 
-Five registries route polymorphic behavior off three enums — the two primary enums (`SessionTypes`,
-`AcquisitionSystems`) plus the read-asset enum (`ReadAssets`). A sixth structure, `SYSTEM_SESSION_TYPES`, is an
-association keyed by `AcquisitionSystems` that records which session types each acquisition system can run. Adding a
-new acquisition system or session type means touching the relevant registries below and `SYSTEM_SESSION_TYPES`;
-adding a new external read asset means touching `READ_ASSET_REGISTRY`. Use the `/library-extension` skill — it owns
-the touch list and the import-time parity check that fails if any registry is incomplete.
+Every dispatch registry is defined — fully populated — in the top-level `registries.py` module, keyed by the
+vocabulary enums in the leaf `enums.py` module. The registries form two governance tiers. The system registries
+(`DESCRIPTOR_REGISTRY`, `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, `SYSTEM_RAW_DATA_REGISTRY`,
+the `SYSTEM_SESSION_TYPES` association, and the `SESSION_TYPES_USING_VR_TASK` gate) form the designed extension
+point: they grow whenever a new acquisition system or session type is added. The contract registries
+(`READ_ASSET_REGISTRY`, `CREDENTIALS_FILE_REGISTRY`) are durable translation contracts curated by Sollertia platform
+maintainers; adding an entry there is a platform-contract decision, not a routine extension. Use the
+`/library-extension` skill for system and session-type extensions — it owns the touch list and the import-time
+parity check that fails if any registry is incomplete.
 
-| Registry                              | File                                       | Keyed by             |
-|---------------------------------------|--------------------------------------------|----------------------|
-| `DESCRIPTOR_REGISTRY`                 | `data_classes/extensions.py`               | `SessionTypes`       |
-| `HARDWARE_STATE_REGISTRY`             | `data_classes/extensions.py`               | `AcquisitionSystems` |
-| `EXPERIMENT_CONFIGURATION_REGISTRY`   | `configuration/configuration_utilities.py` | `AcquisitionSystems` |
-| `SYSTEM_RAW_DATA_REGISTRY`            | `data_classes/session_data.py`             | `AcquisitionSystems` |
-| `SYSTEM_SESSION_TYPES`                | `data_classes/session_data.py`             | `AcquisitionSystems` |
-| `READ_ASSET_REGISTRY`                 | `data_classes/read_assets.py`              | `ReadAssets`         |
+| Registry                            | Keyed by             | Tier                       |
+|-------------------------------------|----------------------|----------------------------|
+| `DESCRIPTOR_REGISTRY`               | `SessionTypes`       | System (extension point)   |
+| `HARDWARE_STATE_REGISTRY`           | `AcquisitionSystems` | System (extension point)   |
+| `EXPERIMENT_CONFIGURATION_REGISTRY` | `AcquisitionSystems` | System (extension point)   |
+| `SYSTEM_RAW_DATA_REGISTRY`          | `AcquisitionSystems` | System (extension point)   |
+| `SYSTEM_SESSION_TYPES`              | `AcquisitionSystems` | System (extension point)   |
+| `READ_ASSET_REGISTRY`               | `ReadAssets`         | Contract (maintainer-only) |
+| `CREDENTIALS_FILE_REGISTRY`         | `CredentialsTypes`   | Contract (maintainer-only) |
 
-These registries, the `SYSTEM_SESSION_TYPES` association, the `SESSION_TYPES_USING_VR_TASK` gate, and the import-time
-checks that guard them are collected in the extension-point hub `data_classes/extensions.py`, which defines
-`DESCRIPTOR_REGISTRY` and `HARDWARE_STATE_REGISTRY` directly and re-exports the rest from the modules that consume
-them. `_assert_registry_coverage()` there runs on a bare `import sollertia_shared_assets` (the hub lives in the data
-layer, so it loads without the MCP server) and raises `RuntimeError` if any of the five public dispatch registries is
-missing entries for a known enum member. Also, if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session
-types or a session type unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()` (every
-registered descriptor must declare the `incomplete` field the inspection tooling reads) and
-`_assert_experiment_configuration_contract()` (every registered experiment configuration must declare the
-`experiment_states`, `trial_structures`, and `unity_scene_name` contract fields and provide a `from_task_template`
-classmethod, so a half-wired acquisition system fails fast instead of having its template-creation tool refuse it at
-runtime).
+`DESCRIPTOR_REGISTRY` is deliberately flat: a session type maps to exactly one descriptor platform-wide, so an
+acquisition system that needs a different descriptor must mint a new `SessionTypes` member.
+`_assert_registry_coverage()` in `registries.py` runs on a bare `import sollertia_shared_assets` (the hub loads
+without the MCP server) and raises `RuntimeError` if any registry is missing entries for a known enum member. Also,
+if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session types or a session type unclaimed by any
+system. The hub additionally runs `_assert_descriptor_contract()` (every registered descriptor must declare the
+`incomplete` field the inspection tooling reads) and `_assert_experiment_configuration_contract()` (every registered
+experiment configuration must declare the `experiment_states`, `trial_structures`, and `unity_scene_name` contract
+fields and provide a `from_task_template` classmethod. A half-wired acquisition system fails fast instead of
+having its template-creation tool refuse it at runtime).
 
 Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
 introspection from that system's `<System>ExperimentConfiguration` dataclass.
@@ -253,18 +271,24 @@ Invoke `/library-extension`. It enumerates every registry and sibling-skill upda
 
 **Modifying configuration dataclasses:**
 
-1. Read the relevant module under `src/sollertia_shared_assets/configuration/`
+1. Read the relevant module: shared primitives live under `src/sollertia_shared_assets/configuration/`,
+   system-specific experiment configurations under the system's subpackage (e.g.,
+   `mesoscope_vr/experiment_configuration.py`)
 2. Preserve the `YamlConfig` inheritance — downstream libraries serialize and deserialize these
 3. Update `__post_init__` validation when adding fields with cross-field constraints
 4. Run `tox -e lint` and verify no field renames break sollertia-experiment or sollertia-forgery
 
 **Modifying session or descriptor dataclasses:**
 
-1. Read the relevant module under `src/sollertia_shared_assets/data_classes/`
-2. New canonical filenames require an entry in `RawDataFiles` or a system-specific `*RawDataFiles` enum
+1. Read the relevant module: `SessionData` and the hierarchy views live under
+   `src/sollertia_shared_assets/data_hierarchy/`, per-system descriptors and raw-data layouts under the system's
+   subpackage (e.g., `mesoscope_vr/runtime_data.py`, `mesoscope_vr/raw_data.py`)
+2. New canonical filenames require an entry in `RawDataFiles` (`data_hierarchy/session_data.py`) or a system-specific
+   `*RawDataFiles` enum (`<system>/raw_data.py`)
 3. New canonical subdirectories require an entry in `Directories` or a system-specific `*Directories` enum
-4. New required `raw_data` assets require updating `SessionData.required_raw_assets` in `data_classes/session_data.py`
-   (for a session type that runs the corridor task, add it to the `SESSION_TYPES_USING_VR_TASK` gate consumed there)
+4. New required `raw_data` assets require updating `SessionData.required_raw_assets` in
+   `data_hierarchy/session_data.py` (for a session type that runs the corridor task, add it to the
+   `SESSION_TYPES_USING_VR_TASK` gate in `registries.py`)
 
 **Adding or modifying MCP tools:**
 
