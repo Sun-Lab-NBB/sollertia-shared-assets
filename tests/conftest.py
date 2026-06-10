@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 import pytest
 import platformdirs
 
+from sollertia_shared_assets.mesoscope_vr import MesoscopeExperimentConfiguration
 from sollertia_shared_assets.configuration import (
     ExperimentState,
     WaterRewardTrial,
-    MesoscopeExperimentConfiguration,
 )
 
 if TYPE_CHECKING:

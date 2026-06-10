@@ -2,18 +2,10 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
-import shutil
-from typing import TYPE_CHECKING
 from pathlib import Path
 
 import platformdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
-
-from .mesoscope_configuration import MesoscopeExperimentConfiguration
-
-if TYPE_CHECKING:
-    from ataraxis_data_structures import YamlConfig
 
 CONFIGURATION_DIRECTORY: str = "configuration"
 """The name of the directory that stores configuration files. Used both under the local working directory (where it
@@ -21,73 +13,9 @@ holds the host's system configuration) and under each project directory (where i
 configuration YAML files)."""
 
 CREDENTIALS_DIRECTORY: str = "credentials"
-"""The name of the working-directory subdirectory that stores all platform credentials files."""
-
-
-class AcquisitionSystems(StrEnum):
-    """Defines the data acquisition systems supported by the Sollertia platform.
-
-    Every Sollertia acquisition system runs in Virtual Reality, presenting a Unity task in the linear infinite
-    corridor. Each acquisition runtime package owns its own system configuration classes; this enum remains the shared
-    vocabulary that identifies which runtime a session or dataset was acquired on.
-    """
-
-    MESOSCOPE_VR = "mesoscope"
-    """Uses the 2-Photon Random Access Mesoscope (2P-RAM) from Thor-Labs and a heavily modified Janelia / Allen 
-    hardware harness."""
-
-
-EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
-}
-"""Maps each acquisition system to its experiment configuration dataclass. Every registered class satisfies the
-experiment-configuration contract; the configuration and template-creation tools dispatch through this registry."""
-
-
-class CredentialsTypes(StrEnum):
-    """Enumerates the credentials categories supported by the Sollertia platform.
-
-    Each member's string value is the canonical identifier for the credentials' category. Downstream consumers extend
-    this enumeration (together with ``CREDENTIALS_FILE_REGISTRY``) to wire additional credentials categories into the
-    platform.
-    """
-
-    GOOGLE = "google"
-    """The Google service account credentials used for all interactions with the Google Sheets API (canonical
-    filename ``google_credentials.json``)."""
-
-
-CREDENTIALS_FILE_REGISTRY: dict[CredentialsTypes, str] = {
-    CredentialsTypes.GOOGLE: "google_credentials.json",
-}
-"""Maps each credentials category to the canonical filename under which its credentials file is stored inside the
-working directory's credentials subdirectory."""
-
-
-def resolve_credentials_file(credentials: str | CredentialsTypes) -> str:
-    """Resolves a credentials category identifier to the canonical filename of its credentials file.
-
-    Args:
-        credentials: A ``CredentialsTypes`` member or its string value (e.g., ``"google"``).
-
-    Returns:
-        The canonical filename registered for the category in ``CREDENTIALS_FILE_REGISTRY``.
-
-    Raises:
-        ValueError: If the identifier is not a valid ``CredentialsTypes`` member.
-    """
-    if credentials not in CredentialsTypes:
-        valid = ", ".join(member.value for member in CredentialsTypes)
-        message = (
-            f"Unable to resolve the credentials category '{credentials}'. Expected one of the supported "
-            f"CredentialsTypes members: {valid}."
-        )
-        console.error(message=message, error=ValueError)
-        # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
-        # noinspection PyUnreachableCode
-        raise ValueError(message)  # pragma: no cover
-
-    return CREDENTIALS_FILE_REGISTRY[CredentialsTypes(credentials)]
+"""The name of the working-directory subdirectory that stores all platform credentials files. The constant lives with
+the working-directory layout (``set_working_directory`` pre-creates the subdirectory); the credentials toolset that
+fills the subdirectory lives in the top-level ``credentials`` module."""
 
 
 def set_working_directory(path: Path) -> None:
@@ -208,85 +136,6 @@ def get_data_root() -> Path:
         console.error(message=message, error=FileNotFoundError)
 
     return data_root
-
-
-def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
-    """Copies the specified credentials file into the working directory's credentials subdirectory.
-
-    The copy is stored under the canonical filename registered for the credentials category, replacing any
-    previously configured credentials file for that category.
-
-    Notes:
-        The configured credentials file is used for all future interactions with the corresponding external
-        service carried out from this machine.
-
-    Args:
-        credentials: The ``CredentialsTypes`` member or its string value identifying the credentials category to
-            configure.
-        path: The path to the credentials file to copy into the credentials' subdirectory.
-
-    Raises:
-        ValueError: If the credentials category is not a valid ``CredentialsTypes`` member, or if the specified
-            file's extension does not match the canonical credentials filename's extension.
-        FileNotFoundError: If the specified credentials file does not exist at the provided path, or if the local
-            working directory has not been configured for the host-machine.
-    """
-    file_name = resolve_credentials_file(credentials=credentials)
-
-    if not path.exists():
-        message = (
-            f"Unable to set the '{CredentialsTypes(credentials)}' credentials file. The specified file ({path}) does "
-            f"not exist. Ensure the credentials file exists at the specified path before calling this function."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    expected_suffix = Path(file_name).suffix
-    if path.suffix.lower() != expected_suffix:
-        message = (
-            f"Unable to set the '{CredentialsTypes(credentials)}' credentials file. The specified file ({path}) does "
-            f"not have a {expected_suffix} extension. Provide the path to a valid {expected_suffix} credentials file."
-        )
-        console.error(message=message, error=ValueError)
-
-    credentials_directory = get_working_directory().joinpath(CREDENTIALS_DIRECTORY)
-    ensure_directory_exists(path=credentials_directory)
-
-    destination = credentials_directory.joinpath(file_name)
-    shutil.copyfile(src=path, dst=destination)
-
-    console.echo(
-        message=f"The '{CredentialsTypes(credentials)}' credentials file copied to: {destination}.",
-        level=LogLevel.SUCCESS,
-    )
-
-
-def get_credentials(credentials: str | CredentialsTypes) -> Path:
-    """Resolves and returns the path to the requested credentials file stored in the working directory's credentials
-    subdirectory.
-
-    Args:
-        credentials: The ``CredentialsTypes`` member or its string value identifying the credentials category to
-            resolve.
-
-    Returns:
-        The path to the requested credentials file.
-
-    Raises:
-        ValueError: If the credentials category is not a valid ``CredentialsTypes`` member.
-        FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
-            credentials file for the requested category has not been set.
-    """
-    file_name = resolve_credentials_file(credentials=credentials)
-    credentials_path = get_working_directory().joinpath(CREDENTIALS_DIRECTORY, file_name)
-
-    if not credentials_path.exists():
-        message = (
-            f"Unable to resolve the path to the '{CredentialsTypes(credentials)}' credentials file, as it has not "
-            f"been set. Set the credentials file by using the 'slsa configure credentials' CLI command."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    return credentials_path
 
 
 def set_task_templates_directory(path: Path) -> None:

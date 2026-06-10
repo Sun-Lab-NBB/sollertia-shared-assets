@@ -1,47 +1,51 @@
-"""Collects every sollertia-shared-assets extension point in one place and runs the import-time checks that guard them.
+"""Collects every sollertia-shared-assets dispatch registry in one place and runs the import-time checks that guard
+them.
 
-This module is the single canonical surface for extending the library with a new acquisition system, session type,
-runtime trial, trigger type, or external read asset. It gathers — in one file — every dispatch registry, the
-system/session-type association, the corridor-task gate, and the enums that key them, alongside the import-time
-assertions that verify each enum member is fully wired.
+This module is the single canonical surface for wiring new capabilities into the library, and it holds two governance
+tiers. The system registries — descriptor, hardware state, experiment configuration, system raw data, the
+system/session-type association, and the corridor-task gate — form the designed extension point: they grow whenever a
+new acquisition system or session type is added, following the recipe owned by the /library-extension skill. The
+contract registries — read assets and credentials — are durable translation contracts curated by Sollertia platform
+maintainers; adding an entry there is a platform-contract decision, not a routine extension.
 
-Several registries are *defined* next to the type they dispatch and are only re-exported here, because relocating their
-definitions would create circular imports.
+The module imports each acquisition system's subpackage (``mesoscope_vr`` and its future siblings) and wires the
+system's classes into the registries, so the shared configuration and data modules never import from a system
+subpackage. The keying enumerations live in the leaf ``enums`` module, which keeps this module importable by every
+registry consumer without circular imports.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 from dataclasses import fields
 
 from ataraxis_base_utilities import console
 
-from .read_assets import READ_ASSET_REGISTRY, ReadAssets
-from .session_data import (
-    SYSTEM_SESSION_TYPES,
-    SYSTEM_RAW_DATA_REGISTRY,
-    SESSION_TYPES_USING_VR_TASK,
+from .enums import (
+    ReadAssets,
     SessionTypes,
-)
-from ..configuration import (
-    EXPERIMENT_CONFIGURATION_REGISTRY,
-    TriggerType,
+    CredentialsTypes,
     AcquisitionSystems,
 )
-from .mesoscope_runtime_data import (
+from .data_classes import SurgeryData
+from .mesoscope_vr import (
+    MesoscopeRawData,
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
+    MesoscopeExperimentConfiguration,
 )
 
 if TYPE_CHECKING:
     from enum import StrEnum
+    from pathlib import Path
 
     from ataraxis_data_structures import YamlConfig
 
 __all__ = [
+    "CREDENTIALS_FILE_REGISTRY",
     "DESCRIPTOR_REGISTRY",
     "EXPERIMENT_CONFIGURATION_REGISTRY",
     "HARDWARE_STATE_REGISTRY",
@@ -49,11 +53,28 @@ __all__ = [
     "SESSION_TYPES_USING_VR_TASK",
     "SYSTEM_RAW_DATA_REGISTRY",
     "SYSTEM_SESSION_TYPES",
-    "AcquisitionSystems",
-    "ReadAssets",
-    "SessionTypes",
-    "TriggerType",
+    "resolve_read_asset",
 ]
+
+
+class _SystemRawDataBuilder(Protocol):
+    """Structural type for system-specific raw data dataclasses registered in ``SYSTEM_RAW_DATA_REGISTRY``."""
+
+    @classmethod
+    def build(cls, root: Path) -> Any:  # noqa: ANN401
+        """Resolves all system-specific raw-asset paths under the session's ``raw_data`` directory.
+
+        Conforming implementations construct and return a dataclass instance whose fields hold absolute paths
+        anchored on ``root``. The concrete return type is the implementing class itself (e.g., ``MesoscopeRawData``).
+
+        Args:
+            root: The session's ``raw_data`` directory absolute path.
+
+        Returns:
+            An instance of the conforming dataclass with every system-specific raw-asset path resolved.
+        """
+        ...  # pragma: no cover
+
 
 DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
     SessionTypes.LICK_TRAINING: LickTrainingDescriptor,
@@ -63,7 +84,8 @@ DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
 }
 """Maps each session type to its descriptor dataclass. The canonical on-disk filename is always the flat
 ``session_descriptor.yaml`` (``RawDataFiles.SESSION_DESCRIPTOR``) regardless of session type — the only thing that
-varies per type is the parsing class."""
+varies per type is the parsing class. The registry is deliberately flat: a session type maps to exactly one descriptor
+platform-wide, so an acquisition system that needs a different descriptor must mint a new ``SessionTypes`` member."""
 
 HARDWARE_STATE_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeHardwareState,
@@ -71,11 +93,84 @@ HARDWARE_STATE_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
 """Maps each acquisition system to its hardware-state dataclass. The canonical on-disk filename is always
 ``hardware_state.yaml`` (``RawDataFiles.HARDWARE_STATE``) regardless of system — only the parsing class varies."""
 
+EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
+}
+"""Maps each acquisition system to its experiment configuration dataclass. Every registered class satisfies the
+experiment-configuration contract; the configuration and template-creation tools dispatch through this registry."""
+
+# noinspection PyTypeChecker
+SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
+    AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
+}
+"""Maps each acquisition system to the dataclass that captures its system-specific raw assets. The registered class
+exposes a ``build(root: Path) -> Self`` classmethod that resolves all system-specific paths under the session's
+``raw_data`` directory."""
+
+SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
+    AcquisitionSystems.MESOSCOPE_VR: frozenset(
+        {
+            SessionTypes.LICK_TRAINING,
+            SessionTypes.RUN_TRAINING,
+            SessionTypes.MESOSCOPE_EXPERIMENT,
+            SessionTypes.WINDOW_CHECKING,
+        }
+    ),
+}
+"""Maps each acquisition system to the set of session types it can run. ``SessionData.create()`` rejects a session
+type that is not paired with the session's acquisition system."""
+
+SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
+"""The session types that run the linear infinite corridor task and therefore write a ``vr_configuration.yaml``
+task-template snapshot. ``SessionData.required_raw_assets`` consults this set to decide whether a session of a given
+type requires the snapshot. Training and window-checking sessions run no task and are absent here."""
+
+READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
+    ReadAssets.SURGERY_DATA: SurgeryData,
+}
+"""Maps each read-asset format to the dataclass that represents it on disk. This contract registry is curated by
+Sollertia platform maintainers; each entry is a durable contract for translating an external data shape into the
+uniform on-disk format the downstream Sollertia libraries consume."""
+
+CREDENTIALS_FILE_REGISTRY: dict[CredentialsTypes, str] = {
+    CredentialsTypes.GOOGLE: "google_credentials.json",
+}
+"""Maps each credentials category to the canonical filename under which its credentials file is stored inside the
+working directory's credentials subdirectory. This contract registry is curated by Sollertia platform maintainers;
+the credentials toolset that consumes it lives in the top-level ``credentials`` module."""
+
+
+def resolve_read_asset(read_asset: str | ReadAssets) -> type[YamlConfig]:
+    """Resolves a read-asset format identifier to the dataclass that represents it on disk.
+
+    Args:
+        read_asset: A ``ReadAssets`` member or its string value (e.g., ``"surgery_data"``).
+
+    Returns:
+        The dataclass registered for the format in ``READ_ASSET_REGISTRY``.
+
+    Raises:
+        ValueError: If the identifier is not a valid ``ReadAssets`` member.
+    """
+    if read_asset not in ReadAssets:
+        valid = ", ".join(member.value for member in ReadAssets)
+        message = (
+            f"Unable to resolve the read-asset format '{read_asset}'. Expected one of the supported ReadAssets "
+            f"members: {valid}."
+        )
+        console.error(message=message, error=ValueError)
+        # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
+        # noinspection PyUnreachableCode
+        raise ValueError(message)  # pragma: no cover
+
+    return READ_ASSET_REGISTRY[ReadAssets(read_asset)]
+
 
 def _assert_registry_coverage() -> None:
-    """Verifies at import time that every ``SessionTypes``, ``AcquisitionSystems``, and ``ReadAssets`` member has an
-    entry in each dispatch registry. Also verifies that ``SYSTEM_SESSION_TYPES`` pairs every acquisition system with
-    at least one session type and claims every session type under at least one system.
+    """Verifies at import time that every ``SessionTypes``, ``AcquisitionSystems``, ``ReadAssets``, and
+    ``CredentialsTypes`` member has an entry in each dispatch registry. Also verifies that ``SYSTEM_SESSION_TYPES``
+    pairs every acquisition system with at least one session type and claims every session type under at least one
+    system.
 
     Raises:
         RuntimeError: If any registry is missing entries for known enum members, or if ``SYSTEM_SESSION_TYPES`` leaves
@@ -92,6 +187,7 @@ def _assert_registry_coverage() -> None:
         ),
         ("SYSTEM_RAW_DATA_REGISTRY", frozenset(AcquisitionSystems), frozenset(SYSTEM_RAW_DATA_REGISTRY)),
         ("READ_ASSET_REGISTRY", frozenset(ReadAssets), frozenset(READ_ASSET_REGISTRY)),
+        ("CREDENTIALS_FILE_REGISTRY", frozenset(CredentialsTypes), frozenset(CREDENTIALS_FILE_REGISTRY)),
     )
     for registry_name, expected, actual in coverage_checks:
         missing = expected - actual

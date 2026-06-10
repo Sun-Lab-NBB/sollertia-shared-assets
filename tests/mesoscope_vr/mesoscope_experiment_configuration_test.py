@@ -1,5 +1,5 @@
 """Contains tests for the Mesoscope-VR experiment configuration provided by the
-``configuration.mesoscope_configuration`` module.
+``mesoscope_vr.experiment_configuration`` module.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from sollertia_shared_assets.mesoscope_vr import MesoscopeExperimentConfiguration
 from sollertia_shared_assets.configuration import (
     Cue,
     TriggerType,
@@ -18,7 +19,6 @@ from sollertia_shared_assets.configuration import (
     TrialStructure,
     ExperimentState,
     WaterRewardTrial,
-    MesoscopeExperimentConfiguration,
 )
 
 if TYPE_CHECKING:

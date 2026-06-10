@@ -1,10 +1,10 @@
-"""Contains tests for the descriptor and hardware-state dataclasses in ``data_classes.mesoscope_runtime_data``."""
+"""Contains tests for the descriptor and hardware-state dataclasses in ``mesoscope_vr.runtime_data``."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sollertia_shared_assets.data_classes import (
+from sollertia_shared_assets.mesoscope_vr import (
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,

@@ -8,19 +8,18 @@ from pathlib import Path
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 
+from ..enums import CredentialsTypes
 from .mcp_server import run_server
-from ..data_classes import ProjectData, discover_projects
+from ..credentials import get_credentials, set_credentials
 from ..configuration import (
-    CredentialsTypes,
     get_data_root,
     set_data_root,
-    get_credentials,
-    set_credentials,
     get_working_directory,
     set_working_directory,
     get_task_templates_directory,
     set_task_templates_directory,
 )
+from ..data_hierarchy import ProjectData, discover_projects
 
 _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 """Ensures that displayed Click help messages are formatted according to the lab standard."""

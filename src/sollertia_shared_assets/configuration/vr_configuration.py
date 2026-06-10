@@ -110,7 +110,7 @@ class TrialStructure:
     Notes:
         This class contains only the spatial data needed by Unity for prefab generation and runtime zone
         configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) live on the matching
-        experiment-side trial classes in mesoscope_configuration.py and are joined back by trial name.
+        experiment-side trial classes in experiment_configuration.py and are joined back by trial name.
 
         The trigger_type field specifies the stimulus trigger zone behavior and determines which experiment trial
         class (WaterRewardTrial or GasPuffTrial) is created when loading this template for experiment configuration.

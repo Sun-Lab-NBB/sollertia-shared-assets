@@ -1,21 +1,21 @@
-"""Contains tests for the project-data-hierarchy assets provided by the ``data_classes.project_hierarchy`` module."""
+"""Contains tests for the project-data-hierarchy assets provided by the ``data_hierarchy.project_hierarchy`` module."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from sollertia_shared_assets.data_classes import (
+from sollertia_shared_assets.enums import SessionTypes, AcquisitionSystems
+from sollertia_shared_assets.data_hierarchy import (
     RAW_DATA_DIRECTORY,
     DATASET_MARKER_FILENAME,
     PERSISTENT_DATA_DIRECTORY,
     AnimalData,
     ProjectData,
     SessionData,
-    SessionTypes,
     discover_projects,
     iter_project_animals,
 )
-from sollertia_shared_assets.configuration import CONFIGURATION_DIRECTORY, AcquisitionSystems
+from sollertia_shared_assets.configuration import CONFIGURATION_DIRECTORY
 
 _LOCAL_ROOT: Path = Path("/data/local")
 """Sentinel local data root used by the path-resolution tests; never touched on disk."""

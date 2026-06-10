@@ -293,7 +293,7 @@ filename is flat across all types — only the parsing class varies, and is disp
 
 **Step 1: Extend the SessionTypes enum and pair it with an acquisition system**
 
-In `data_classes/session_data.py`, add a new member to `SessionTypes`:
+In `enums.py`, add a new member to `SessionTypes`:
 
 ```python
 class SessionTypes(StrEnum):
@@ -304,34 +304,34 @@ class SessionTypes(StrEnum):
     NEW_TYPE = "new type"  # Add new session type here
 ```
 
-Then add the new member to the `SYSTEM_SESSION_TYPES` frozenset of every acquisition system that can run it. The
-import-time parity check (`_assert_registry_coverage`) raises if any session type is claimed by no acquisition
-system, and `SessionData.create()` rejects a session type that is not paired with the session's acquisition system.
+Then, in `registries.py`, add the new member to the `SYSTEM_SESSION_TYPES` frozenset of every acquisition system that
+can run it. The import-time parity check (`_assert_registry_coverage`) raises if any session type is claimed by no
+acquisition system, and `SessionData.create()` rejects a session type that is not paired with the session's
+acquisition system.
 
 **Step 2: Add the descriptor dataclass**
 
 Add a `<Type>Descriptor` dataclass inheriting from `YamlConfig` that captures the task parameters and outcome
-metadata for the new session type. Each acquisition system keeps its runtime dataclasses in its own
-`data_classes/<system>_runtime_data.py` module; add the descriptor to the module of the system that runs the new
-session type. Use `LickTrainingDescriptor` or `RunTrainingDescriptor` in `data_classes/mesoscope_runtime_data.py` as
-reference. Export the new class from `data_classes/__init__.py`.
+metadata for the new session type. Each acquisition system keeps its runtime dataclasses in the `runtime_data.py`
+module of its own subpackage; add the descriptor to the subpackage of the system that runs the new session type. Use
+`LickTrainingDescriptor` or `RunTrainingDescriptor` in `mesoscope_vr/runtime_data.py` as reference. Export the new
+class from the subpackage's `__init__.py`.
 
 **Step 3: Register the descriptor**
 
-In `data_classes/extensions.py` (the extension-point hub):
+In `registries.py` (the registry hub):
 
-1. Import the new descriptor class.
+1. Import the new descriptor class from its system subpackage.
 2. Register it in `DESCRIPTOR_REGISTRY` under the new `SessionTypes` key.
 
 **Step 4: Update required-asset checks (if applicable)**
 
-The required-asset policy lives in `SessionData.required_raw_assets` (`data_classes/session_data.py`), and the session
-inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
+The required-asset policy lives in `SessionData.required_raw_assets` (`data_hierarchy/session_data.py`), and the
+session inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
 requires `session_descriptor.yaml` and `system_configuration.yaml`; `experiment_configuration.yaml` is required
 whenever the session has an `experiment_name`; and `vr_configuration.yaml` is required for any session type listed in
-`SESSION_TYPES_USING_VR_TASK` (`data_classes/session_data.py`). If the new session type runs the linear infinite
-corridor task, add it to that frozenset; if it requires some other extra asset, extend `required_raw_assets`
-accordingly.
+`SESSION_TYPES_USING_VR_TASK` (`registries.py`). If the new session type runs the linear infinite corridor task, add
+it to that frozenset; if it requires some other extra asset, extend `required_raw_assets` accordingly.
 
 **Step 5: Update downstream libraries**
 
@@ -342,18 +342,17 @@ acquisition.
 
 An acquisition system identifies a hardware platform that can produce a session (e.g., the Mesoscope-VR system).
 Each system contributes its own hardware-state snapshot, experiment-configuration schema, and a system-specific raw
-data dataclass that resolves the system's unique on-disk assets. Three registries dispatch parsing and builder classes
-by `AcquisitionSystems` value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and
-`SYSTEM_RAW_DATA_REGISTRY`. Each system must also declare the session types it can run in `SYSTEM_SESSION_TYPES`.
-These registries, the `SYSTEM_SESSION_TYPES` association, and the import-time checks that guard them are collected in
-the extension-point hub `data_classes/extensions.py` (defined there for `DESCRIPTOR_REGISTRY` and
-`HARDWARE_STATE_REGISTRY`, re-exported there for the rest, which stay beside the classes that consume them).
-System-level hardware and software configuration classes live in the acquisition runtime package
-(sollertia-experiment).
+data dataclass that resolves the system's unique on-disk assets. All of these classes live together in the system's
+own subpackage (e.g., `mesoscope_vr/`). Three registries dispatch parsing and builder classes by `AcquisitionSystems`
+value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and `SYSTEM_RAW_DATA_REGISTRY`. Each system
+must also declare the session types it can run in `SYSTEM_SESSION_TYPES`. Every registry, the `SYSTEM_SESSION_TYPES`
+association, and the import-time checks that guard them are defined — fully populated — in the top-level
+`registries.py` module. System-level hardware and software configuration classes live in the acquisition runtime
+package (sollertia-experiment).
 
 **Step 1: Extend the AcquisitionSystems enum**
 
-In `configuration/configuration_utilities.py`, add a new member to `AcquisitionSystems`:
+In `enums.py`, add a new member to `AcquisitionSystems`:
 
 ```python
 class AcquisitionSystems(StrEnum):
@@ -361,56 +360,45 @@ class AcquisitionSystems(StrEnum):
     NEW_SYSTEM = "new_system"  # Add new system here
 ```
 
-**Step 2: Add the hardware-state dataclass**
+**Step 2: Create the system subpackage**
 
-Create a new `data_classes/<system>_runtime_data.py` module to hold the new system's runtime dataclasses. In it, add
-a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records the configuration of every active
-hardware module on the new system. The same module later holds the system's per-session-type descriptors. Use
-`MesoscopeHardwareState` in `data_classes/mesoscope_runtime_data.py` as reference. Export the new class from
-`data_classes/__init__.py`.
+Create a new `<system>/` subpackage (a sibling of `mesoscope_vr/`) holding the new system's dataclasses, and export
+every class from the subpackage's `__init__.py`. The Mesoscope-VR subpackage is the reference for both the module
+split and the contents:
 
-**Step 3: Add the experiment-configuration module**
+1. `<system>/runtime_data.py` — a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records the
+   configuration of every active hardware module on the new system, plus the system's per-session-type descriptors.
+   Use `mesoscope_vr/runtime_data.py` as reference.
+2. `<system>/experiment_configuration.py` — a `<System>ExperimentConfiguration` dataclass inheriting from
+   `YamlConfig` that captures the runtime experiment parameters for the new system. Every
+   `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field (a mapping of
+   `ExperimentState`, the experiment state machine that every experiment runs as), a `trial_structures` field (the
+   trials the experiment runs, whose concrete trial classes vary per system), a `unity_scene_name` field (the linear
+   infinite corridor task the experiment runs), and a `from_task_template` classmethod that builds the configuration
+   from a task template. Fields beyond that contract are system-specific. Use
+   `mesoscope_vr/experiment_configuration.py` as reference.
+3. `<system>/raw_data.py` — a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all
+   system-specific raw assets and exposes a `build(cls, root: Path) -> <System>RawData` classmethod that resolves
+   every field against the session's `raw_data` directory. Optionally add `<System>RawDataFiles` and/or
+   `<System>Directories` `StrEnum` classes that enumerate any canonical filenames or subdirectories unique to the
+   new system's `raw_data`. Use `mesoscope_vr/raw_data.py` as reference.
 
-Create a new file (e.g., `new_system_configuration.py`) in `configuration/` containing a
-`<System>ExperimentConfiguration` dataclass inheriting from `YamlConfig` that captures the runtime experiment
-parameters for the new system. Every `<System>ExperimentConfiguration` shares one contract: an `experiment_states`
-field (a mapping of `ExperimentState`, the experiment state machine that every experiment runs as), a
-`trial_structures` field (the trials the experiment runs, whose concrete trial classes vary per system), a
-`unity_scene_name` field (the linear infinite corridor task the experiment runs), and a `from_task_template`
-classmethod that builds the configuration from a task template. Fields beyond that contract are system-specific.
-Use `MesoscopeExperimentConfiguration` in `mesoscope_configuration.py` as reference. Export the new class from
-`configuration/__init__.py`.
+**Step 3: Register the dispatch classes**
 
-**Step 4: Add the system-specific raw-data dataclass**
+In `registries.py` (the registry hub), import the new classes from the system subpackage and add an entry for the
+new system to each registry:
 
-In `data_classes/session_data.py`:
+1. Add `<System>HardwareState` to `HARDWARE_STATE_REGISTRY`.
+2. Add `<System>ExperimentConfiguration` to `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this
+   registry to load the per-session experiment configuration snapshot and cache the matching corridor task template.
+3. Add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults this registry to build the
+   runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the new system into session
+   loading.
+4. Add a `SYSTEM_SESSION_TYPES` entry mapping the new `AcquisitionSystems` key to the `frozenset` of `SessionTypes`
+   the system can run. The parity check raises if a system declares no session types, and `SessionData.create()`
+   uses this set to reject session-type / system pairings the system does not support.
 
-1. (Optional) Add `<System>RawDataFiles` and/or `<System>Directories` `StrEnum` classes that enumerate any canonical
-   filenames or subdirectories unique to the new system's `raw_data`. Use `MesoscopeRawDataFiles` /
-   `MesoscopeDirectories` as reference.
-2. Add a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all system-specific raw assets
-   and exposes a `build(cls, root: Path) -> <System>RawData` classmethod that resolves every field against the
-   session's `raw_data` directory. Use `MesoscopeRawData` as reference.
-3. Export the new class(es) from `data_classes/__init__.py`.
-
-**Step 5: Register the dispatch classes**
-
-Three registries need entries for the new system:
-
-1. In `data_classes/extensions.py` (the extension-point hub), import `<System>HardwareState` and add it to
-   `HARDWARE_STATE_REGISTRY`.
-2. In `configuration/configuration_utilities.py`, import `<System>ExperimentConfiguration` and add it to
-   `EXPERIMENT_CONFIGURATION_REGISTRY`. `SessionData.create()` consults this registry to load the per-session
-   experiment configuration snapshot and cache the matching corridor task template.
-3. In `data_classes/session_data.py`, add `<System>RawData` to `SYSTEM_RAW_DATA_REGISTRY`. `SessionData` consults
-   this registry to build the runtime-only `system_raw_data` sub-dataclass attribute, so this step is what wires the
-   new system into session loading.
-4. In `data_classes/session_data.py`, add a `SYSTEM_SESSION_TYPES` entry mapping the new `AcquisitionSystems` key to
-   the `frozenset` of `SessionTypes` the system can run. The parity check raises if a system declares no session
-   types, and `SessionData.create()` uses this set to reject session-type / system pairings the system does not
-   support.
-
-**Step 6: Implement the experiment-configuration creation path**
+**Step 4: Implement the experiment-configuration creation path**
 
 Every Sollertia acquisition system builds its experiment configuration from a Unity VR task template through the shared
 `create_experiment_from_vr_template_tool`, so no new tool is needed. Add a `from_task_template` classmethod to the
@@ -421,7 +409,7 @@ fast if the builder or any contract field is missing. Use `MesoscopeExperimentCo
 reference. The generic `write_experiment_configuration_tool` remains available to author or repair a full payload
 directly.
 
-**Step 7: Update downstream libraries**
+**Step 5: Update downstream libraries**
 
 Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
 acquisition runtime) and sollertia-forgery (data processing) as needed.
@@ -439,18 +427,22 @@ This applies only to assets the platform **reads**. Assets the platform only **w
 example, the water-restriction log) have no on-disk representation to standardize, so they need no dataclass and no
 registry entry — they are owned entirely by the writing library.
 
-`ReadAssets` enumerates the supported read-asset formats and `READ_ASSET_REGISTRY` maps each to its on-disk
-dataclass, both in `data_classes/read_assets.py`. The import-time parity check (`_assert_registry_coverage`)
-enforces that every `ReadAssets` member has a registered dataclass.
+`ReadAssets` (in `enums.py`) enumerates the supported read-asset formats and `READ_ASSET_REGISTRY` (in
+`registries.py`) maps each to its on-disk dataclass. The contract dataclasses themselves live in the `data_classes/`
+package. Unlike the acquisition-system registries, this is a contract surface curated by Sollertia platform
+maintainers: each entry is a durable translation contract, and adding one is a platform-contract decision rather
+than a routine extension. The import-time parity check (`_assert_registry_coverage`) enforces that every
+`ReadAssets` member has a registered dataclass.
 
-**Step 1: Add the dataclass**
+**Step 1: Add the contract dataclass**
 
-In `data_classes/`, add the concrete on-disk representation as a dataclass inheriting from `YamlConfig` (use
-`data_classes/surgery_data.py`'s `SurgeryData` as reference). Export it from `data_classes/__init__.py`.
+In `data_classes/`, add a new module holding the concrete on-disk representation as a dataclass inheriting from
+`YamlConfig` (use `data_classes/surgery_data.py`'s `SurgeryData` as reference). Contract modules export plain
+dataclasses and never consume the dispatch registries. Export the new class from `data_classes/__init__.py`.
 
 **Step 2: Extend the ReadAssets enum**
 
-In `data_classes/read_assets.py`, add a new member to `ReadAssets`:
+In `enums.py`, add a new member to `ReadAssets`:
 
 ```python
 class ReadAssets(StrEnum):
@@ -460,7 +452,7 @@ class ReadAssets(StrEnum):
 
 **Step 3: Register the dataclass**
 
-In the same file, register it in `READ_ASSET_REGISTRY` under the new `ReadAssets` key:
+In `registries.py`, register it in `READ_ASSET_REGISTRY` under the new `ReadAssets` key:
 
 ```python
 READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {

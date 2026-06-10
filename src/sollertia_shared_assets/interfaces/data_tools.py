@@ -9,6 +9,12 @@ from dataclasses import fields, dataclass
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
+from ..enums import ReadAssets, SessionTypes, AcquisitionSystems
+from ..registries import (
+    DESCRIPTOR_REGISTRY,
+    READ_ASSET_REGISTRY,
+    HARDWARE_STATE_REGISTRY,
+)
 from .mcp_instance import (
     mcp,
     read_yaml,
@@ -20,24 +26,19 @@ from .mcp_instance import (
     resolve_root_directory,
     read_descriptor_incomplete,
 )
-from ..data_classes import (
+from ..configuration import CONFIGURATION_DIRECTORY
+from ..data_hierarchy import (
     RAW_DATA_DIRECTORY,
-    DESCRIPTOR_REGISTRY,
-    READ_ASSET_REGISTRY,
     DATASET_MARKER_FILENAME,
-    HARDWARE_STATE_REGISTRY,
-    ReadAssets,
     ProjectData,
     SessionData,
     RawDataFiles,
-    SessionTypes,
     ProcessingTrackers,
     filter_sessions,
     discover_projects,
     iter_project_animals,
     get_session_root_from_marker,
 )
-from ..configuration import CONFIGURATION_DIRECTORY, AcquisitionSystems
 
 _STATUS_KEYS: tuple[str, ...] = ("uninitialized", "incomplete", "acquired", "processed", "error")
 """Canonical lifecycle status keys used in ``counts`` dicts across the overview and inspection tools."""
