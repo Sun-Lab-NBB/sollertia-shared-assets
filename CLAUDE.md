@@ -180,9 +180,14 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   runs, with concrete trial classes varying per system), a `unity_scene_name` field (the corridor task the experiment
   runs), and a `from_task_template` classmethod. Fields beyond the contract are system-specific; the shared building
   blocks (`ExperimentState`, `WaterRewardTrial`, `GasPuffTrial`) stay in `configuration/`.
+  The platform `TriggerType` enum carries five members — `INTERACTION`, `COLLISION`, `OCCUPANCY_DISARM`,
+  `OCCUPANCY_ARM`, and `OCCUPANCY_TRIGGER` — and each acquisition system maps only the subset it supports.
   `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
   `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
-  `TriggerType.INTERACTION`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY_DISARM`). `create_experiment_from_vr_template_tool`
+  `TriggerType.INTERACTION`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY_DISARM`). The remaining three members
+  (`COLLISION`, `OCCUPANCY_ARM`, `OCCUPANCY_TRIGGER`) are intentionally unmapped on Mesoscope-VR, so a Mesoscope-VR
+  config that uses one raises a clear "not mapped to a runtime trial class" error; a new `TriggerType` member does NOT
+  require a `from_task_template` branch, because a system may leave it unsupported. `create_experiment_from_vr_template_tool`
   dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered class's `from_task_template`, and
   `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
   "Adding New Acquisition Systems" Step 4 for the creation-path recipe.
