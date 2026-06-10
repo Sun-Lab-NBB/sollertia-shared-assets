@@ -250,14 +250,14 @@ def read_task_parameters_tool() -> dict[str, Any]:
         ``controller``. ``mqtt`` carries ``ip`` and ``port``. ``display`` carries
         ``current_brightness``, ``brightness``, and ``height_in_vr``. ``camera_mapping`` carries
         a list of per-monitor dicts with ``monitor``, ``left``, ``top``, and ``camera``. ``task``
-        carries ``require_lick``, ``require_wait``, ``track_length``, and ``track_seed``.
+        carries ``require_interaction``, ``require_wait``, ``track_length``, and ``track_seed``.
         The ``options`` key lists enumerated alternatives for fields with a finite valid set.
         ``actor.model`` lists every Resources actor prefab plus the literal ``"None"``.
         ``actor.controller`` lists every scene ControllerOutput plus the literal ``"None"``.
         ``camera_mapping.camera`` lists every scene Camera not tagged MainCamera or named
         ``Main Camera``, also plus ``"None"``.
         The ``visibility`` key holds per-control flags indicating whether the matching control is
-        currently rendered in the Parameters window. ``task.require_lick`` is true only when the
+        currently rendered in the Parameters window. ``task.require_interaction`` is true only when the
         scene contains a ``GuidanceZone``. ``task.require_wait`` is true only when the scene
         contains an ``OccupancyZone``. Writes against fields whose visibility is false are
         rejected by :func:`write_task_parameters_tool`.
@@ -283,7 +283,7 @@ def write_task_parameters_tool(
 
     Validation rejects values that fall outside the enumeration reported by
     :func:`read_task_parameters_tool`, mismatched monitor indices, and writes targeting
-    ``task.require_lick`` / ``task.require_wait`` when the corresponding zone is absent from the scene
+    ``task.require_interaction`` / ``task.require_wait`` when the corresponding zone is absent from the scene
     (mirroring the GUI's conditional rendering). The tightened require-toggle contract guarantees that
     a successful write means the flag will actually take effect at runtime.
 
@@ -298,8 +298,8 @@ def write_task_parameters_tool(
         camera_mapping: Optional list of per-monitor dicts. Each entry requires ``monitor`` (1-based
             index, matching the GUI row index) and ``camera`` (str matching
             ``options.camera_mapping.camera``). Omitted monitors keep their current assignment.
-        task: Optional dict with ``require_lick`` (bool), ``require_wait`` (bool), ``track_length``
-            (float), and/or ``track_seed`` (int). ``require_lick`` is rejected when the scene has no
+        task: Optional dict with ``require_interaction`` (bool), ``require_wait`` (bool), ``track_length``
+            (float), and/or ``track_seed`` (int). ``require_interaction`` is rejected when the scene has no
             ``GuidanceZone``; ``require_wait`` is rejected when the scene has no ``OccupancyZone``.
 
     Returns:

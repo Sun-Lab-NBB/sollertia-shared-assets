@@ -97,7 +97,7 @@ def _build_sample_task_template() -> TaskTemplate:
                 stimulus_trigger_zone_end_cm=100.0,
                 stimulus_location_cm=90.0,
                 show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.LICK,
+                trigger_type=TriggerType.INTERACTION,
             ),
         },
     )

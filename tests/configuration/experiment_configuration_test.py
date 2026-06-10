@@ -80,14 +80,12 @@ def test_gas_puff_trial_defaults() -> None:
     """Verifies that GasPuffTrial fields default to documented values."""
     trial = GasPuffTrial()
     assert trial.puff_duration_ms == 100
-    assert trial.occupancy_duration_ms == 1000
 
 
 def test_gas_puff_trial_initialization() -> None:
     """Verifies basic initialization of GasPuffTrial."""
-    trial = GasPuffTrial(puff_duration_ms=150, occupancy_duration_ms=1500)
+    trial = GasPuffTrial(puff_duration_ms=150)
     assert trial.puff_duration_ms == 150
-    assert trial.occupancy_duration_ms == 1500
 
 
 def test_trial_field_types() -> None:
@@ -96,6 +94,5 @@ def test_trial_field_types() -> None:
     assert isinstance(water_trial.reward_size_ul, float)
     assert isinstance(water_trial.reward_tone_duration_ms, int)
 
-    gas_trial = GasPuffTrial(puff_duration_ms=100, occupancy_duration_ms=1000)
+    gas_trial = GasPuffTrial(puff_duration_ms=100)
     assert isinstance(gas_trial.puff_duration_ms, int)
-    assert isinstance(gas_trial.occupancy_duration_ms, int)

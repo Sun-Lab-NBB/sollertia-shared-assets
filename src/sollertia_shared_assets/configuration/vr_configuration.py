@@ -32,17 +32,17 @@ class TriggerType(StrEnum):
     """Defines the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
-        All Sollertia platform acquisition systems share these core trial types. LICK maps to the StimulusTriggerZone
-        prefab (with a GuidanceZone child) in Unity, and OCCUPANCY maps to the OccupancyTriggerZone prefab (with
-        OccupancyZone and OccupancyGuidanceZone children).
+        All Sollertia platform acquisition systems share these core trigger types. INTERACTION maps to the
+        StimulusTriggerZone prefab (with a GuidanceZone child) in Unity, and OCCUPANCY_DISARM maps to the
+        OccupancyTriggerZone prefab (with OccupancyZone and OccupancyGuidanceZone children).
     """
 
-    LICK = "lick"
-    """Indicates a lick-triggered trial where the animal must lick inside the stimulus trigger zone to elicit stimulus
-    delivery."""
-    OCCUPANCY = "occupancy"
-    """Indicates an occupancy-triggered trial where the animal must occupy the trigger zone for a specified duration to
-    disable the stimulus delivery."""
+    INTERACTION = "interaction"
+    """Indicates an interaction-triggered trial where the animal must engage an interaction sensor (lick port, button,
+    lever, pressure plate) inside the stimulus trigger zone to elicit stimulus delivery."""
+    OCCUPANCY_DISARM = "occupancy_disarm"
+    """Indicates an occupancy-disarm trial where the animal must occupy the trigger zone for a specified duration to
+    disarm the stimulus delivery boundary."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +129,10 @@ class TrialStructure:
     the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
     trigger_type: str | TriggerType
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
+    occupancy_duration_ms: float | None = None
+    """The duration in milliseconds the animal must occupy the zone for occupancy trigger modes. Unity enforces this
+    value and the experiment configuration mirrors it. Leave null for non-occupancy trials to inherit the experiment
+    configuration's generation default."""
     transitions: dict[str, float] | None = None
     """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
     other trial names defined on the same TaskTemplate. If provided, values must sum to 1.0. Set to null in the YAML
@@ -150,6 +154,13 @@ class TrialStructure:
                     f"Unable to initialize TrialStructure. The transitions must sum to 1.0, but got {probability_sum}."
                 )
                 console.error(message=message, error=ValueError)
+
+        if self.occupancy_duration_ms is not None and self.occupancy_duration_ms <= 0:
+            message = (
+                "Unable to initialize TrialStructure. The occupancy_duration_ms must be greater than 0, but got "
+                f"{self.occupancy_duration_ms}."
+            )
+            console.error(message=message, error=ValueError)
 
 
 @dataclass
@@ -253,6 +264,20 @@ class TaskTemplate(YamlConfig):
                 trial_structure=trial_structure,
                 trial_length_cm=trial_length_cm,
             )
+
+        # Rejects two trials that share an identical cue sequence. Identical cue sequences are indistinguishable to
+        # the experiment's cue-stream decomposer, which would silently merge them into a single decoded trial.
+        seen_sequences: dict[tuple[str, ...], str] = {}
+        for trial_name, trial_structure in self.trial_structures.items():
+            signature = tuple(trial_structure.cue_sequence)
+            if signature in seen_sequences:
+                message = (
+                    f"Unable to initialize TaskTemplate. Trials '{seen_sequences[signature]}' and '{trial_name}' "
+                    "share an identical cue sequence. Each trial must have a unique cue sequence so the experiment "
+                    "can identify it; use distinct cue codes (textures may be shared) to multiplex identical visuals."
+                )
+                console.error(message=message, error=ValueError)
+            seen_sequences[signature] = trial_name
 
     @property
     def _cue_by_name(self) -> dict[str, Cue]:

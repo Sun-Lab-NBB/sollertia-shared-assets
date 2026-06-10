@@ -83,7 +83,7 @@ def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> N
     config = MesoscopeExperimentConfiguration(
         trial_structures={
             "reward": WaterRewardTrial(reward_size_ul=4.0, reward_tone_duration_ms=200),
-            "puff": GasPuffTrial(puff_duration_ms=150, occupancy_duration_ms=2000),
+            "puff": GasPuffTrial(puff_duration_ms=150),
         },
         experiment_states={
             "state1": ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0),
@@ -97,8 +97,8 @@ def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> N
     assert config.trial_structures["puff"].puff_duration_ms == 150
 
 
-def test_from_task_template_maps_lick_trial_to_water_reward() -> None:
-    """Verifies that from_task_template maps a LICK trigger trial to a WaterRewardTrial."""
+def test_from_task_template_maps_interaction_trial_to_water_reward() -> None:
+    """Verifies that from_task_template maps an INTERACTION trigger trial to a WaterRewardTrial."""
     template = _create_base_task_template()
 
     config = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="TestScene")
@@ -111,7 +111,7 @@ def test_from_task_template_maps_lick_trial_to_water_reward() -> None:
 
 
 def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
-    """Verifies that from_task_template maps an OCCUPANCY trigger trial to a GasPuffTrial."""
+    """Verifies that from_task_template maps an OCCUPANCY_DISARM trigger trial to a GasPuffTrial."""
     template = _create_base_task_template(
         trial_structures={
             "occ_trial": TrialStructure(
@@ -120,7 +120,7 @@ def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
                 stimulus_trigger_zone_end_cm=100.0,
                 stimulus_location_cm=90.0,
                 show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.OCCUPANCY,
+                trigger_type=TriggerType.OCCUPANCY_DISARM,
             ),
         }
     )
@@ -129,13 +129,11 @@ def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
         template=template,
         unity_scene_name="OccScene",
         default_puff_duration_ms=200,
-        default_occupancy_duration_ms=2000,
     )
 
     trial = config.trial_structures["occ_trial"]
     assert isinstance(trial, GasPuffTrial)
     assert trial.puff_duration_ms == 200
-    assert trial.occupancy_duration_ms == 2000
 
 
 def test_from_task_template_seeds_water_reward_guided_states() -> None:
@@ -165,7 +163,7 @@ def test_from_task_template_seeds_gas_puff_guided_states() -> None:
                 stimulus_trigger_zone_end_cm=100.0,
                 stimulus_location_cm=90.0,
                 show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.OCCUPANCY,
+                trigger_type=TriggerType.OCCUPANCY_DISARM,
             ),
         }
     )
@@ -229,7 +227,7 @@ def _create_base_task_template(
                 stimulus_trigger_zone_end_cm=100.0,
                 stimulus_location_cm=90.0,
                 show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.LICK,
+                trigger_type=TriggerType.INTERACTION,
             ),
         }
     return TaskTemplate(
