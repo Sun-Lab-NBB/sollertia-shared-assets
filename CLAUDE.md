@@ -182,7 +182,7 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   blocks (`ExperimentState`, `WaterRewardTrial`, `GasPuffTrial`) stay in `configuration/`.
   `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
   `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
-  `TriggerType.LICK`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY`). `create_experiment_from_vr_template_tool`
+  `TriggerType.INTERACTION`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY_DISARM`). `create_experiment_from_vr_template_tool`
   dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered class's `from_task_template`, and
   `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
   "Adding New Acquisition Systems" Step 4 for the creation-path recipe.
