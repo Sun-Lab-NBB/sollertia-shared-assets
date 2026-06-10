@@ -35,7 +35,6 @@ from .surgery_data import (
     ProcedureData,
 )
 from .project_hierarchy import (
-    CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
     PERSISTENT_DATA_DIRECTORY,
     AnimalData,
@@ -62,7 +61,6 @@ from .mesoscope_runtime_data import (
 )
 
 __all__ = [
-    "CONFIGURATION_DIRECTORY",
     "DATASET_MARKER_FILENAME",
     "DESCRIPTOR_REGISTRY",
     "HARDWARE_STATE_REGISTRY",

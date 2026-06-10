@@ -8,14 +8,19 @@ from .vr_configuration import (
     TrialStructure,
 )
 from .configuration_utilities import (
+    CREDENTIALS_DIRECTORY,
+    CONFIGURATION_DIRECTORY,
+    CREDENTIALS_FILE_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
+    CredentialsTypes,
     AcquisitionSystems,
     get_data_root,
     set_data_root,
+    get_credentials,
+    set_credentials,
     get_working_directory,
     set_working_directory,
-    get_google_credentials_path,
-    set_google_credentials_path,
+    resolve_credentials_file,
     get_task_templates_directory,
     set_task_templates_directory,
 )
@@ -27,8 +32,12 @@ from .experiment_configuration import (
 )
 
 __all__ = [
+    "CONFIGURATION_DIRECTORY",
+    "CREDENTIALS_DIRECTORY",
+    "CREDENTIALS_FILE_REGISTRY",
     "EXPERIMENT_CONFIGURATION_REGISTRY",
     "AcquisitionSystems",
+    "CredentialsTypes",
     "Cue",
     "ExperimentState",
     "GasPuffTrial",
@@ -38,12 +47,13 @@ __all__ = [
     "TriggerType",
     "VREnvironment",
     "WaterRewardTrial",
+    "get_credentials",
     "get_data_root",
-    "get_google_credentials_path",
     "get_task_templates_directory",
     "get_working_directory",
+    "resolve_credentials_file",
+    "set_credentials",
     "set_data_root",
-    "set_google_credentials_path",
     "set_task_templates_directory",
     "set_working_directory",
 ]

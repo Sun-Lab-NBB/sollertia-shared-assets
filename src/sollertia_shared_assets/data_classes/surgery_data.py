@@ -56,26 +56,18 @@ class ProcedureData:
 
 @dataclass(frozen=True, slots=True)
 class DrugData:
-    """Stores information about all medical substances (drugs) administered to the subject before, during, and
+    """Stores information about a single medical substance (drug) administered to the subject before, during, or
     immediately after the surgical intervention.
+
+    Multiple DrugData instances can be used at the same time if the surgery involved administering multiple drugs.
     """
 
-    lactated_ringers_solution_volume_ml: float
-    """The volume of Lactated Ringer's Solution (LRS) administered during the surgery, in milliliters."""
-    lactated_ringers_solution_code: str
-    """The manufacturer code or internal reference code for the administered Lactated Ringer's Solution (LRS)."""
-    ketoprofen_volume_ml: float
-    """The volume of diluted ketoprofen administered during the surgery, in milliliters."""
-    ketoprofen_code: str
-    """The manufacturer code or internal reference code for the administered ketoprofen."""
-    buprenorphine_volume_ml: float
-    """The volume of diluted buprenorphine administered during the surgery, in milliliters."""
-    buprenorphine_code: str
-    """The manufacturer code or internal reference code for the administered buprenorphine."""
-    dexamethasone_volume_ml: float
-    """The volume of diluted dexamethasone administered during the surgery, in milliliters."""
-    dexamethasone_code: str
-    """The manufacturer code or internal reference code for the administered dexamethasone."""
+    drug: str
+    """The descriptive name of the drug."""
+    drug_volume_ml: float
+    """The volume of the drug administered to the subject, in milliliters."""
+    drug_code: str
+    """The manufacturer code or internal reference code for the administered drug."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +123,7 @@ class SurgeryData(YamlConfig):
     """Stores information about the subject of the surgical intervention."""
     procedure: ProcedureData
     """Stores general information about the surgical intervention."""
-    drugs: DrugData
+    drugs: list[DrugData]
     """Stores information about all medical substances (drugs) administered to the subject before, during, and
     immediately after the surgical intervention."""
     implants: list[ImplantData]

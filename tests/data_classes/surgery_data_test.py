@@ -45,17 +45,12 @@ def _make_procedure() -> ProcedureData:
     )
 
 
-def _make_drugs() -> DrugData:
+def _make_drug() -> DrugData:
     """Returns a fully populated DrugData instance suitable for round-trip tests."""
     return DrugData(
-        lactated_ringers_solution_volume_ml=1.5,
-        lactated_ringers_solution_code="LRS-001",
-        ketoprofen_volume_ml=0.05,
-        ketoprofen_code="KETO-2024",
-        buprenorphine_volume_ml=0.03,
-        buprenorphine_code="BUPR-2024",
-        dexamethasone_volume_ml=0.02,
-        dexamethasone_code="DEXA-2024",
+        drug="Lactated Ringer's Solution",
+        drug_volume_ml=1.5,
+        drug_code="LRS-001",
     )
 
 
@@ -113,6 +108,15 @@ def test_procedure_data_default_quality() -> None:
     assert procedure.surgery_quality == 0
 
 
+def test_drug_data_initialization() -> None:
+    """Verifies that DrugData stores every supplied field verbatim."""
+    drug = _make_drug()
+
+    assert drug.drug == "Lactated Ringer's Solution"
+    assert drug.drug_volume_ml == 1.5
+    assert drug.drug_code == "LRS-001"
+
+
 def test_implant_data_initialization() -> None:
     """Verifies that ImplantData stores every supplied field verbatim."""
     implant = _make_implant()
@@ -138,7 +142,7 @@ def test_surgery_data_yaml_round_trip(tmp_path: Path) -> None:
     surgery = SurgeryData(
         subject=_make_subject(),
         procedure=_make_procedure(),
-        drugs=_make_drugs(),
+        drugs=[_make_drug()],
         implants=[_make_implant()],
         injections=[_make_injection()],
     )
@@ -151,11 +155,18 @@ def test_surgery_data_yaml_round_trip(tmp_path: Path) -> None:
 
 
 def test_surgery_data_round_trips_multi_implant_multi_injection(tmp_path: Path) -> None:
-    """Verifies that SurgeryData preserves multiple implants and injections through YAML."""
+    """Verifies that SurgeryData preserves multiple drugs, implants, and injections through YAML."""
     surgery = SurgeryData(
         subject=_make_subject(),
         procedure=_make_procedure(),
-        drugs=_make_drugs(),
+        drugs=[
+            _make_drug(),
+            DrugData(
+                drug="Ketoprofen",
+                drug_volume_ml=0.05,
+                drug_code="KETO-2024",
+            ),
+        ],
         implants=[
             _make_implant(),
             ImplantData(
@@ -185,6 +196,7 @@ def test_surgery_data_round_trips_multi_implant_multi_injection(tmp_path: Path) 
     surgery.to_yaml(file_path=yaml_path)
     loaded = SurgeryData.from_yaml(file_path=yaml_path)
 
+    assert len(loaded.drugs) == 2
     assert len(loaded.implants) == 2
     assert len(loaded.injections) == 2
     assert loaded == surgery

@@ -11,12 +11,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
+from ..configuration import CONFIGURATION_DIRECTORY
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-CONFIGURATION_DIRECTORY: str = "configuration"
-"""Subdirectory under each project that holds experiment configuration YAML files. This directory is typically
-only present on data acquisition systems."""
 
 PERSISTENT_DATA_DIRECTORY: str = "persistent_data"
 """Subdirectory under each animal that holds data persisted across the animal's sessions. This directory is typically

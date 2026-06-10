@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+import shutil
 from typing import TYPE_CHECKING
 from pathlib import Path
 
@@ -13,6 +14,14 @@ from .mesoscope_configuration import MesoscopeExperimentConfiguration
 
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
+
+CONFIGURATION_DIRECTORY: str = "configuration"
+"""The name of the directory that stores configuration files. Used both under the local working directory (where it
+holds the host's system configuration) and under each project directory (where it holds the project's experiment
+configuration YAML files)."""
+
+CREDENTIALS_DIRECTORY: str = "credentials"
+"""The name of the working-directory subdirectory that stores all platform credentials files."""
 
 
 class AcquisitionSystems(StrEnum):
@@ -35,6 +44,52 @@ EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = 
 experiment-configuration contract; the configuration and template-creation tools dispatch through this registry."""
 
 
+class CredentialsTypes(StrEnum):
+    """Enumerates the credentials categories supported by the Sollertia platform.
+
+    Each member's string value is the canonical identifier for the credentials' category. Downstream consumers extend
+    this enumeration (together with ``CREDENTIALS_FILE_REGISTRY``) to wire additional credentials categories into the
+    platform.
+    """
+
+    GOOGLE = "google"
+    """The Google service account credentials used for all interactions with the Google Sheets API (canonical
+    filename ``google_credentials.json``)."""
+
+
+CREDENTIALS_FILE_REGISTRY: dict[CredentialsTypes, str] = {
+    CredentialsTypes.GOOGLE: "google_credentials.json",
+}
+"""Maps each credentials category to the canonical filename under which its credentials file is stored inside the
+working directory's credentials subdirectory."""
+
+
+def resolve_credentials_file(credentials: str | CredentialsTypes) -> str:
+    """Resolves a credentials category identifier to the canonical filename of its credentials file.
+
+    Args:
+        credentials: A ``CredentialsTypes`` member or its string value (e.g., ``"google"``).
+
+    Returns:
+        The canonical filename registered for the category in ``CREDENTIALS_FILE_REGISTRY``.
+
+    Raises:
+        ValueError: If the identifier is not a valid ``CredentialsTypes`` member.
+    """
+    if credentials not in CredentialsTypes:
+        valid = ", ".join(member.value for member in CredentialsTypes)
+        message = (
+            f"Unable to resolve the credentials category '{credentials}'. Expected one of the supported "
+            f"CredentialsTypes members: {valid}."
+        )
+        console.error(message=message, error=ValueError)
+        # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
+        # noinspection PyUnreachableCode
+        raise ValueError(message)  # pragma: no cover
+
+    return CREDENTIALS_FILE_REGISTRY[CredentialsTypes(credentials)]
+
+
 def set_working_directory(path: Path) -> None:
     """Sets the specified directory as the Sollertia platform working directory for the local machine (PC).
 
@@ -51,7 +106,8 @@ def set_working_directory(path: Path) -> None:
 
     ensure_directory_exists(path=path_file)
     ensure_directory_exists(path=path)
-    ensure_directory_exists(path=path.joinpath("configuration"))
+    ensure_directory_exists(path=path.joinpath(CONFIGURATION_DIRECTORY))
+    ensure_directory_exists(path=path.joinpath(CREDENTIALS_DIRECTORY))
 
     with path_file.open(mode="w") as file:
         file.write(str(path))
@@ -154,73 +210,79 @@ def get_data_root() -> Path:
     return data_root
 
 
-def set_google_credentials_path(path: Path) -> None:
-    """Sets the path to the Google Sheets service account credentials .JSON file for the local machine (PC).
+def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
+    """Copies the specified credentials file into the working directory's credentials subdirectory.
+
+    The copy is stored under the canonical filename registered for the credentials category, replacing any
+    previously configured credentials file for that category.
 
     Notes:
-        The configured credentials file is used for all future interactions with the Google Sheets API carried
-        out from this machine.
+        The configured credentials file is used for all future interactions with the corresponding external
+        service carried out from this machine.
 
     Args:
-        path: The path to the .JSON file containing the Google Sheets service account credentials.
+        credentials: The ``CredentialsTypes`` member or its string value identifying the credentials category to
+            configure.
+        path: The path to the credentials file to copy into the credentials' subdirectory.
 
     Raises:
-        FileNotFoundError: If the specified credentials file does not exist at the provided path.
-        ValueError: If the specified file does not have a .json extension.
+        ValueError: If the credentials category is not a valid ``CredentialsTypes`` member, or if the specified
+            file's extension does not match the canonical credentials filename's extension.
+        FileNotFoundError: If the specified credentials file does not exist at the provided path, or if the local
+            working directory has not been configured for the host-machine.
     """
+    file_name = resolve_credentials_file(credentials=credentials)
+
     if not path.exists():
         message = (
-            f"Unable to set the Google Sheets credentials path. The specified file ({path}) does not exist. "
-            f"Ensure the .JSON credentials file exists at the specified path before calling this function."
+            f"Unable to set the '{CredentialsTypes(credentials)}' credentials file. The specified file ({path}) does "
+            f"not exist. Ensure the credentials file exists at the specified path before calling this function."
         )
         console.error(message=message, error=FileNotFoundError)
 
-    if path.suffix.lower() != ".json":
+    expected_suffix = Path(file_name).suffix
+    if path.suffix.lower() != expected_suffix:
         message = (
-            f"Unable to set the Google Sheets credentials path. The specified file ({path}) does not have a .json "
-            f"extension. Provide the path to the Google Sheets service account credentials .JSON file."
+            f"Unable to set the '{CredentialsTypes(credentials)}' credentials file. The specified file ({path}) does "
+            f"not have a {expected_suffix} extension. Provide the path to a valid {expected_suffix} credentials file."
         )
         console.error(message=message, error=ValueError)
 
-    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = application_directory.joinpath("google_credentials_path.txt")
+    credentials_directory = get_working_directory().joinpath(CREDENTIALS_DIRECTORY)
+    ensure_directory_exists(path=credentials_directory)
 
-    ensure_directory_exists(path=path_file)
+    destination = credentials_directory.joinpath(file_name)
+    shutil.copyfile(src=path, dst=destination)
 
-    with path_file.open(mode="w") as file:
-        file.write(str(path.resolve()))
+    console.echo(
+        message=f"The '{CredentialsTypes(credentials)}' credentials file copied to: {destination}.",
+        level=LogLevel.SUCCESS,
+    )
 
-    console.echo(message=f"Google Sheets credentials path set to: {path.resolve()}.", level=LogLevel.SUCCESS)
 
+def get_credentials(credentials: str | CredentialsTypes) -> Path:
+    """Resolves and returns the path to the requested credentials file stored in the working directory's credentials
+    subdirectory.
 
-def get_google_credentials_path() -> Path:
-    """Resolves and returns the path to the Google service account credentials .JSON file.
+    Args:
+        credentials: The ``CredentialsTypes`` member or its string value identifying the credentials category to
+            resolve.
 
     Returns:
-        The path to the Google service account credentials .JSON file.
+        The path to the requested credentials file.
 
     Raises:
-        FileNotFoundError: If the Google service account credentials path has not been configured for the host-machine,
-            or if the previously configured credentials file does not exist at the expected path.
+        ValueError: If the credentials category is not a valid ``CredentialsTypes`` member.
+        FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
+            credentials file for the requested category has not been set.
     """
-    application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
-    path_file = application_directory.joinpath("google_credentials_path.txt")
-
-    if not path_file.exists():
-        message = (
-            "Unable to resolve the path to the Google account credentials file, as it has not been set. "
-            "Set the Google service account credentials path by using the 'slsa configure google' CLI command."
-        )
-        console.error(message=message, error=FileNotFoundError)
-
-    with path_file.open() as file:
-        credentials_path = Path(file.read().strip())
+    file_name = resolve_credentials_file(credentials=credentials)
+    credentials_path = get_working_directory().joinpath(CREDENTIALS_DIRECTORY, file_name)
 
     if not credentials_path.exists():
         message = (
-            f"Unable to resolve the path to the Google account credentials file, as the previously configured "
-            f"credentials file does not exist at the expected path ({credentials_path}). Set a new credentials path "
-            f"by using the 'slsa configure google' CLI command."
+            f"Unable to resolve the path to the '{CredentialsTypes(credentials)}' credentials file, as it has not "
+            f"been set. Set the credentials file by using the 'slsa configure credentials' CLI command."
         )
         console.error(message=message, error=FileNotFoundError)
 

@@ -11,12 +11,13 @@ from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
 from .mcp_server import run_server
 from ..data_classes import ProjectData, discover_projects
 from ..configuration import (
+    CredentialsTypes,
     get_data_root,
     set_data_root,
+    get_credentials,
+    set_credentials,
     get_working_directory,
     set_working_directory,
-    get_google_credentials_path,
-    set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
 )
@@ -61,10 +62,17 @@ def get_data_root_path() -> None:  # pragma: no cover
     console.echo(message=f"Data root: {get_data_root()}.")
 
 
-@get_group.command("google", context_settings=_CONTEXT_SETTINGS)
-def get_google_credentials() -> None:  # pragma: no cover
-    """Reports the configured Google service account credentials file path."""
-    console.echo(message=f"Google credentials path: {get_google_credentials_path()}.")
+@get_group.command("credentials", context_settings=_CONTEXT_SETTINGS)
+@click.option(
+    "-c",
+    "--category",
+    type=click.Choice([member.value for member in CredentialsTypes], case_sensitive=False),
+    required=True,
+    help="The category of the credentials file to report.",
+)
+def get_credentials_path(category: str) -> None:  # pragma: no cover
+    """Reports the path to the requested credentials file stored in the platform credentials directory."""
+    console.echo(message=f"The '{category}' credentials path: {get_credentials(credentials=category)}.")
 
 
 @get_group.command("templates", context_settings=_CONTEXT_SETTINGS)
@@ -142,17 +150,24 @@ def configure_data_root(directory: Path) -> None:  # pragma: no cover
     set_data_root(path=directory)
 
 
-@configure_group.command("google", context_settings=_CONTEXT_SETTINGS)
+@configure_group.command("credentials", context_settings=_CONTEXT_SETTINGS)
 @click.option(
     "-c",
-    "--credentials",
+    "--category",
+    type=click.Choice([member.value for member in CredentialsTypes], case_sensitive=False),
+    required=True,
+    help="The category of the credentials file to configure.",
+)
+@click.option(
+    "-f",
+    "--file",
     type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
     required=True,
-    help="The absolute path to the Google service account credentials .JSON file.",
+    help="The absolute path to the credentials file to copy into the platform credentials directory.",
 )
-def configure_google_credentials(credentials: Path) -> None:  # pragma: no cover
-    """Sets the path to the Google service account credentials file."""
-    set_google_credentials_path(path=credentials)
+def configure_credentials(category: str, file: Path) -> None:  # pragma: no cover
+    """Copies the input credentials file into the platform credentials directory under its canonical name."""
+    set_credentials(credentials=category, path=file)
 
 
 @configure_group.command("templates", context_settings=_CONTEXT_SETTINGS)

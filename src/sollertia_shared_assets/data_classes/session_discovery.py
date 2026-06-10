@@ -10,8 +10,8 @@ from zoneinfo import ZoneInfo
 from dateutil import parser
 
 from .session_data import SessionData, RawDataFiles
+from ..configuration import CONFIGURATION_DIRECTORY
 from .project_hierarchy import (
-    CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
     AnimalData,
     ProjectData,
