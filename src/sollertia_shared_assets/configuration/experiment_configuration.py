@@ -57,12 +57,9 @@ class GasPuffTrial:
     """Defines a trial that delivers a gas puff (an aversive stimulus) when the animal fails the trial's avoidance
     condition.
 
-    The animal avoids the puff by satisfying an occupancy condition for the configured duration; failing to do so
-    delivers a puff of the configured duration. The behavioral condition is defined by the task and the acquisition
-    system, not by this class.
+    The animal avoids the puff by satisfying the task's occupancy condition; failing to do so delivers a puff of the
+    configured duration. The behavioral condition is defined by the task and the acquisition system, not by this class.
     """
 
     puff_duration_ms: int = 100
     """The duration, in milliseconds, for which to deliver the gas puff when the animal fails the trial."""
-    occupancy_duration_ms: int = 1000
-    """The time, in milliseconds, the animal must satisfy the occupancy condition to avoid the gas puff."""

@@ -58,14 +58,13 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         default_reward_size_ul: float = 5.0,
         default_reward_tone_duration_ms: int = 300,
         default_puff_duration_ms: int = 100,
-        default_occupancy_duration_ms: int = 1000,
     ) -> MesoscopeExperimentConfiguration:
         """Builds a Mesoscope-VR experiment configuration from a Unity VR task template.
 
         Maps each of the template's trial structures to a runtime trial class by its trigger type, pairing
-        ``TriggerType.LICK`` with a ``WaterRewardTrial`` and ``TriggerType.OCCUPANCY`` with a ``GasPuffTrial``.
-        Then seeds ``state_count`` sequentially numbered runtime states ('state_1', 'state_2', and so on) whose
-        reinforcing or aversive guidance defaults follow the trial types present in the template.
+        ``TriggerType.INTERACTION`` with a ``WaterRewardTrial`` and ``TriggerType.OCCUPANCY_DISARM`` with a
+        ``GasPuffTrial``. Then seeds ``state_count`` sequentially numbered runtime states ('state_1', 'state_2', and
+        so on) whose reinforcing or aversive guidance defaults follow the trial types present in the template.
 
         Args:
             template: The task template whose VR trial structures (cues, trial zones) seed the configuration.
@@ -73,10 +72,9 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 name so ``SessionData.create()`` can locate the corresponding VR template during snapshot export.
                 Matching is the caller's responsibility and is not validated here.
             state_count: The number of default-valued runtime states to generate.
-            default_reward_size_ul: Water reward volume in microliters for lick-type trials.
-            default_reward_tone_duration_ms: Reward tone duration in milliseconds for lick-type trials.
-            default_puff_duration_ms: Gas puff duration in milliseconds for occupancy-type trials.
-            default_occupancy_duration_ms: Occupancy threshold duration in milliseconds for occupancy-type trials.
+            default_reward_size_ul: Water reward volume in microliters for interaction-type trials.
+            default_reward_tone_duration_ms: Reward tone duration in milliseconds for interaction-type trials.
+            default_puff_duration_ms: Gas puff duration in milliseconds for occupancy-disarm trials.
 
         Returns:
             The experiment configuration populated with the template's trial structures and the requested number
@@ -84,16 +82,13 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         """
         trial_structures: dict[str, WaterRewardTrial | GasPuffTrial] = {}
         for trial_name, trial_structure in template.trial_structures.items():
-            if trial_structure.trigger_type == TriggerType.LICK:
+            if trial_structure.trigger_type == TriggerType.INTERACTION:
                 trial_structures[trial_name] = WaterRewardTrial(
                     reward_size_ul=default_reward_size_ul,
                     reward_tone_duration_ms=default_reward_tone_duration_ms,
                 )
-            elif trial_structure.trigger_type == TriggerType.OCCUPANCY:
-                trial_structures[trial_name] = GasPuffTrial(
-                    puff_duration_ms=default_puff_duration_ms,
-                    occupancy_duration_ms=default_occupancy_duration_ms,
-                )
+            elif trial_structure.trigger_type == TriggerType.OCCUPANCY_DISARM:
+                trial_structures[trial_name] = GasPuffTrial(puff_duration_ms=default_puff_duration_ms)
             else:
                 message = (
                     f"Unable to build a MesoscopeExperimentConfiguration from the task template. Trial '{trial_name}' "
