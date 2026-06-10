@@ -1,31 +1,11 @@
-"""Provides assets for storing data acquired through the Sollertia platform."""
+"""Provides the contract dataclasses that translate external data records into the uniform on-disk formats consumed
+by the Sollertia platform libraries.
 
-from .extensions import (
-    DESCRIPTOR_REGISTRY,
-    HARDWARE_STATE_REGISTRY,
-)
-from .read_assets import (
-    READ_ASSET_REGISTRY,
-    ReadAssets,
-    resolve_read_asset,
-)
-from .session_data import (
-    RAW_DATA_DIRECTORY,
-    SYSTEM_SESSION_TYPES,
-    PROCESSED_DATA_DIRECTORY,
-    SYSTEM_RAW_DATA_REGISTRY,
-    SESSION_TYPES_USING_VR_TASK,
-    RawData,
-    Directories,
-    SessionData,
-    RawDataFiles,
-    SessionTypes,
-    ProcessedData,
-    MesoscopeRawData,
-    ProcessingTrackers,
-    MesoscopeDirectories,
-    MesoscopeRawDataFiles,
-)
+Each module in this package is a durable read-asset contract: it defines the dataclasses that represent one external
+data shape (for example, the surgery log) on disk. Contract modules export plain dataclasses and never consume the
+dispatch registries, so the ``registries`` hub can import them without circular imports.
+"""
+
 from .surgery_data import (
     DrugData,
     ImplantData,
@@ -34,76 +14,12 @@ from .surgery_data import (
     InjectionData,
     ProcedureData,
 )
-from .project_hierarchy import (
-    DATASET_MARKER_FILENAME,
-    PERSISTENT_DATA_DIRECTORY,
-    AnimalData,
-    ProjectData,
-)
-from .session_discovery import (
-    filter_sessions,
-    iterate_sessions,
-    discover_projects,
-    discover_sessions,
-    validate_directory,
-    iter_animal_sessions,
-    iter_project_animals,
-    get_projects_for_animal,
-    parse_session_timestamp,
-    get_session_root_from_marker,
-)
-from .mesoscope_runtime_data import (
-    RunTrainingDescriptor,
-    LickTrainingDescriptor,
-    MesoscopeHardwareState,
-    WindowCheckingDescriptor,
-    MesoscopeExperimentDescriptor,
-)
 
 __all__ = [
-    "DATASET_MARKER_FILENAME",
-    "DESCRIPTOR_REGISTRY",
-    "HARDWARE_STATE_REGISTRY",
-    "PERSISTENT_DATA_DIRECTORY",
-    "PROCESSED_DATA_DIRECTORY",
-    "RAW_DATA_DIRECTORY",
-    "READ_ASSET_REGISTRY",
-    "SESSION_TYPES_USING_VR_TASK",
-    "SYSTEM_RAW_DATA_REGISTRY",
-    "SYSTEM_SESSION_TYPES",
-    "AnimalData",
-    "Directories",
     "DrugData",
     "ImplantData",
     "InjectionData",
-    "LickTrainingDescriptor",
-    "MesoscopeDirectories",
-    "MesoscopeExperimentDescriptor",
-    "MesoscopeHardwareState",
-    "MesoscopeRawData",
-    "MesoscopeRawDataFiles",
     "ProcedureData",
-    "ProcessedData",
-    "ProcessingTrackers",
-    "ProjectData",
-    "RawData",
-    "RawDataFiles",
-    "ReadAssets",
-    "RunTrainingDescriptor",
-    "SessionData",
-    "SessionTypes",
     "SubjectData",
     "SurgeryData",
-    "WindowCheckingDescriptor",
-    "discover_projects",
-    "discover_sessions",
-    "filter_sessions",
-    "get_projects_for_animal",
-    "get_session_root_from_marker",
-    "iter_animal_sessions",
-    "iter_project_animals",
-    "iterate_sessions",
-    "parse_session_timestamp",
-    "resolve_read_asset",
-    "validate_directory",
 ]

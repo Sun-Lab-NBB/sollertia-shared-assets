@@ -1,4 +1,4 @@
-"""Contains tests for the session-discovery helpers in ``data_classes.session_discovery``."""
+"""Contains tests for the session-discovery helpers in ``data_hierarchy.session_discovery``."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from sollertia_shared_assets.data_classes import (
+from sollertia_shared_assets.enums import SessionTypes
+from sollertia_shared_assets.data_hierarchy import (
     AnimalData,
     SessionData,
-    SessionTypes,
     filter_sessions,
     iterate_sessions,
     discover_sessions,
@@ -23,7 +23,7 @@ from sollertia_shared_assets.data_classes import (
     parse_session_timestamp,
     get_session_root_from_marker,
 )
-from sollertia_shared_assets.data_classes.session_discovery import _parse_date_boundary
+from sollertia_shared_assets.data_hierarchy.session_discovery import _parse_date_boundary
 
 if TYPE_CHECKING:
     from pathlib import Path

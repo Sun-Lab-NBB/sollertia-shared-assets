@@ -1,4 +1,4 @@
-"""Contains tests for the dataclasses provided by the ``data_classes.session_data`` module."""
+"""Contains tests for the dataclasses provided by the ``data_hierarchy.session_data`` module."""
 
 from __future__ import annotations
 
@@ -6,29 +6,24 @@ from pathlib import Path
 
 import pytest
 
-from sollertia_shared_assets.data_classes import (
-    SYSTEM_SESSION_TYPES,
-    SYSTEM_RAW_DATA_REGISTRY,
+from sollertia_shared_assets.enums import SessionTypes, AcquisitionSystems
+from sollertia_shared_assets.registries import SYSTEM_SESSION_TYPES, SYSTEM_RAW_DATA_REGISTRY
+from sollertia_shared_assets.data_hierarchy import (
     RawData,
     AnimalData,
     Directories,
     SessionData,
     RawDataFiles,
-    SessionTypes,
     ProcessedData,
-    MesoscopeRawData,
     ProcessingTrackers,
-    MesoscopeDirectories,
-    MesoscopeRawDataFiles,
 )
+from sollertia_shared_assets.mesoscope_vr import MesoscopeRawData, MesoscopeExperimentConfiguration
 from sollertia_shared_assets.configuration import (
     Cue,
     TriggerType,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
-    AcquisitionSystems,
-    MesoscopeExperimentConfiguration,
     set_working_directory,
     set_task_templates_directory,
 )
@@ -169,22 +164,6 @@ def test_required_raw_assets_gates_experiment_and_vr_independently(tmp_path: Pat
 
     assert RawDataFiles.EXPERIMENT_CONFIGURATION.value in names
     assert RawDataFiles.VR_CONFIGURATION.value not in names
-
-
-def test_session_types_values() -> None:
-    """Verifies all SessionTypes enumeration values."""
-    assert SessionTypes.LICK_TRAINING == "lick training"
-    assert SessionTypes.RUN_TRAINING == "run training"
-    assert SessionTypes.MESOSCOPE_EXPERIMENT == "mesoscope experiment"
-    assert SessionTypes.WINDOW_CHECKING == "window checking"
-
-
-def test_session_types_is_string_enum() -> None:
-    """Verifies that SessionTypes inherits from StrEnum."""
-    assert isinstance(SessionTypes.LICK_TRAINING, str)
-    assert isinstance(SessionTypes.RUN_TRAINING, str)
-    assert isinstance(SessionTypes.MESOSCOPE_EXPERIMENT, str)
-    assert isinstance(SessionTypes.WINDOW_CHECKING, str)
 
 
 def test_session_data_default_path_fields() -> None:
@@ -526,19 +505,11 @@ def test_session_data_raw_data_file_paths() -> None:
 
 
 def test_session_data_system_raw_data_file_paths() -> None:
-    """Verifies that every Mesoscope-VR-specific raw-data file path resolves under raw_data_path."""
+    """Verifies that the system-specific raw-data sub-dataclass is dispatched and anchored on the raw data root."""
     session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     assert isinstance(session.system_raw_data, MesoscopeRawData)
-    assert session.system_raw_data.zaber_positions_path == _SENTINEL_RAW_PATH / MesoscopeRawDataFiles.ZABER_POSITIONS
-    assert (
-        session.system_raw_data.mesoscope_positions_path
-        == _SENTINEL_RAW_PATH / MesoscopeRawDataFiles.MESOSCOPE_POSITIONS
-    )
-    assert (
-        session.system_raw_data.window_screenshot_path == _SENTINEL_RAW_PATH / MesoscopeRawDataFiles.WINDOW_SCREENSHOT
-    )
-    assert session.system_raw_data.mesoscope_data_path == _SENTINEL_RAW_PATH / MesoscopeDirectories.MESOSCOPE_DATA
+    assert session.system_raw_data == MesoscopeRawData.build(root=_SENTINEL_RAW_PATH)
 
 
 def test_session_data_raw_data_directory_paths() -> None:
@@ -641,7 +612,7 @@ def test_session_data_build_sub_dataclasses_unsupported_system_raises_error(
     # Empties the registry so the lookup falls into the defensive error branch even though the
     # acquisition_system value is a valid AcquisitionSystems member.
     monkeypatch.setattr(
-        "sollertia_shared_assets.data_classes.session_data.SYSTEM_RAW_DATA_REGISTRY",
+        "sollertia_shared_assets.data_hierarchy.session_data.SYSTEM_RAW_DATA_REGISTRY",
         {},
     )
 
@@ -709,14 +680,11 @@ def test_session_data_build_sub_dataclasses_returns_typed_instances() -> None:
 
 
 def test_raw_data_files_enum_is_string_enum() -> None:
-    """Verifies that RawDataFiles members are strings (StrEnum) and that Mesoscope-specific entries live separately."""
+    """Verifies that RawDataFiles members are strings (StrEnum)."""
     assert isinstance(RawDataFiles.SESSION_DATA, str)
     assert RawDataFiles.SESSION_DATA == "session_data.yaml"
     assert RawDataFiles.SESSION_DESCRIPTOR == "session_descriptor.yaml"
     assert RawDataFiles.NK_MARKER == "nk.bin"
-    assert MesoscopeRawDataFiles.ZABER_POSITIONS == "zaber_positions.yaml"
-    assert MesoscopeRawDataFiles.MESOSCOPE_POSITIONS == "mesoscope_positions.yaml"
-    assert MesoscopeRawDataFiles.WINDOW_SCREENSHOT == "window_screenshot.png"
 
 
 def test_directories_enum_is_string_enum() -> None:

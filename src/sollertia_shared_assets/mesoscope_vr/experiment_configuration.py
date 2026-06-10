@@ -10,11 +10,10 @@ from dataclasses import dataclass
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
-from .vr_configuration import TriggerType
-from .experiment_configuration import GasPuffTrial, ExperimentState, WaterRewardTrial
+from ..configuration import TriggerType, GasPuffTrial, ExperimentState, WaterRewardTrial
 
 if TYPE_CHECKING:
-    from .vr_configuration import TaskTemplate
+    from ..configuration import TaskTemplate
 
 _DEFAULT_STATE_DURATION_S: int = 60
 """Default duration in seconds for each runtime state seeded by ``from_task_template``."""

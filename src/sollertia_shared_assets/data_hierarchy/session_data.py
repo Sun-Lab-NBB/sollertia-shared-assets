@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 import shutil
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -14,11 +14,14 @@ from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
-from ..configuration import (
+from ..enums import SessionTypes, AcquisitionSystems
+from ..registries import (
+    SYSTEM_SESSION_TYPES,
+    SYSTEM_RAW_DATA_REGISTRY,
+    SESSION_TYPES_USING_VR_TASK,
     EXPERIMENT_CONFIGURATION_REGISTRY,
-    AcquisitionSystems,
-    get_task_templates_directory,
 )
+from ..configuration import get_task_templates_directory
 
 if TYPE_CHECKING:
     from .project_hierarchy import AnimalData
@@ -114,46 +117,6 @@ class ProcessingTrackers(StrEnum):
     TRANSFER = "transfer_processing_tracker.yaml"
     """Tracker for batch session transfer and deletion jobs. Location is specified by the caller, since transfer jobs
     are not bound to a single session or dataset."""
-
-
-class SessionTypes(StrEnum):
-    """Defines the data acquisition session types supported by all data acquisition systems in the Sollertia
-    platform.
-    """
-
-    LICK_TRAINING = "lick training"
-    """Teaches animals to use the water delivery port while being head-fixed on the Mesoscope-VR system."""
-    RUN_TRAINING = "run training"
-    """Teaches animals to run on the treadmill while being head-fixed on the Mesoscope-VR system."""
-    MESOSCOPE_EXPERIMENT = "mesoscope experiment"
-    """Runs virtual reality tasks using Unity game engine and collects brain activity data using the 2-Photon Random
-    Access Mesoscope (2P-RAM)."""
-    WINDOW_CHECKING = "window checking"
-    """Evaluates the quality of the cranial window implantation procedure and the suitability of the animal for
-    experiment sessions using the Mesoscope."""
-
-
-class MesoscopeRawDataFiles(StrEnum):
-    """Enumerates the canonical filenames at the root of a session's ``raw_data`` directory that are written
-    exclusively by the Mesoscope-VR acquisition system.
-    """
-
-    ZABER_POSITIONS = "zaber_positions.yaml"
-    """The Zaber motor position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
-    MESOSCOPE_POSITIONS = "mesoscope_positions.yaml"
-    """The Mesoscope objective position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
-    WINDOW_SCREENSHOT = "window_screenshot.png"
-    """The cranial imaging window screenshot captured at session start by the Mesoscope-VR acquisition runtime."""
-
-
-class MesoscopeDirectories(StrEnum):
-    """Enumerates the canonical names of subdirectories under a session's ``raw_data`` directory that are written
-    exclusively by the Mesoscope-VR acquisition system.
-    """
-
-    MESOSCOPE_DATA = "mesoscope_data"
-    """Persistent mesoscope data directory under ``raw_data``. Stores LERC-compressed TIFF stacks and acquisition
-    metadata written by sollertia-experiment's preprocessing."""
 
 
 @dataclass(slots=True)
@@ -299,96 +262,6 @@ class ProcessedData:
             cindra_single_recording_tracker_path=cindra_data_path.joinpath(ProcessingTrackers.CINDRA_SINGLE_RECORDING),
             cindra_multi_recording_path=cindra_data_path.joinpath(Directories.MULTI_RECORDING),
         )
-
-
-@dataclass(slots=True)
-class MesoscopeRawData:
-    """Stores the absolute paths to the Mesoscope-VR-specific raw assets of a single data acquisition session.
-
-    Notes:
-        Instances are constructed by ``SessionData._build_sub_dataclasses`` when the session's acquisition_system is
-        AcquisitionSystems.MESOSCOPE_VR. The ``build`` classmethod is the single source of truth for the
-        enum-to-field mapping.
-    """
-
-    zaber_positions_path: Path
-    """Captures the states of the Zaber motorized stages used by the Mesoscope-VR system at the start of the
-    session."""
-    mesoscope_positions_path: Path
-    """Records the 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window
-    during the session, allowing the same imaging field of view to be recovered in follow-up sessions."""
-    window_screenshot_path: Path
-    """Provides a visual reference of the cranial imaging window taken at the start of the session, used for
-    downstream registration and quality assessment."""
-    mesoscope_data_path: Path
-    """Holds the compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata
-    produced by sollertia-experiment's preprocessing, which serves as the input to cindra's neural imaging analysis
-    pipelines."""
-
-    @classmethod
-    def build(cls, root: Path) -> MesoscopeRawData:
-        """Builds a MesoscopeRawData instance with every field resolved against the input raw data root.
-
-        Args:
-            root: The path to the session's ``raw_data`` directory.
-
-        Returns:
-            A MesoscopeRawData instance whose fields are absolute paths under the input root.
-        """
-        return cls(
-            zaber_positions_path=root.joinpath(MesoscopeRawDataFiles.ZABER_POSITIONS),
-            mesoscope_positions_path=root.joinpath(MesoscopeRawDataFiles.MESOSCOPE_POSITIONS),
-            window_screenshot_path=root.joinpath(MesoscopeRawDataFiles.WINDOW_SCREENSHOT),
-            mesoscope_data_path=root.joinpath(MesoscopeDirectories.MESOSCOPE_DATA),
-        )
-
-
-class _SystemRawDataBuilder(Protocol):
-    """Structural type for system-specific raw data dataclasses registered in ``SYSTEM_RAW_DATA_REGISTRY``."""
-
-    @classmethod
-    def build(cls, root: Path) -> Any:  # noqa: ANN401
-        """Resolves all system-specific raw-asset paths under the session's ``raw_data`` directory.
-
-        Conforming implementations construct and return a dataclass instance whose fields hold absolute paths
-        anchored on ``root``. The concrete return type is the implementing class itself (e.g., ``MesoscopeRawData``).
-
-        Args:
-            root: The session's ``raw_data`` directory absolute path.
-
-        Returns:
-            An instance of the conforming dataclass with every system-specific raw-asset path resolved.
-        """
-        ...  # pragma: no cover
-
-
-# noinspection PyTypeChecker
-SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
-    AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
-}
-"""Maps each acquisition system to the dataclass that captures its system-specific raw assets. The registered class
-exposes a ``build(root: Path) -> Self`` classmethod that resolves all system-specific paths under the session's
-``raw_data`` directory."""
-
-
-SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
-    AcquisitionSystems.MESOSCOPE_VR: frozenset(
-        {
-            SessionTypes.LICK_TRAINING,
-            SessionTypes.RUN_TRAINING,
-            SessionTypes.MESOSCOPE_EXPERIMENT,
-            SessionTypes.WINDOW_CHECKING,
-        }
-    ),
-}
-"""Maps each acquisition system to the set of session types it can run. ``SessionData.create()`` rejects a session
-type that is not paired with the session's acquisition system."""
-
-
-SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
-"""The session types that run the linear infinite corridor task and therefore write a ``vr_configuration.yaml``
-task-template snapshot. ``required_raw_assets`` consults this set to decide whether a session of a given type requires
-the snapshot. Training and window-checking sessions run no task and are absent here."""
 
 
 @dataclass

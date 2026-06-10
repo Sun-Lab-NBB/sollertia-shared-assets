@@ -8,47 +8,41 @@ Authors: Ivan Kondratyev (Inkaros), Kushaan Gupta, Natalie Yeung
 
 from ataraxis_base_utilities import console
 
-from .data_classes import (
-    RAW_DATA_DIRECTORY,
-    READ_ASSET_REGISTRY,
-    PROCESSED_DATA_DIRECTORY,
-    PERSISTENT_DATA_DIRECTORY,
-    RawData,
-    DrugData,
-    AnimalData,
+from .enums import (
     ReadAssets,
-    Directories,
+    SessionTypes,
+    CredentialsTypes,
+    AcquisitionSystems,
+)
+from .registries import (
+    READ_ASSET_REGISTRY,
+    CREDENTIALS_FILE_REGISTRY,
+    resolve_read_asset,
+)
+from .credentials import (
+    get_credentials,
+    set_credentials,
+    resolve_credentials_file,
+)
+from .data_classes import (
+    DrugData,
     ImplantData,
-    ProjectData,
-    SessionData,
     SubjectData,
     SurgeryData,
-    RawDataFiles,
-    SessionTypes,
     InjectionData,
     ProcedureData,
-    ProcessedData,
-    ProcessingTrackers,
+)
+from .mesoscope_vr import (
     RunTrainingDescriptor,
     LickTrainingDescriptor,
     MesoscopeHardwareState,
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
-    filter_sessions,
-    iterate_sessions,
-    discover_projects,
-    discover_sessions,
-    resolve_read_asset,
-    validate_directory,
-    iter_animal_sessions,
-    iter_project_animals,
-    get_projects_for_animal,
-    parse_session_timestamp,
+    MesoscopeExperimentConfiguration,
 )
 from .configuration import (
     CREDENTIALS_DIRECTORY,
     CONFIGURATION_DIRECTORY,
-    CREDENTIALS_FILE_REGISTRY,
     Cue,
     TriggerType,
     GasPuffTrial,
@@ -56,19 +50,35 @@ from .configuration import (
     VREnvironment,
     TrialStructure,
     ExperimentState,
-    CredentialsTypes,
     WaterRewardTrial,
-    AcquisitionSystems,
-    MesoscopeExperimentConfiguration,
     get_data_root,
     set_data_root,
-    get_credentials,
-    set_credentials,
     get_working_directory,
     set_working_directory,
-    resolve_credentials_file,
     get_task_templates_directory,
     set_task_templates_directory,
+)
+from .data_hierarchy import (
+    RAW_DATA_DIRECTORY,
+    PROCESSED_DATA_DIRECTORY,
+    PERSISTENT_DATA_DIRECTORY,
+    RawData,
+    AnimalData,
+    Directories,
+    ProjectData,
+    SessionData,
+    RawDataFiles,
+    ProcessedData,
+    ProcessingTrackers,
+    filter_sessions,
+    iterate_sessions,
+    discover_projects,
+    discover_sessions,
+    validate_directory,
+    iter_animal_sessions,
+    iter_project_animals,
+    get_projects_for_animal,
+    parse_session_timestamp,
 )
 
 # Ensures console is enabled when this library is imported.

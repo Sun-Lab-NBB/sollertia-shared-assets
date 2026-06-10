@@ -12,12 +12,9 @@ from dataclasses import MISSING, fields, is_dataclass
 import yaml
 from mcp.server.fastmcp import FastMCP
 
-from ..data_classes import (
-    DESCRIPTOR_REGISTRY,
-    SessionData,
-    RawDataFiles,
-    SessionTypes,
-)
+from ..enums import SessionTypes
+from ..registries import DESCRIPTOR_REGISTRY
+from ..data_hierarchy import SessionData, RawDataFiles
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

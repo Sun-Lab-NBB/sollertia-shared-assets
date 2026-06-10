@@ -10,6 +10,20 @@ if TYPE_CHECKING:
 
     from ataraxis_data_structures import YamlConfig
 
+from ..enums import (
+    ReadAssets,
+    SessionTypes,
+    CredentialsTypes,
+    AcquisitionSystems,
+)
+from ..registries import (
+    DESCRIPTOR_REGISTRY,
+    READ_ASSET_REGISTRY,
+    SYSTEM_SESSION_TYPES,
+    CREDENTIALS_FILE_REGISTRY,
+    EXPERIMENT_CONFIGURATION_REGISTRY,
+)
+from ..credentials import get_credentials, set_credentials
 from .mcp_instance import (
     mcp,
     read_yaml,
@@ -22,34 +36,21 @@ from .mcp_instance import (
     resolve_root_directory,
     collect_field_dataclasses,
 )
-from ..data_classes import (
-    DESCRIPTOR_REGISTRY,
-    READ_ASSET_REGISTRY,
-    SYSTEM_SESSION_TYPES,
-    ReadAssets,
-    ProjectData,
-    SessionTypes,
-)
 from ..configuration import (
     CONFIGURATION_DIRECTORY,
-    CREDENTIALS_FILE_REGISTRY,
-    EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
-    CredentialsTypes,
-    AcquisitionSystems,
     get_data_root,
     set_data_root,
-    get_credentials,
-    set_credentials,
     get_working_directory,
     set_working_directory,
     get_task_templates_directory,
     set_task_templates_directory,
 )
+from ..data_hierarchy import ProjectData
 
 
 @mcp.tool()
