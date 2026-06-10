@@ -79,7 +79,7 @@ repositories.
 | `/audit-facts`                  | Audit documentation files against source code for factual accuracy               |
 | `/audit-style`                  | Audit files against applicable style skill checklists for compliance             |
 | `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                       |
-| `/working-directory`            | Initialize the working directory, Google credentials, and templates path         |
+| `/working-directory`            | Initialize the working directory, credentials files, and templates path          |
 | `/project-hierarchy`            | Discover the project / animal / session tree under the data root                 |
 | `/session-discovery`            | Discover and filter sessions by date, animal, or name (`session_paths` flow)     |
 | `/session-data`                 | Read, write, and validate `session_data.yaml` markers                            |
@@ -105,7 +105,7 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 | CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands        |
 | Server bootstrap    | `interfaces/mcp_server.py`          | Imports tool modules to trigger registration; exposes `run_server` |
 | Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, response helpers, serialization, validators      |
-| Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, Google creds, templates dir, experiments   |
+| Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, credentials, templates dir, experiments    |
 | Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, surgery, etc.          |
 | Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                      |
 
@@ -128,8 +128,9 @@ This library is the shared-asset layer between every other Sollertia component. 
 contracts, or canonical filenames ripple through three downstream libraries:
 
 - **sollertia-experiment** (acquisition runtime). Consumes `SessionData.create` / `load`, every descriptor class,
-  `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials path. Owns the system-level
-  `MesoscopeSystemConfiguration`, which extends but does not live in this library.
+  `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials file resolved through
+  `get_credentials`. Owns the system-level `MesoscopeSystemConfiguration`, which extends but does not live in this
+  library.
 - **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `filter_sessions`, the working
   directory itself (per-project artifacts like `<working_dir>/<project>/manifest.feather`) and its `configuration/`
   subdirectory (where the forgery server configuration is persisted), the `ProcessingTrackers` enum,
@@ -180,11 +181,12 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   validation, and dataclass-introspection helpers; the dispatch registries and their import-time checks live in the
   data layer's extension-point hub (`data_classes/extensions.py`), not here. Tool modules import the instance and
   register `@mcp.tool()` functions. The CLI
-  (`slsa`) starts the server and exposes `configure {directory,data-root,google,templates,project}` and
-  `get {directory,data-root,google,templates,projects,experiments}` command groups.
-- **Persistent host settings**: Four independent `platformdirs`-backed settings — working directory, data root,
-  Google credentials path, templates directory — are managed in `configuration/configuration_utilities.py`. Only the
-  working directory is required for `slsa mcp` to function.
+  (`slsa`) starts the server and exposes `configure {directory,data-root,credentials,templates,project}` and
+  `get {directory,data-root,credentials,templates,projects,experiments}` command groups.
+- **Persistent host settings**: Three independent `platformdirs`-backed settings — working directory, data root,
+  templates directory — are managed in `configuration/configuration_utilities.py`, alongside the credentials toolset
+  that copies each category's credentials file into the working directory's `credentials/` subdirectory under its
+  canonical filename. Only the working directory is required for `slsa mcp` to function.
 
 ### Extension contracts
 
