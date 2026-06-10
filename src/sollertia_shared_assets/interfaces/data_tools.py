@@ -24,7 +24,6 @@ from ..data_classes import (
     RAW_DATA_DIRECTORY,
     DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
-    CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
     HARDWARE_STATE_REGISTRY,
     ReadAssets,
@@ -38,7 +37,7 @@ from ..data_classes import (
     iter_project_animals,
     get_session_root_from_marker,
 )
-from ..configuration import AcquisitionSystems
+from ..configuration import CONFIGURATION_DIRECTORY, AcquisitionSystems
 
 _STATUS_KEYS: tuple[str, ...] = ("uninitialized", "incomplete", "acquired", "processed", "error")
 """Canonical lifecycle status keys used in ``counts`` dicts across the overview and inspection tools."""

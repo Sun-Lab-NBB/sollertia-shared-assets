@@ -26,25 +26,27 @@ from ..data_classes import (
     DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
     SYSTEM_SESSION_TYPES,
-    CONFIGURATION_DIRECTORY,
     ReadAssets,
     ProjectData,
     SessionTypes,
 )
 from ..configuration import (
+    CONFIGURATION_DIRECTORY,
+    CREDENTIALS_FILE_REGISTRY,
     EXPERIMENT_CONFIGURATION_REGISTRY,
     Cue,
     TriggerType,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
+    CredentialsTypes,
     AcquisitionSystems,
     get_data_root,
     set_data_root,
+    get_credentials,
+    set_credentials,
     get_working_directory,
     set_working_directory,
-    get_google_credentials_path,
-    set_google_credentials_path,
     get_task_templates_directory,
     set_task_templates_directory,
 )
@@ -54,13 +56,14 @@ from ..configuration import (
 def get_platform_environment_status_tool() -> dict[str, Any]:
     """Returns a health report for the Sollertia platform configuration components owned by this package.
 
-    Combines working directory, data root, templates directory, and Google credentials status into a single
+    Combines working directory, data root, templates directory, and per-category credentials status into a single
     report. Only the working directory is required for ``slsa mcp`` to function. The task templates directory is
-    needed only when authoring task templates or experiment configurations. Google credentials are needed only by
-    hosts that fetch subject metadata or water-restriction logs from Google Sheets. ``overall_ok`` reflects the
-    required components only — optional components contribute ``configured`` and ``ok`` per-component but do
-    not gate the aggregate. System configuration mount checks are not included here — those live with the
-    acquisition runtime package (sl-experiment).
+    needed only when authoring task templates or experiment configurations. Credentials are needed only by hosts
+    that integrate with the corresponding external service (for example, Google credentials are used to fetch
+    subject metadata or water-restriction logs from Google Sheets). ``overall_ok`` reflects the required
+    components only — optional components contribute ``configured`` and ``ok`` per-component but do not gate the
+    aggregate. System configuration mount checks are not included here — those live with the acquisition runtime
+    package (sl-experiment).
 
     Returns:
         A response dict with ``overall_ok`` (the aggregate health flag, computed from required components only)
@@ -97,21 +100,23 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
             "ok": False,
         }
 
-    try:
-        google_credentials = get_google_credentials_path()
-        report["google_credentials"] = {
-            "required": False,
-            "configured": True,
-            "path": str(google_credentials),
-            "ok": True,
-        }
-    except FileNotFoundError as exception:
-        report["google_credentials"] = {
-            "required": False,
-            "configured": False,
-            "error": str(exception),
-            "ok": False,
-        }
+    for credentials_type in CredentialsTypes:
+        component_name = f"{credentials_type.value}_credentials"
+        try:
+            credentials_path = get_credentials(credentials=credentials_type)
+            report[component_name] = {
+                "required": False,
+                "configured": True,
+                "path": str(credentials_path),
+                "ok": True,
+            }
+        except FileNotFoundError as exception:
+            report[component_name] = {
+                "required": False,
+                "configured": False,
+                "error": str(exception),
+                "ok": False,
+            }
 
     overall_ok = all(component["ok"] for component in report.values() if component["required"])
     return ok_response(overall_ok=overall_ok, components=report)
@@ -219,35 +224,46 @@ def create_project_tool(project_name: str, root_directory: str | None = None) ->
 
 
 @mcp.tool()
-def read_google_credentials_tool() -> dict[str, Any]:
-    """Returns the configured path to the Google service account credentials JSON file.
+def read_credentials_tool(credentials: str) -> dict[str, Any]:
+    """Returns the path to the requested credentials file stored in the platform credentials directory.
+
+    Use ``list_supported_credentials_tool`` to enumerate valid ``credentials`` values.
+
+    Args:
+        credentials: The ``CredentialsTypes`` value identifying the credentials category to resolve.
 
     Returns:
-        A response dict with ``google_credentials_path`` containing the path.
+        A response dict with ``credentials`` (the echoed credentials category) and ``credentials_path``
+        containing the path to the credentials file.
     """
     try:
-        path = get_google_credentials_path()
-    except FileNotFoundError as exception:
+        path = get_credentials(credentials=credentials)
+    except (FileNotFoundError, ValueError) as exception:
         return error_response(message=str(exception))
-    return ok_response(google_credentials_path=str(path))
+    return ok_response(credentials=credentials, credentials_path=str(path))
 
 
 @mcp.tool()
-def set_google_credentials_tool(credentials_path: str) -> dict[str, Any]:
-    """Sets the path to the Google service account credentials JSON file.
+def set_credentials_tool(credentials: str, file_path: str) -> dict[str, Any]:
+    """Copies the source credentials file into the platform credentials directory under its canonical name.
+
+    The copy replaces any previously configured credentials file for the same category. Use
+    ``list_supported_credentials_tool`` to enumerate valid ``credentials`` values.
 
     Args:
-        credentials_path: The absolute path to the credentials JSON file.
+        credentials: The ``CredentialsTypes`` value identifying the credentials category to configure.
+        file_path: The absolute path to the source credentials file to copy.
 
     Returns:
-        A response dict with ``google_credentials_path`` containing the configured path.
+        A response dict with ``credentials`` (the echoed credentials category) and ``credentials_path``
+        containing the path to the configured credentials file.
     """
     try:
-        path = Path(credentials_path)
-        set_google_credentials_path(path=path)
+        set_credentials(credentials=credentials, path=Path(file_path))
+        path = get_credentials(credentials=credentials)
     except (FileNotFoundError, OSError, ValueError) as exception:
         return error_response(message=str(exception))
-    return ok_response(google_credentials_path=str(path))
+    return ok_response(credentials=credentials, credentials_path=str(path))
 
 
 @mcp.tool()
@@ -809,6 +825,29 @@ def list_supported_data_assets_tool() -> dict[str, Any]:
         for read_asset in ReadAssets
     ]
     return ok_response(data_assets=entries)
+
+
+@mcp.tool()
+def list_supported_credentials_tool() -> dict[str, Any]:
+    """Enumerates the credentials categories supported by the Sollertia platform.
+
+    Use the returned ``value`` as the ``credentials`` argument to ``read_credentials_tool`` and
+    ``set_credentials_tool``.
+
+    Returns:
+        A response dict with ``credentials`` (a list of dicts containing ``value``, ``name``, and ``file_name``
+        for each supported credentials category). The ``file_name`` is the canonical filename under which the
+        category's credentials file is stored inside the platform credentials directory.
+    """
+    entries: list[dict[str, Any]] = [
+        {
+            "value": member.value,
+            "name": member.name,
+            "file_name": CREDENTIALS_FILE_REGISTRY[member],
+        }
+        for member in CredentialsTypes
+    ]
+    return ok_response(credentials=entries)
 
 
 @mcp.tool()

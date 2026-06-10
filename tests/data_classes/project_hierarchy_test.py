@@ -6,7 +6,6 @@ from pathlib import Path
 
 from sollertia_shared_assets.data_classes import (
     RAW_DATA_DIRECTORY,
-    CONFIGURATION_DIRECTORY,
     DATASET_MARKER_FILENAME,
     PERSISTENT_DATA_DIRECTORY,
     AnimalData,
@@ -16,7 +15,7 @@ from sollertia_shared_assets.data_classes import (
     discover_projects,
     iter_project_animals,
 )
-from sollertia_shared_assets.configuration import AcquisitionSystems
+from sollertia_shared_assets.configuration import CONFIGURATION_DIRECTORY, AcquisitionSystems
 
 _LOCAL_ROOT: Path = Path("/data/local")
 """Sentinel local data root used by the path-resolution tests; never touched on disk."""
