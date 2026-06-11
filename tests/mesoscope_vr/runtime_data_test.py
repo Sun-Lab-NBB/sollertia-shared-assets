@@ -71,7 +71,6 @@ def test_lick_training_descriptor_yaml_round_trip(tmp_path: Path) -> None:
         dispensed_water_volume_ml=0.5,
         pause_dispensed_water_volume_ml=0.05,
         experimenter_given_water_volume_ml=0.1,
-        preferred_session_water_volume_ml=1.0,
         incomplete=False,
         experimenter_notes="Animal performed well; consider increasing reward delay.",
     )
@@ -104,7 +103,6 @@ def test_run_training_descriptor_yaml_round_trip(tmp_path: Path) -> None:
         dispensed_water_volume_ml=0.8,
         pause_dispensed_water_volume_ml=0.02,
         experimenter_given_water_volume_ml=0.0,
-        preferred_session_water_volume_ml=1.5,
         incomplete=False,
         experimenter_notes="Steady progression across all guidance steps.",
     )
@@ -125,7 +123,6 @@ def test_mesoscope_experiment_descriptor_yaml_round_trip(tmp_path: Path) -> None
         dispensed_water_volume_ml=1.1,
         pause_dispensed_water_volume_ml=0.0,
         experimenter_given_water_volume_ml=0.05,
-        preferred_session_water_volume_ml=1.5,
         incomplete=False,
         experimenter_notes="Stable imaging; no motion artifacts.",
     )

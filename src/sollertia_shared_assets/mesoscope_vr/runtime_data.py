@@ -84,9 +84,6 @@ class LickTrainingDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
     session."""
-    preferred_session_water_volume_ml: float = 0.0
-    """The volume of water, in milliliters, the animal should be receiving during the session runtime if its
-    performance matches experimenter-specified threshold."""
     incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
@@ -143,9 +140,6 @@ class RunTrainingDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
     session."""
-    preferred_session_water_volume_ml: float = 0.0
-    """The volume of water, in milliliters, the animal should be receiving during the session runtime if its
-    performance matches experimenter-specified threshold."""
     incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
@@ -172,9 +166,6 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     experimenter_given_water_volume_ml: float = 0.0
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
     session."""
-    preferred_session_water_volume_ml: float = 0.0
-    """The volume of water, in milliliters, the animal should be receiving during the session runtime if its
-    performance matches experimenter-specified threshold."""
     incomplete: bool = True
     """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."

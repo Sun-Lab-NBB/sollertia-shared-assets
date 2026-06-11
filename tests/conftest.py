@@ -7,11 +7,8 @@ from typing import TYPE_CHECKING
 import pytest
 import platformdirs
 
-from sollertia_shared_assets.mesoscope_vr import MesoscopeExperimentConfiguration
-from sollertia_shared_assets.configuration import (
-    ExperimentState,
-    WaterRewardTrial,
-)
+from sollertia_shared_assets.mesoscope_vr import MesoscopeWaterRewardTrial, MesoscopeExperimentConfiguration
+from sollertia_shared_assets.configuration import ExperimentState
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,7 +27,7 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
         reinforcing_recovery_guided_trials=3,
     )
 
-    trial = WaterRewardTrial(reward_size_ul=5.0, reward_tone_duration_ms=300)
+    trial = MesoscopeWaterRewardTrial(reward_size_ul=5.0, reward_tone_duration_ms=300)
 
     return MesoscopeExperimentConfiguration(
         trial_structures={"trial1": trial},

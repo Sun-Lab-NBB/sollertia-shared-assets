@@ -1,4 +1,4 @@
-"""Contains tests for the Mesoscope-VR experiment configuration provided by the
+"""Contains tests for the Mesoscope-VR trial classes and the experiment configuration provided by the
 ``mesoscope_vr.experiment_configuration`` module.
 """
 
@@ -9,20 +9,58 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from sollertia_shared_assets.mesoscope_vr import MesoscopeExperimentConfiguration
+from sollertia_shared_assets.mesoscope_vr import (
+    MesoscopeGasPuffTrial,
+    MesoscopeWaterRewardTrial,
+    MesoscopeExperimentConfiguration,
+)
 from sollertia_shared_assets.configuration import (
     Cue,
     TriggerType,
-    GasPuffTrial,
     TaskTemplate,
     VREnvironment,
     TrialStructure,
     ExperimentState,
-    WaterRewardTrial,
 )
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def test_water_reward_trial_defaults() -> None:
+    """Verifies that MesoscopeWaterRewardTrial fields default to documented values."""
+    trial = MesoscopeWaterRewardTrial()
+    assert trial.reward_size_ul == 5.0
+    assert trial.reward_tone_duration_ms == 300
+
+
+def test_water_reward_trial_initialization() -> None:
+    """Verifies basic initialization of MesoscopeWaterRewardTrial."""
+    trial = MesoscopeWaterRewardTrial(reward_size_ul=4.5, reward_tone_duration_ms=250)
+    assert trial.reward_size_ul == 4.5
+    assert trial.reward_tone_duration_ms == 250
+
+
+def test_gas_puff_trial_defaults() -> None:
+    """Verifies that MesoscopeGasPuffTrial fields default to documented values."""
+    trial = MesoscopeGasPuffTrial()
+    assert trial.puff_duration_ms == 100
+
+
+def test_gas_puff_trial_initialization() -> None:
+    """Verifies basic initialization of MesoscopeGasPuffTrial."""
+    trial = MesoscopeGasPuffTrial(puff_duration_ms=150)
+    assert trial.puff_duration_ms == 150
+
+
+def test_trial_field_types() -> None:
+    """Verifies the data types of trial fields for both water and gas puff trials."""
+    water_trial = MesoscopeWaterRewardTrial(reward_size_ul=5.0, reward_tone_duration_ms=300)
+    assert isinstance(water_trial.reward_size_ul, float)
+    assert isinstance(water_trial.reward_tone_duration_ms, int)
+
+    gas_trial = MesoscopeGasPuffTrial(puff_duration_ms=100)
+    assert isinstance(gas_trial.puff_duration_ms, int)
 
 
 def test_mesoscope_experiment_configuration_initialization(
@@ -43,7 +81,7 @@ def test_mesoscope_experiment_configuration_nested_structures(
     assert state.experiment_state_code == 1
 
     trial = sample_experiment_config.trial_structures["trial1"]
-    assert isinstance(trial, WaterRewardTrial)
+    assert isinstance(trial, MesoscopeWaterRewardTrial)
     assert trial.reward_size_ul == 5.0
 
 
@@ -82,8 +120,8 @@ def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> N
     """Verifies that MesoscopeExperimentConfiguration accepts mixed WaterReward and GasPuff trials."""
     config = MesoscopeExperimentConfiguration(
         trial_structures={
-            "reward": WaterRewardTrial(reward_size_ul=4.0, reward_tone_duration_ms=200),
-            "puff": GasPuffTrial(puff_duration_ms=150),
+            "reward": MesoscopeWaterRewardTrial(reward_size_ul=4.0, reward_tone_duration_ms=200),
+            "puff": MesoscopeGasPuffTrial(puff_duration_ms=150),
         },
         experiment_states={
             "state1": ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0),
@@ -91,14 +129,14 @@ def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> N
         unity_scene_name="MixedScene",
     )
 
-    assert isinstance(config.trial_structures["reward"], WaterRewardTrial)
-    assert isinstance(config.trial_structures["puff"], GasPuffTrial)
+    assert isinstance(config.trial_structures["reward"], MesoscopeWaterRewardTrial)
+    assert isinstance(config.trial_structures["puff"], MesoscopeGasPuffTrial)
     assert config.trial_structures["reward"].reward_size_ul == 4.0
     assert config.trial_structures["puff"].puff_duration_ms == 150
 
 
 def test_from_task_template_maps_interaction_trial_to_water_reward() -> None:
-    """Verifies that from_task_template maps an INTERACTION trigger trial to a WaterRewardTrial."""
+    """Verifies that from_task_template maps an INTERACTION trigger trial to a MesoscopeWaterRewardTrial."""
     template = _create_base_task_template()
 
     config = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="TestScene")
@@ -106,12 +144,12 @@ def test_from_task_template_maps_interaction_trial_to_water_reward() -> None:
     assert config.unity_scene_name == "TestScene"
     assert len(config.trial_structures) == 1
     trial = config.trial_structures["trial1"]
-    assert isinstance(trial, WaterRewardTrial)
+    assert isinstance(trial, MesoscopeWaterRewardTrial)
     assert trial.reward_size_ul == 5.0
 
 
 def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
-    """Verifies that from_task_template maps an OCCUPANCY_DISARM trigger trial to a GasPuffTrial."""
+    """Verifies that from_task_template maps an OCCUPANCY_DISARM trigger trial to a MesoscopeGasPuffTrial."""
     template = _create_base_task_template(
         trial_structures={
             "occ_trial": TrialStructure(
@@ -132,7 +170,7 @@ def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
     )
 
     trial = config.trial_structures["occ_trial"]
-    assert isinstance(trial, GasPuffTrial)
+    assert isinstance(trial, MesoscopeGasPuffTrial)
     assert trial.puff_duration_ms == 200
 
 
