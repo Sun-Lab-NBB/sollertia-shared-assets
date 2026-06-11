@@ -4,11 +4,7 @@
 
 from __future__ import annotations
 
-from sollertia_shared_assets.configuration import (
-    GasPuffTrial,
-    ExperimentState,
-    WaterRewardTrial,
-)
+from sollertia_shared_assets.configuration import ExperimentState
 
 
 def test_experiment_state_initialization() -> None:
@@ -60,39 +56,3 @@ def test_experiment_state_field_types() -> None:
     assert isinstance(state.aversive_initial_guided_trials, int)
     assert isinstance(state.aversive_recovery_failed_threshold, int)
     assert isinstance(state.aversive_recovery_guided_trials, int)
-
-
-def test_water_reward_trial_defaults() -> None:
-    """Verifies that WaterRewardTrial fields default to documented values."""
-    trial = WaterRewardTrial()
-    assert trial.reward_size_ul == 5.0
-    assert trial.reward_tone_duration_ms == 300
-
-
-def test_water_reward_trial_initialization() -> None:
-    """Verifies basic initialization of WaterRewardTrial."""
-    trial = WaterRewardTrial(reward_size_ul=4.5, reward_tone_duration_ms=250)
-    assert trial.reward_size_ul == 4.5
-    assert trial.reward_tone_duration_ms == 250
-
-
-def test_gas_puff_trial_defaults() -> None:
-    """Verifies that GasPuffTrial fields default to documented values."""
-    trial = GasPuffTrial()
-    assert trial.puff_duration_ms == 100
-
-
-def test_gas_puff_trial_initialization() -> None:
-    """Verifies basic initialization of GasPuffTrial."""
-    trial = GasPuffTrial(puff_duration_ms=150)
-    assert trial.puff_duration_ms == 150
-
-
-def test_trial_field_types() -> None:
-    """Verifies the data types of trial fields for both water and gas puff trials."""
-    water_trial = WaterRewardTrial(reward_size_ul=5.0, reward_tone_duration_ms=300)
-    assert isinstance(water_trial.reward_size_ul, float)
-    assert isinstance(water_trial.reward_tone_duration_ms, int)
-
-    gas_trial = GasPuffTrial(puff_duration_ms=100)
-    assert isinstance(gas_trial.puff_duration_ms, int)

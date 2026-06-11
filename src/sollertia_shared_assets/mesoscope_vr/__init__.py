@@ -12,16 +12,22 @@ from .runtime_data import (
     WindowCheckingDescriptor,
     MesoscopeExperimentDescriptor,
 )
-from .experiment_configuration import MesoscopeExperimentConfiguration
+from .experiment_configuration import (
+    MesoscopeGasPuffTrial,
+    MesoscopeWaterRewardTrial,
+    MesoscopeExperimentConfiguration,
+)
 
 __all__ = [
     "LickTrainingDescriptor",
     "MesoscopeDirectories",
     "MesoscopeExperimentConfiguration",
     "MesoscopeExperimentDescriptor",
+    "MesoscopeGasPuffTrial",
     "MesoscopeHardwareState",
     "MesoscopeRawData",
     "MesoscopeRawDataFiles",
+    "MesoscopeWaterRewardTrial",
     "RunTrainingDescriptor",
     "WindowCheckingDescriptor",
 ]

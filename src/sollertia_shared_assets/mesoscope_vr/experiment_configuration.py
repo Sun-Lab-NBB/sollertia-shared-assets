@@ -1,5 +1,6 @@
-"""Provides the experiment configuration dataclass used by both the acquisition runtime (sollertia-experiment) and the
-processing pipeline (sollertia-forgery) for the Mesoscope-VR data acquisition system.
+"""Provides the Mesoscope-VR trial classes and the experiment configuration dataclass used by both the acquisition
+runtime (sollertia-experiment) and the processing pipeline (sollertia-forgery) for the Mesoscope-VR data acquisition
+system.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
 
-from ..configuration import TriggerType, GasPuffTrial, ExperimentState, WaterRewardTrial
+from ..configuration import TriggerType, ExperimentState
 
 if TYPE_CHECKING:
     from ..configuration import TaskTemplate
@@ -28,6 +29,34 @@ _DEFAULT_RECOVERY_GUIDED_TRIALS: int = 3
 """Default number of guided trials issued when the recovery threshold is crossed."""
 
 
+@dataclass(frozen=True, slots=True)
+class MesoscopeWaterRewardTrial:
+    """Defines a Mesoscope-VR trial that delivers a water reward (a reinforcing stimulus) when the animal meets the
+    trial's success condition.
+
+    The reward is a configured volume of water accompanied by an auditory tone. The behavioral condition that earns
+    the reward is defined by the task, not by this class.
+    """
+
+    reward_size_ul: float = 5.0
+    """The volume of water, in microliters, to deliver when the animal successfully completes the trial."""
+    reward_tone_duration_ms: int = 300
+    """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
+
+
+@dataclass(frozen=True, slots=True)
+class MesoscopeGasPuffTrial:
+    """Defines a Mesoscope-VR trial that delivers a gas puff (an aversive stimulus) when the animal fails the trial's
+    avoidance condition.
+
+    The animal avoids the puff by satisfying the task's occupancy condition; failing to do so delivers a puff of the
+    configured duration. The behavioral condition is defined by the task, not by this class.
+    """
+
+    puff_duration_ms: int = 100
+    """The duration, in milliseconds, for which to deliver the gas puff when the animal fails the trial."""
+
+
 # noinspection PyArgumentList - PyCharm misreports the YamlConfig-derived dataclass __init__ signature.
 @dataclass
 class MesoscopeExperimentConfiguration(YamlConfig):
@@ -39,9 +68,9 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     by the acquisition runtime (sollertia-experiment) and the analysis pipeline (sollertia-forgery).
     """
 
-    trial_structures: dict[str, WaterRewardTrial | GasPuffTrial]
+    trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial]
     """The trials the experiment runs, keyed by trial name. This contract field is required by every experiment
-    configuration; ``WaterRewardTrial`` and ``GasPuffTrial`` are Mesoscope-VR's trial classes."""
+    configuration; ``MesoscopeWaterRewardTrial`` and ``MesoscopeGasPuffTrial`` are Mesoscope-VR's trial classes."""
     experiment_states: dict[str, ExperimentState]
     """The experiment state machine, keyed by state name. This contract field is required by every experiment
     configuration."""
@@ -62,9 +91,10 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         """Builds a Mesoscope-VR experiment configuration from a Unity VR task template.
 
         Maps each of the template's trial structures to a runtime trial class by its trigger type, pairing
-        ``TriggerType.INTERACTION`` with a ``WaterRewardTrial`` and ``TriggerType.OCCUPANCY_DISARM`` with a
-        ``GasPuffTrial``. Then seeds ``state_count`` sequentially numbered runtime states ('state_1', 'state_2', and
-        so on) whose reinforcing or aversive guidance defaults follow the trial types present in the template.
+        ``TriggerType.INTERACTION`` with a ``MesoscopeWaterRewardTrial`` and ``TriggerType.OCCUPANCY_DISARM`` with a
+        ``MesoscopeGasPuffTrial``. Then seeds ``state_count`` sequentially numbered runtime states ('state_1',
+        'state_2', and so on) whose reinforcing or aversive guidance defaults follow the trial types present in the
+        template.
 
         Args:
             template: The task template whose VR trial structures (cues, trial zones) seed the configuration.
@@ -80,15 +110,15 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             The experiment configuration populated with the template's trial structures and the requested number
             of default-valued runtime states.
         """
-        trial_structures: dict[str, WaterRewardTrial | GasPuffTrial] = {}
+        trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial] = {}
         for trial_name, trial_structure in template.trial_structures.items():
             if trial_structure.trigger_type == TriggerType.INTERACTION:
-                trial_structures[trial_name] = WaterRewardTrial(
+                trial_structures[trial_name] = MesoscopeWaterRewardTrial(
                     reward_size_ul=default_reward_size_ul,
                     reward_tone_duration_ms=default_reward_tone_duration_ms,
                 )
             elif trial_structure.trigger_type == TriggerType.OCCUPANCY_DISARM:
-                trial_structures[trial_name] = GasPuffTrial(puff_duration_ms=default_puff_duration_ms)
+                trial_structures[trial_name] = MesoscopeGasPuffTrial(puff_duration_ms=default_puff_duration_ms)
             else:
                 message = (
                     f"Unable to build a MesoscopeExperimentConfiguration from the task template. Trial '{trial_name}' "
@@ -98,8 +128,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 )
                 console.error(message=message, error=ValueError)
 
-        has_water_reward = any(isinstance(trial, WaterRewardTrial) for trial in trial_structures.values())
-        has_gas_puff = any(isinstance(trial, GasPuffTrial) for trial in trial_structures.values())
+        has_water_reward = any(isinstance(trial, MesoscopeWaterRewardTrial) for trial in trial_structures.values())
+        has_gas_puff = any(isinstance(trial, MesoscopeGasPuffTrial) for trial in trial_structures.values())
         experiment_states: dict[str, ExperimentState] = {}
         for state_index in range(state_count):
             experiment_states[f"state_{state_index + 1}"] = ExperimentState(

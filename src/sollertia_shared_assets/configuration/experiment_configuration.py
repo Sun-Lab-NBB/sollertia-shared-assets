@@ -1,8 +1,8 @@
 """Provides system-agnostic experiment configuration building blocks.
 
-This module contains the ``ExperimentState`` dataclass and the system-agnostic trial classes (``WaterRewardTrial``
-and ``GasPuffTrial``) that define experiment phases and trial primitives independent of the specific data acquisition
-system. System-specific experiment configurations compose these into their own schema.
+This module contains the ``ExperimentState`` dataclass that defines experiment phases independent of the specific
+data acquisition system. System-specific experiment configurations compose it into their own schema alongside the
+runtime trial classes each acquisition system defines in its own subpackage.
 """
 
 from __future__ import annotations
@@ -35,31 +35,3 @@ class ExperimentState:
     """The number of sequentially failed aversive trials after which to enable the recovery guidance mode."""
     aversive_recovery_guided_trials: int = 0
     """The number of guided aversive trials to use in the recovery guidance mode."""
-
-
-@dataclass(frozen=True, slots=True)
-class WaterRewardTrial:
-    """Defines a trial that delivers a water reward (a reinforcing stimulus) when the animal meets the trial's success
-    condition.
-
-    The reward is a configured volume of water accompanied by an auditory tone. The behavioral condition that earns
-    the reward is defined by the task and the acquisition system, not by this class.
-    """
-
-    reward_size_ul: float = 5.0
-    """The volume of water, in microliters, to deliver when the animal successfully completes the trial."""
-    reward_tone_duration_ms: int = 300
-    """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
-
-
-@dataclass(frozen=True, slots=True)
-class GasPuffTrial:
-    """Defines a trial that delivers a gas puff (an aversive stimulus) when the animal fails the trial's avoidance
-    condition.
-
-    The animal avoids the puff by satisfying the task's occupancy condition; failing to do so delivers a puff of the
-    configured duration. The behavioral condition is defined by the task and the acquisition system, not by this class.
-    """
-
-    puff_duration_ms: int = 100
-    """The duration, in milliseconds, for which to deliver the gas puff when the animal fails the trial."""

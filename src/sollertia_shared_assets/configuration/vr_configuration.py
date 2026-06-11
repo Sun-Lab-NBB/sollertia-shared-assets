@@ -121,10 +121,10 @@ class TrialStructure:
     Notes:
         This class contains only the spatial data needed by Unity for prefab generation and runtime zone
         configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) live on the matching
-        experiment-side trial classes in experiment_configuration.py and are joined back by trial name.
+        runtime trial classes defined by each acquisition system and are joined back by trial name.
 
-        The trigger_type field specifies the stimulus trigger zone behavior and determines which experiment trial
-        class (WaterRewardTrial or GasPuffTrial) is created when loading this template for experiment configuration.
+        The trigger_type field specifies the stimulus trigger zone behavior and determines which of the acquisition
+        system's runtime trial classes is created when loading this template for experiment configuration.
     """
 
     cue_sequence: list[str]
@@ -181,7 +181,7 @@ class TaskTemplate(YamlConfig):
     Notes:
         Task templates contain only the data Unity needs for prefab generation and runtime. Experiment-specific
         parameters (rewards, guidance, experiment states) are not included here — those live on the matching
-        experiment-side trial classes (WaterRewardTrial, GasPuffTrial) and are joined by trial name.
+        runtime trial classes defined by each acquisition system and are joined by trial name.
 
         This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-unity-tasks
         project.

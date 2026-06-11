@@ -17,23 +17,17 @@ from .configuration_utilities import (
     get_task_templates_directory,
     set_task_templates_directory,
 )
-from .experiment_configuration import (
-    GasPuffTrial,
-    ExperimentState,
-    WaterRewardTrial,
-)
+from .experiment_configuration import ExperimentState
 
 __all__ = [
     "CONFIGURATION_DIRECTORY",
     "CREDENTIALS_DIRECTORY",
     "Cue",
     "ExperimentState",
-    "GasPuffTrial",
     "TaskTemplate",
     "TrialStructure",
     "TriggerType",
     "VREnvironment",
-    "WaterRewardTrial",
     "get_data_root",
     "get_task_templates_directory",
     "get_working_directory",

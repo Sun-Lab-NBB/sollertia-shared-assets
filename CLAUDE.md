@@ -91,8 +91,8 @@ repositories.
 | `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
-member, `SessionTypes` member, runtime trial class (a sibling of `WaterRewardTrial` / `GasPuffTrial`), or
-`TriggerType` member. The skill owns the touch list and the import-time parity check.
+member, `SessionTypes` member, runtime trial class (a sibling of `MesoscopeWaterRewardTrial` /
+`MesoscopeGasPuffTrial`), or `TriggerType` member. The skill owns the touch list and the import-time parity check.
 
 ## MCP server
 
@@ -178,19 +178,21 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   Unity VR task in the linear infinite corridor, so every `<System>ExperimentConfiguration` shares one contract: an
   `experiment_states` field (the experiment state machine), a `trial_structures` field (the trials the experiment
   runs, with concrete trial classes varying per system), a `unity_scene_name` field (the corridor task the experiment
-  runs), and a `from_task_template` classmethod. Fields beyond the contract are system-specific; the shared building
-  blocks (`ExperimentState`, `WaterRewardTrial`, `GasPuffTrial`) stay in `configuration/`.
+  runs), and a `from_task_template` classmethod. Fields beyond the contract are system-specific; `ExperimentState` is
+  the shared building block that stays in `configuration/`, while each acquisition system defines its own trial
+  classes in its subpackage (Mesoscope-VR's `MesoscopeWaterRewardTrial` and `MesoscopeGasPuffTrial` live in
+  `mesoscope_vr/experiment_configuration.py`).
   The platform `TriggerType` enum carries five members — `INTERACTION`, `COLLISION`, `OCCUPANCY_DISARM`,
   `OCCUPANCY_ARM`, and `OCCUPANCY_TRIGGER` — and each acquisition system maps only the subset it supports.
   `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
-  `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `WaterRewardTrial` (for
-  `TriggerType.INTERACTION`) or `GasPuffTrial` (for `TriggerType.OCCUPANCY_DISARM`). The remaining three members
-  (`COLLISION`, `OCCUPANCY_ARM`, `OCCUPANCY_TRIGGER`) are intentionally unmapped on Mesoscope-VR, so a Mesoscope-VR
-  config that uses one raises a clear "not mapped to a runtime trial class" error; a new `TriggerType` member does NOT
-  require a `from_task_template` branch, because a system may leave it unsupported. `create_experiment_from_vr_template_tool`
-  dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered class's `from_task_template`, and
-  `write_experiment_configuration_tool` authors any system's configuration from a full payload. See the README's
-  "Adding New Acquisition Systems" Step 4 for the creation-path recipe.
+  `MesoscopeExperimentConfiguration` by mapping each `TrialStructure.trigger_type` to a `MesoscopeWaterRewardTrial`
+  (for `TriggerType.INTERACTION`) or `MesoscopeGasPuffTrial` (for `TriggerType.OCCUPANCY_DISARM`). The remaining three
+  members (`COLLISION`, `OCCUPANCY_ARM`, `OCCUPANCY_TRIGGER`) are intentionally unmapped on Mesoscope-VR, so a
+  Mesoscope-VR config that uses one raises a clear "not mapped to a runtime trial class" error; a new `TriggerType`
+  member does NOT require a `from_task_template` branch, because a system may leave it unsupported.
+  `create_experiment_from_vr_template_tool` dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the registered
+  class's `from_task_template`, and `write_experiment_configuration_tool` authors any system's configuration from a
+  full payload. See the README's "Adding New Acquisition Systems" Step 4 for the creation-path recipe.
 - **Data layer**: `SessionData` (in `data_hierarchy/session_data.py`) is the entry point for every session on disk.
   `SessionData.create()` mints a new session, `SessionData.load()` rehydrates one. Both build runtime-only
   `raw_data`, `processed_data`, and `system_raw_data` sub-dataclasses by consulting `SYSTEM_RAW_DATA_REGISTRY`.
