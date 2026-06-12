@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pytest
 
 from sollertia_shared_assets import registries
+from sollertia_shared_assets import MesoscopeExperimentConfiguration
 from sollertia_shared_assets.enums import (
     ReadAssets,
     SessionTypes,
@@ -137,4 +138,86 @@ def test_assert_experiment_configuration_contract_raises_on_missing_builder(monk
         {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingBuilder},
     )
     with pytest.raises(RuntimeError, match=r"from_task_template builder"):
+        registries._assert_experiment_configuration_contract()
+
+
+def test_experiment_builder_signature_gaps_passes_for_real_builder() -> None:
+    """Verifies the real MesoscopeExperimentConfiguration builder satisfies the creation tool's call convention."""
+    gaps = registries._experiment_builder_signature_gaps(
+        builder=MesoscopeExperimentConfiguration.from_task_template,
+        contract_parameters=("template", "unity_scene_name", "state_count"),
+    )
+    assert gaps == []
+
+
+def test_experiment_builder_signature_gaps_flags_missing_contract_parameter() -> None:
+    """Verifies the signature check flags a builder that omits a contract parameter."""
+
+    def builder(template: object, unity_scene_name: str) -> None:
+        """Stub builder missing the state_count contract parameter."""
+
+    gaps = registries._experiment_builder_signature_gaps(
+        builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
+    )
+    assert "the 'state_count' parameter on from_task_template" in gaps
+
+
+def test_experiment_builder_signature_gaps_flags_parameter_without_default() -> None:
+    """Verifies the signature check flags a system-specific parameter that declares no default."""
+
+    def builder(template: object, unity_scene_name: str, state_count: int, reward_size: float) -> None:
+        """Stub builder whose reward_size parameter has no default."""
+
+    gaps = registries._experiment_builder_signature_gaps(
+        builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
+    )
+    assert "a default for the 'reward_size' parameter on from_task_template" in gaps
+
+
+def test_experiment_builder_signature_gaps_flags_positional_only_contract_parameter() -> None:
+    """Verifies the signature check flags a contract parameter the creation tool cannot supply by keyword."""
+
+    def builder(template: object, /, unity_scene_name: str = "", state_count: int = 1) -> None:
+        """Stub builder whose template parameter is positional-only."""
+
+    gaps = registries._experiment_builder_signature_gaps(
+        builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
+    )
+    assert "keyword access to the 'template' parameter on from_task_template" in gaps
+
+
+def test_experiment_builder_signature_gaps_accepts_variadic_keywords() -> None:
+    """Verifies a builder that accepts arbitrary keyword arguments satisfies the contract-parameter requirement."""
+
+    def builder(**parameters: object) -> None:
+        """Stub builder that accepts every contract parameter through variadic keywords."""
+
+    gaps = registries._experiment_builder_signature_gaps(
+        builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
+    )
+    assert gaps == []
+
+
+def test_assert_experiment_configuration_contract_raises_on_incompatible_builder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies the contract check raises when a builder cannot be called with the creation tool's keyword arguments."""
+
+    @dataclass
+    class _ConfigurationIncompatibleBuilder:
+        experiment_states: dict[str, object]
+        trial_structures: dict[str, object]
+        unity_scene_name: str
+
+        @classmethod
+        def from_task_template(cls, template: object) -> object:
+            """Stub builder missing the unity_scene_name and state_count contract parameters."""
+            return cls(experiment_states={}, trial_structures={}, unity_scene_name="")
+
+    monkeypatch.setattr(
+        registries,
+        "EXPERIMENT_CONFIGURATION_REGISTRY",
+        {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationIncompatibleBuilder},
+    )
+    with pytest.raises(RuntimeError, match=r"parameter on from_task_template"):
         registries._assert_experiment_configuration_contract()

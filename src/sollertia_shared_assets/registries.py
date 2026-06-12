@@ -17,6 +17,7 @@ registry consumer without circular imports.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
+import inspect
 from dataclasses import fields
 
 from ataraxis_base_utilities import console
@@ -251,23 +252,68 @@ def _assert_descriptor_contract() -> None:
         console.error(message=message, error=RuntimeError)
 
 
+def _experiment_builder_signature_gaps(builder: Any, contract_parameters: tuple[str, ...]) -> list[str]:  # noqa: ANN401
+    """Resolves the ways a ``from_task_template`` builder violates the generic creation tool's call convention.
+
+    ``create_experiment_from_vr_template_tool`` calls every registered builder with exactly the contract keyword
+    arguments, so the builder must accept each contract parameter by keyword. Every other parameter must declare a
+    default for the tool to omit the system-specific generation values.
+
+    Args:
+        builder: The ``from_task_template`` classmethod resolved from a registered experiment-configuration class.
+        contract_parameters: The keyword-argument names the creation tool always supplies to the builder.
+
+    Returns:
+        A list of human-readable gap descriptions, empty when the builder satisfies the call convention.
+    """
+    parameters = inspect.signature(builder).parameters
+    accepts_variadic_keywords = any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
+    variadic_kinds = (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+    missing_contract_parameters = [
+        f"the '{name}' parameter on from_task_template"
+        for name in contract_parameters
+        if name not in parameters and not accepts_variadic_keywords
+    ]
+    positional_only_contract_parameters = [
+        f"keyword access to the '{name}' parameter on from_task_template"
+        for name in contract_parameters
+        if name in parameters and parameters[name].kind is inspect.Parameter.POSITIONAL_ONLY
+    ]
+    missing_parameter_defaults = [
+        f"a default for the '{name}' parameter on from_task_template"
+        for name, parameter in parameters.items()
+        if name not in contract_parameters
+        and parameter.kind not in variadic_kinds
+        and parameter.default is inspect.Parameter.empty
+    ]
+    return missing_contract_parameters + positional_only_contract_parameters + missing_parameter_defaults
+
+
 def _assert_experiment_configuration_contract() -> None:
     """Verifies at import time that every class in ``EXPERIMENT_CONFIGURATION_REGISTRY`` satisfies the
     experiment-configuration contract: the ``experiment_states``, ``trial_structures``, and ``unity_scene_name``
-    fields and a ``from_task_template`` classmethod. Without it a half-wired configuration would fail only at runtime
-    when ``create_experiment_from_vr_template_tool`` builds a configuration for its system.
+    fields plus a ``from_task_template`` classmethod that ``create_experiment_from_vr_template_tool`` can call with the
+    ``template``, ``unity_scene_name``, and ``state_count`` keyword arguments. Without it a half-wired configuration
+    would fail only at runtime when the creation tool builds a configuration for its system.
 
     Raises:
-        RuntimeError: If any registered configuration class omits a required contract field or the
-            ``from_task_template`` builder, naming the offending acquisition systems.
+        RuntimeError: If any registered configuration class omits a required contract field, omits the
+            ``from_task_template`` builder, or declares a builder the creation tool cannot call, naming the offending
+            acquisition systems.
     """
     required_fields: tuple[str, ...] = ("experiment_states", "trial_structures", "unity_scene_name")
+    contract_parameters: tuple[str, ...] = ("template", "unity_scene_name", "state_count")
     offenders: list[str] = []
     for system, configuration_class in EXPERIMENT_CONFIGURATION_REGISTRY.items():
         declared_fields = {field_definition.name for field_definition in fields(configuration_class)}
         gaps = [field_name for field_name in required_fields if field_name not in declared_fields]
-        if not callable(getattr(configuration_class, "from_task_template", None)):
+        builder = getattr(configuration_class, "from_task_template", None)
+        if not callable(builder):
             gaps.append("from_task_template builder")
+        else:
+            gaps.extend(_experiment_builder_signature_gaps(builder=builder, contract_parameters=contract_parameters))
         if gaps:
             offenders.append(f"{system.name} (missing {', '.join(gaps)})")
     if offenders:
@@ -275,8 +321,9 @@ def _assert_experiment_configuration_contract() -> None:
         message = (
             f"EXPERIMENT_CONFIGURATION_REGISTRY classes do not satisfy the experiment-configuration contract for "
             f"{offender_names}. Every experiment configuration must declare the 'experiment_states', "
-            f"'trial_structures', and 'unity_scene_name' fields and provide a 'from_task_template' classmethod. See "
-            f"the README's 'Adding New Acquisition Systems' section."
+            f"'trial_structures', and 'unity_scene_name' fields and provide a 'from_task_template' classmethod that "
+            f"create_experiment_from_vr_template_tool can call with the 'template', 'unity_scene_name', and "
+            f"'state_count' keyword arguments. See the README's 'Adding New Acquisition Systems' section."
         )
         console.error(message=message, error=RuntimeError)
 

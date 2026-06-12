@@ -42,6 +42,8 @@ ___
 - [Developers](#developers)
   - [Adding New Session Types](#adding-new-session-types)
   - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
+  - [Adding a New Trial Class](#adding-a-new-trial-class)
+  - [Adding a New Trigger Type](#adding-a-new-trigger-type)
   - [Adding a New Read Asset](#adding-a-new-read-asset)
 - [Versioning](#versioning)
 - [Authors](#authors)
@@ -314,8 +316,10 @@ acquisition system.
 Add a `<Type>Descriptor` dataclass inheriting from `YamlConfig` that captures the task parameters and outcome
 metadata for the new session type. Each acquisition system keeps its runtime dataclasses in the `runtime_data.py`
 module of its own subpackage; add the descriptor to the subpackage of the system that runs the new session type. Use
-`LickTrainingDescriptor` or `RunTrainingDescriptor` in `mesoscope_vr/runtime_data.py` as reference. Export the new
-class from the subpackage's `__init__.py`.
+`LickTrainingDescriptor` or `RunTrainingDescriptor` in `mesoscope_vr/runtime_data.py` as reference. The descriptor must
+declare an `incomplete: bool = True` field, which the session-inspection tooling reads to decide whether a session is
+complete; the import-time `_assert_descriptor_contract` check fails if it is missing. Export the new class from the
+subpackage's `__init__.py`.
 
 **Step 3: Register the descriptor**
 
@@ -368,7 +372,8 @@ split and the contents:
 
 1. `<system>/runtime_data.py` — a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records the
    configuration of every active hardware module on the new system, plus the system's per-session-type descriptors.
-   Use `mesoscope_vr/runtime_data.py` as reference.
+   Each descriptor must declare an `incomplete: bool = True` field, enforced by the import-time
+   `_assert_descriptor_contract` check. Use `mesoscope_vr/runtime_data.py` as reference.
 2. `<system>/experiment_configuration.py` — a `<System>ExperimentConfiguration` dataclass inheriting from
    `YamlConfig` that captures the runtime experiment parameters for the new system. Every
    `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field (a mapping of
@@ -382,6 +387,10 @@ split and the contents:
    every field against the session's `raw_data` directory. Optionally add `<System>RawDataFiles` and/or
    `<System>Directories` `StrEnum` classes that enumerate any canonical filenames or subdirectories unique to the
    new system's `raw_data`. Use `mesoscope_vr/raw_data.py` as reference.
+
+Beyond the subpackage `__init__.py`, re-export the new system's classes from the top-level
+`src/sollertia_shared_assets/__init__.py` (and its `__all__`), mirroring the Mesoscope-VR exports, so downstream
+libraries can import them by name.
 
 **Step 3: Register the dispatch classes**
 
@@ -413,6 +422,65 @@ directly.
 
 Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
 acquisition runtime) and sollertia-forgery (data processing) as needed.
+
+### Adding a New Trial Class
+
+A trial class defines the runtime parameters of one trial type an experiment runs (reward sizes, durations,
+thresholds). Trial classes are acquisition-system-specific: each system declares its own classes in its subpackage,
+next to that system's experiment configuration. The spatial layout of a trial (its cues and zones) lives on the
+matching `TrialStructure` in the paired Unity task template, not on the trial class.
+
+**Step 1: Define the trial class**
+
+In the owning system's `<system>/experiment_configuration.py`, add a standalone `@dataclass(frozen=True, slots=True)`
+whose name is prefixed with the system name (mirror `MesoscopeWaterRewardTrial` and `MesoscopeGasPuffTrial`). The class
+carries only runtime parameters and declares no spatial fields.
+
+**Step 2: Export the trial class**
+
+Export the new class from the system subpackage's `__init__.py`, and re-export it from the top-level
+`src/sollertia_shared_assets/__init__.py` (and its `__all__`), mirroring the existing trial classes.
+
+**Step 3: Add the class to the experiment-configuration trial union**
+
+Add the new class to the `trial_structures` type-union annotation of each `<System>ExperimentConfiguration` that uses
+it (for example, `dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial | <NewTrial>]`). The MCP
+trial-vocabulary introspection derives a system's trial types from this annotation, so a class absent from the union
+does not surface in the tooling.
+
+**Step 4: Map a trigger to the trial class**
+
+Update that configuration's `from_task_template` so the trial's `TriggerType` instantiates the new class (the trigger
+may itself be new — see "Adding a New Trigger Type"). A trigger that no branch handles raises, so every trigger the
+template can carry on this system needs a branch.
+
+***Note,*** the import-time `_assert_experiment_configuration_contract` check confirms the contract fields and the
+`from_task_template` builder, but it does not verify the trial union or the trigger mapping. Cover a new trial class
+in the experiment-configuration tests.
+
+### Adding a New Trigger Type
+
+A `TriggerType` identifies the corridor condition that resolves a trial (an interaction, an occupancy event, and so
+on). The enum is platform-wide; each acquisition system maps only the subset of trigger types it supports to its
+runtime trial classes.
+
+**Step 1: Extend the TriggerType enum**
+
+In `configuration/vr_configuration.py`, add a new member to `TriggerType`.
+
+**Step 2: Map the trigger on each supporting system**
+
+For every acquisition system that supports the new trigger, add the matching branch to that system's
+`from_task_template`, instantiating the runtime trial class the trigger maps to (which may itself be new — see "Adding
+a New Trial Class"). A system that does not support the trigger adds no branch; its `from_task_template` then raises
+for that trigger, which is the intended "unsupported on this system" signal. A new `TriggerType` member therefore does
+not require a branch in every system.
+
+**Step 3: Update downstream libraries**
+
+A new trigger type also requires Unity-side assets — the zone prefab and the task-generation pipeline — in
+sollertia-unity-tasks. The unity plugin's `/zone-prefabs` and `/task-generator` skills own that work; it is out of
+scope for this library.
 
 ### Adding a New Read Asset
 
