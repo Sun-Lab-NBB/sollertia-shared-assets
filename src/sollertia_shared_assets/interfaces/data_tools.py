@@ -171,10 +171,10 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
     Each report carries an ``identity`` block (project, animal, session name, session type, acquisition
     system, experiment name), lifecycle status, an existence flag for every canonical ``raw_data`` file and
     every ``processed_data`` subdirectory (with paired processing-tracker presence), a ``required_assets``
-    check (descriptor and system configuration always required; experiment configuration and VR
-    configuration also required for ``mesoscope experiment`` sessions), and an ``issues`` list summarizing
-    any missing required assets. Paths that fail to resolve or load surface with ``status="error"`` and an
-    ``error_detail`` field without aborting the batch.
+    check (descriptor and system configuration always required; experiment configuration required when the
+    session declares an experiment name, and VR configuration required for session types that run the linear
+    infinite corridor task), and an ``issues`` list summarizing any missing required assets. Paths that fail to
+    resolve or load surface with ``status="error"`` and an ``error_detail`` field without aborting the batch.
 
     Args:
         session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a

@@ -589,6 +589,11 @@ def create_experiment_from_vr_template_tool(
     name is inferred from the template filename, mirroring how sollertia-unity-tasks derives the scene name at task
     creation. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
+    The generated configuration's trial parameters take the acquisition system's built-in defaults. To author a
+    configuration with custom trial parameters, inspect the schema with
+    ``describe_experiment_configuration_schema_tool`` and write the full payload with
+    ``write_experiment_configuration_tool``.
+
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
             location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
