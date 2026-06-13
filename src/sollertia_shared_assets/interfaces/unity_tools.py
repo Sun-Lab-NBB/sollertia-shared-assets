@@ -112,13 +112,12 @@ def clone_zone_prefab_tool(
 ) -> dict[str, Any]:
     """Clones a canonical base zone prefab into a new trigger-zone prefab.
 
-    Performs the prefab-authoring step of adding a new trigger zone through Unity's serialization layer
-    rather than by hand-editing prefab YAML, so fileIDs, script references, and parent-child wiring are
-    assigned by Unity and cannot drift. The clone copies one of the two protected base zone prefabs,
-    optionally swaps the root and named region modifier scripts for new compiled ``MonoBehaviour`` types,
-    and applies serialized field overrides. Every requested script name is resolved before any asset is
-    written, and the created asset is rolled back if a later edit fails, so a failed call leaves no partial
-    prefab behind. Unity names the new prefab's root after the destination filename.
+    Performs the prefab-authoring step of adding a new trigger zone through Unity's serialization layer, so
+    fileIDs, script references, and parent-child wiring are assigned by Unity and stay consistent. The clone copies
+    one of the two protected base zone prefabs, optionally swaps the root and named region modifier scripts for new
+    compiled ``MonoBehaviour`` types, and applies serialized field overrides. Every requested script name is
+    resolved before any asset is written, and the created asset is rolled back if a later edit fails, so a failed
+    call leaves a clean working tree. Unity names the new prefab's root after the destination filename.
 
     This tool only produces the prefab. Wiring it into the runtime (the ``ConfigLoader`` trigger_type
     literal, the ``CreateTask`` placement branch, the ``McpBridge`` protected-path set, and the Python
