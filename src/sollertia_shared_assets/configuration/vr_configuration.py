@@ -146,8 +146,8 @@ class TrialStructure:
     configuration's generation default."""
     transitions: dict[str, float] | None = None
     """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
-    other trial names defined on the same TaskTemplate. If provided, values must sum to 1.0. Set to null in the YAML
-    file if not used."""
+    other trial names defined on the same TaskTemplate. If provided and non-empty, values must sum to 1.0. Set to
+    null in the YAML file if not used."""
 
     def __post_init__(self) -> None:
         """Validates trial structure definition parameters."""
@@ -198,8 +198,8 @@ class TaskTemplate(YamlConfig):
         """Validates task template configuration.
 
         Runs the full cascade of integrity checks against the loaded template: cue catalog uniqueness (codes
-        and names), per-trial cue references, transition targets, trigger types, trial name pattern, and zone
-        positions within trial segment bounds.
+        and names), per-trial cue references, transition targets, trigger types, trial name pattern, zone
+        positions within trial segment bounds, and cue-sequence uniqueness across trials.
 
         Raises:
             ValueError: If any of the validations above fails. The message identifies the offending field and

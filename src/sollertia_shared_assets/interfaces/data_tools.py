@@ -256,7 +256,8 @@ def filter_sessions_tool(
     Returns:
         A response dict with the filtered ``sessions`` list, a ``session_paths`` list of eligible
         session roots from the filtered subset, ``total_sessions`` / ``total_eligible`` counts, and
-        an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``.
+        an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``, each
+        annotated with a ``filter_error`` field.
     """
     # Builds a (session_name, animal) tuple set and a reverse map from session name to the original
     # entry so the filter helper can operate on plain tuples and results can be rehydrated to dicts.

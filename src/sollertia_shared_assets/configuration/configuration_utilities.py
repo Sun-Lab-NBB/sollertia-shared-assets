@@ -24,7 +24,8 @@ def set_working_directory(path: Path) -> None:
     Notes:
         This function caches the path to the working directory in the user's data directory.
 
-        If the input path does not point to an existing directory, the function creates the requested directory.
+        If the input path does not point to an existing directory, the function creates the requested directory
+        along with its ``configuration`` and ``credentials`` subdirectories.
 
     Args:
         path: The path to the directory to set as the local Sollertia platform working directory.
