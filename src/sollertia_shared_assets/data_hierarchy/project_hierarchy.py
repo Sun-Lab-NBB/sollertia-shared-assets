@@ -98,7 +98,7 @@ class ProjectData:
         return self
 
     def exists(self) -> bool:
-        """Returns whether the project directory exists on disk under the data root."""
+        """Determines whether the project directory exists on disk under the data root."""
         return self.path.exists()
 
 
@@ -156,5 +156,5 @@ class AnimalData:
         return AnimalData(root=root, project_name=self.project_name, animal_id=self.animal_id)
 
     def exists(self) -> bool:
-        """Returns whether the animal directory exists on disk under the project."""
+        """Determines whether the animal directory exists on disk under the project."""
         return self.path.exists()

@@ -81,11 +81,11 @@ def get_working_directory() -> Path:
 def set_data_root(path: Path) -> None:
     """Sets the specified directory as the local machine's Sollertia platform data root.
 
-    The data root is the directory under which all project directories, and therefore all animal and session
-    directories, are stored on this machine. Persisting it lets the discovery and inventory assets resolve the
-    project hierarchy without the caller supplying the root each time.
-
     Notes:
+        The data root is the directory under which all project directories, and therefore all animal and session
+        directories, are stored on this machine. Persisting it lets the discovery and inventory assets resolve the
+        project hierarchy without the caller supplying the root each time.
+
         This function caches the path to the data root in the user's data directory.
 
         If the input path does not point to an existing directory, the function creates the requested directory.

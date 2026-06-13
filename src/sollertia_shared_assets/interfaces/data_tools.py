@@ -733,7 +733,7 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
     Returns:
         A list of per-project aggregate dicts sorted by project name.
     """
-    # Buckets by SessionData identity rather than directory layout to suppress phantom-project entries from stray dirs.
+    # Buckets by SessionData identity rather than directory layout to suppress phantom projects from stray directories.
     project_buckets: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for entry in sessions:
         if entry.get("status") == "error":

@@ -3,7 +3,7 @@ them.
 
 This module is the single canonical surface for wiring new capabilities into the library, and it holds two governance
 tiers. The system registries — descriptor, hardware state, experiment configuration, system raw data, the
-system/session-type association, and the corridor-task gate — form the designed extension point: they grow whenever a
+system/session-type association, and the corridor-task gate — form the designed extension point. They grow whenever a
 new acquisition system or session type is added, following the recipe owned by the /library-extension skill. The
 contract registries — read assets and credentials — are durable translation contracts curated by Sollertia platform
 maintainers; adding an entry there is a platform-contract decision, not a routine extension.

@@ -295,11 +295,6 @@ class TaskTemplate(YamlConfig):
         """Indexes the template's cues by their human-readable name for fast lookup during validation."""
         return {cue.name: cue for cue in self.cues}
 
-    @property
-    def _cue_name_to_code(self) -> dict[str, int]:
-        """Indexes the template's cue identifier codes by their human-readable name for trial-sequence resolution."""
-        return {cue.name: cue.code for cue in self.cues}
-
     def _get_trial_length_cm(self, trial_name: str) -> float:
         """Returns the total length of the VR trial's segment in centimeters.
 
@@ -309,16 +304,6 @@ class TaskTemplate(YamlConfig):
         trial = self.trial_structures[trial_name]
         cue_map = self._cue_by_name
         return sum(cue_map[cue_name].length_cm for cue_name in trial.cue_sequence)
-
-    def _get_trial_cue_codes(self, trial_name: str) -> list[int]:
-        """Returns the sequence of cue codes for the specified trial's cue sequence.
-
-        Args:
-            trial_name: The name of the trial structure whose cue codes to resolve.
-        """
-        trial = self.trial_structures[trial_name]
-        cue_name_to_code = self._cue_name_to_code
-        return [cue_name_to_code[name] for name in trial.cue_sequence]
 
     @staticmethod
     def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, trial_length_cm: float) -> None:

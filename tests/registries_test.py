@@ -6,8 +6,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from sollertia_shared_assets import registries
-from sollertia_shared_assets import MesoscopeExperimentConfiguration
+from sollertia_shared_assets import MesoscopeExperimentConfiguration, registries
 from sollertia_shared_assets.enums import (
     ReadAssets,
     SessionTypes,
@@ -110,8 +109,8 @@ def test_assert_experiment_configuration_contract_raises_on_missing_field(monkey
 
         @classmethod
         def from_task_template(cls) -> object:
-            """Stub builder so only the missing field trips the check; the contract check only verifies it is
-            callable and never invokes it."""
+            """Returns a stub configuration so only the missing unity_scene_name field trips the contract check,
+            which verifies callability without invoking the builder."""
             return cls(experiment_states={}, trial_structures={})
 
     monkeypatch.setattr(
@@ -154,7 +153,7 @@ def test_experiment_builder_signature_gaps_flags_missing_contract_parameter() ->
     """Verifies the signature check flags a builder that omits a contract parameter."""
 
     def builder(template: object, unity_scene_name: str) -> None:
-        """Stub builder missing the state_count contract parameter."""
+        """Omits the state_count contract parameter to exercise the missing-parameter gap."""
 
     gaps = registries._experiment_builder_signature_gaps(
         builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
@@ -166,7 +165,7 @@ def test_experiment_builder_signature_gaps_flags_parameter_without_default() -> 
     """Verifies the signature check flags a system-specific parameter that declares no default."""
 
     def builder(template: object, unity_scene_name: str, state_count: int, reward_size: float) -> None:
-        """Stub builder whose reward_size parameter has no default."""
+        """Declares a reward_size parameter without a default to exercise the missing-default gap."""
 
     gaps = registries._experiment_builder_signature_gaps(
         builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
@@ -178,7 +177,7 @@ def test_experiment_builder_signature_gaps_flags_positional_only_contract_parame
     """Verifies the signature check flags a contract parameter the creation tool cannot supply by keyword."""
 
     def builder(template: object, /, unity_scene_name: str = "", state_count: int = 1) -> None:
-        """Stub builder whose template parameter is positional-only."""
+        """Declares the template parameter as positional-only to exercise the keyword-access gap."""
 
     gaps = registries._experiment_builder_signature_gaps(
         builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
@@ -190,7 +189,7 @@ def test_experiment_builder_signature_gaps_accepts_variadic_keywords() -> None:
     """Verifies a builder that accepts arbitrary keyword arguments satisfies the contract-parameter requirement."""
 
     def builder(**parameters: object) -> None:
-        """Stub builder that accepts every contract parameter through variadic keywords."""
+        """Accepts every contract parameter through variadic keyword arguments."""
 
     gaps = registries._experiment_builder_signature_gaps(
         builder=builder, contract_parameters=("template", "unity_scene_name", "state_count")
@@ -210,8 +209,8 @@ def test_assert_experiment_configuration_contract_raises_on_incompatible_builder
         unity_scene_name: str
 
         @classmethod
-        def from_task_template(cls, template: object) -> object:
-            """Stub builder missing the unity_scene_name and state_count contract parameters."""
+        def from_task_template(cls, template: object) -> object:  # noqa: ARG003 - stub param unused by design.
+            """Omits the unity_scene_name and state_count contract parameters."""
             return cls(experiment_states={}, trial_structures={}, unity_scene_name="")
 
     monkeypatch.setattr(

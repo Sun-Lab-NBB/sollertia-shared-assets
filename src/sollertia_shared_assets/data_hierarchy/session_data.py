@@ -283,6 +283,14 @@ class SessionData(YamlConfig):
         When this class is used to create a new session, it generates the new session's name using the current UTC
         timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall
         session order.
+
+    Attributes:
+        raw_data: The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by
+            ``create()`` and ``load()``.
+        processed_data: The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated
+            by ``load()``.
+        system_raw_data: The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset
+            paths, populated by ``create()`` and ``load()``.
     """
 
     project_name: str
