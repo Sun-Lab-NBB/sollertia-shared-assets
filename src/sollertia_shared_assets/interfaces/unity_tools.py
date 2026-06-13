@@ -102,6 +102,66 @@ def inspect_prefab_tool(prefab_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def clone_zone_prefab_tool(
+    source_prefab: str,
+    destination_prefab: str,
+    root_script: str | None = None,
+    regions: list[dict[str, Any]] | None = None,
+    *,
+    overwrite: bool = False,
+) -> dict[str, Any]:
+    """Clones a canonical base zone prefab into a new trigger-zone prefab.
+
+    Performs the prefab-authoring step of adding a new trigger zone through Unity's serialization layer, so
+    fileIDs, script references, and parent-child wiring are assigned by Unity and stay consistent. The clone copies
+    one of the two protected base zone prefabs, optionally swaps the root and named region modifier scripts for new
+    compiled ``MonoBehaviour`` types, and applies serialized field overrides. Every requested script name is
+    resolved before any asset is written, and the created asset is rolled back if a later edit fails, so a failed
+    call leaves a clean working tree. Unity names the new prefab's root after the destination filename.
+
+    This tool only produces the prefab. Wiring it into the runtime (the ``ConfigLoader`` trigger_type
+    literal, the ``CreateTask`` placement branch, the ``McpBridge`` protected-path set, and the Python
+    ``TriggerType`` registry) remains the documented zone-extension recipe. A new region behavior should
+    follow the zone-modifier architecture: subclass an existing zone, or add a standalone ``IResettable``
+    registered in ``ResetZone``, on a root that subclasses ``StimulusTriggerZone`` and publishes the
+    standard ``Stimulus`` event.
+
+    Requires the Unity Editor to be running with the McpBridge plugin active.
+
+    Args:
+        source_prefab: The project-relative path to a canonical base zone prefab, either
+            ``Assets/InfiniteCorridorTask/Prefabs/StimulusTriggerZone.prefab`` or
+            ``Assets/InfiniteCorridorTask/Prefabs/OccupancyTriggerZone.prefab``.
+        destination_prefab: The project-relative path for the new prefab under
+            ``Assets/InfiniteCorridorTask/Prefabs/``. Must end with ``.prefab`` and must not name a
+            protected base prefab.
+        root_script: Optional name of a compiled ``MonoBehaviour`` deriving from ``StimulusTriggerZone``
+            to replace the root modifier script. When omitted, the root script is kept.
+        regions: Optional list of per-region edits. Each entry requires ``match`` (the name of the region
+            to modify) and may carry ``rename`` (str), ``script`` (the name of a compiled ``MonoBehaviour``
+            replacing that region's modifier), and ``fields`` (a name-to-value map of serialized field
+            overrides applied to the region's modifier).
+        overwrite: When true, replaces an existing prefab at ``destination_prefab``. Defaults to false,
+            which makes an existing destination an error.
+
+    Returns:
+        A response dict with ``destination_prefab``, ``hierarchy`` (the new prefab's recursive GameObject
+        tree, in the same shape as :func:`inspect_prefab_tool`), and a ``warning`` listing the remaining
+        recipe steps on success.
+    """
+    relay_arguments: dict[str, Any] = {
+        "source_prefab": source_prefab,
+        "destination_prefab": destination_prefab,
+        "overwrite": overwrite,
+    }
+    if root_script is not None:
+        relay_arguments["root_script"] = root_script
+    if regions is not None:
+        relay_arguments["regions"] = regions
+    return _unity_relay(tool="clone_zone_prefab", arguments=relay_arguments)
+
+
+@mcp.tool()
 def delete_asset_tool(asset_path: str) -> dict[str, Any]:
     """Deletes a non-scene Unity asset and refreshes the AssetDatabase.
 
