@@ -134,8 +134,8 @@ class RawData:
     """Stores the task parameters and outcome metadata captured during acquisition. The concrete descriptor class is
     determined by the session's session_type and is dispatched via DESCRIPTOR_REGISTRY."""
     surgery_metadata_path: Path
-    """Stores a frozen snapshot of the animal's surgical history (procedures, drugs, implants, injections) as it stood
-    at the moment the session was acquired."""
+    """Stores a frozen snapshot of the animal's surgical history (subject, procedure, drugs, implants, injections) as
+    it stood at the moment the session was acquired."""
     hardware_state_path: Path
     """Records the configuration of every active hardware module on the acquisition system, used to interpret the raw
     data during downstream processing. The concrete parsing class is determined by the session's acquisition_system
@@ -283,6 +283,14 @@ class SessionData(YamlConfig):
         When this class is used to create a new session, it generates the new session's name using the current UTC
         timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall
         session order.
+
+    Attributes:
+        raw_data: The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by
+            ``create()`` and ``load()``.
+        processed_data: The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated
+            by ``load()``.
+        system_raw_data: The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset
+            paths, populated by ``create()`` and ``load()``.
     """
 
     project_name: str
@@ -298,7 +306,7 @@ class SessionData(YamlConfig):
     experiment_name: str | None = None
     """The name of the experiment performed during the session or Null (None), if the session is not an experiment
     session."""
-    python_version: str = "3.14.4"
+    python_version: str = "3.14.6"
     """The Python version used to acquire session's data."""
     sollertia_experiment_version: str = "5.0.0"
     """The sollertia-experiment library version used to acquire the session's data."""

@@ -338,7 +338,7 @@ def _discover_projects_by_directory(root_path: Path) -> list[ProjectData]:
 
 
 def _is_animal_directory(path: Path) -> bool:
-    """Returns whether the given path is an animal directory under a project.
+    """Determines whether the given path is an animal directory under a project.
 
     The project's configuration directory, dataset directories (those holding a dataset marker), and hidden
     directories are not animals and therefore return False.

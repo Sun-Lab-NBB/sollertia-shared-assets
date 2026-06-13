@@ -145,6 +145,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 
 | Tool                                            | Description                                                                                    |
 |-------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `clone_zone_prefab_tool`                        | Clones a canonical base zone prefab into a new trigger-zone prefab                             |
 | `create_experiment_from_vr_template_tool`       | Creates an experiment configuration from a Unity VR task template using sensible defaults      |
 | `create_project_tool`                           | Creates the on-disk directory structure for a new project under a data root                    |
 | `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call    |
@@ -203,10 +204,10 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call      |
 | `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory             |
 
-***Note,*** tools that interact with Unity (`create_task_tool`, `delete_asset_tool`, `delete_task_tool`,
-`enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`, `inspect_scene_tool`,
-`list_assets_tool`, `list_scenes_tool`, `open_scene_tool`, `read_task_parameters_tool`, `write_task_parameters_tool`)
-require the Unity Editor to be running on the local machine with the McpBridge plugin from
+***Note,*** tools that interact with Unity (`clone_zone_prefab_tool`, `create_task_tool`, `delete_asset_tool`,
+`delete_task_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`,
+`inspect_scene_tool`, `list_assets_tool`, `list_scenes_tool`, `open_scene_tool`, `read_task_parameters_tool`,
+`write_task_parameters_tool`) require the Unity Editor to be running on the local machine with the McpBridge plugin from
 [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks) active. These tools relay commands to the
 Editor via HTTP.
 

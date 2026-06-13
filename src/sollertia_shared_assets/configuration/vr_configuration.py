@@ -146,8 +146,8 @@ class TrialStructure:
     configuration's generation default."""
     transitions: dict[str, float] | None = None
     """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
-    other trial names defined on the same TaskTemplate. If provided, values must sum to 1.0. Set to null in the YAML
-    file if not used."""
+    other trial names defined on the same TaskTemplate. If provided and non-empty, values must sum to 1.0. Set to
+    null in the YAML file if not used."""
 
     def __post_init__(self) -> None:
         """Validates trial structure definition parameters."""
@@ -198,8 +198,8 @@ class TaskTemplate(YamlConfig):
         """Validates task template configuration.
 
         Runs the full cascade of integrity checks against the loaded template: cue catalog uniqueness (codes
-        and names), per-trial cue references, transition targets, trigger types, trial name pattern, and zone
-        positions within trial segment bounds.
+        and names), per-trial cue references, transition targets, trigger types, trial name pattern, zone
+        positions within trial segment bounds, and cue-sequence uniqueness across trials.
 
         Raises:
             ValueError: If any of the validations above fails. The message identifies the offending field and
@@ -295,11 +295,6 @@ class TaskTemplate(YamlConfig):
         """Indexes the template's cues by their human-readable name for fast lookup during validation."""
         return {cue.name: cue for cue in self.cues}
 
-    @property
-    def _cue_name_to_code(self) -> dict[str, int]:
-        """Indexes the template's cue identifier codes by their human-readable name for trial-sequence resolution."""
-        return {cue.name: cue.code for cue in self.cues}
-
     def _get_trial_length_cm(self, trial_name: str) -> float:
         """Returns the total length of the VR trial's segment in centimeters.
 
@@ -309,16 +304,6 @@ class TaskTemplate(YamlConfig):
         trial = self.trial_structures[trial_name]
         cue_map = self._cue_by_name
         return sum(cue_map[cue_name].length_cm for cue_name in trial.cue_sequence)
-
-    def _get_trial_cue_codes(self, trial_name: str) -> list[int]:
-        """Returns the sequence of cue codes for the specified trial's cue sequence.
-
-        Args:
-            trial_name: The name of the trial structure whose cue codes to resolve.
-        """
-        trial = self.trial_structures[trial_name]
-        cue_name_to_code = self._cue_name_to_code
-        return [cue_name_to_code[name] for name in trial.cue_sequence]
 
     @staticmethod
     def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, trial_length_cm: float) -> None:

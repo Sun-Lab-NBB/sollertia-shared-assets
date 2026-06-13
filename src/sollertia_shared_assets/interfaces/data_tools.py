@@ -256,7 +256,8 @@ def filter_sessions_tool(
     Returns:
         A response dict with the filtered ``sessions`` list, a ``session_paths`` list of eligible
         session roots from the filtered subset, ``total_sessions`` / ``total_eligible`` counts, and
-        an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``.
+        an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``, each
+        annotated with a ``filter_error`` field.
     """
     # Builds a (session_name, animal) tuple set and a reverse map from session name to the original
     # entry so the filter helper can operate on plain tuples and results can be rehydrated to dicts.
@@ -732,7 +733,7 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
     Returns:
         A list of per-project aggregate dicts sorted by project name.
     """
-    # Buckets by SessionData identity rather than directory layout to suppress phantom-project entries from stray dirs.
+    # Buckets by SessionData identity rather than directory layout to suppress phantom projects from stray directories.
     project_buckets: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for entry in sessions:
         if entry.get("status") == "error":

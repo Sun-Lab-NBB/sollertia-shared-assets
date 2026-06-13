@@ -109,6 +109,11 @@ class MesoscopeExperimentConfiguration(YamlConfig):
         Returns:
             The experiment configuration populated with the template's trial structures and the requested number
             of default-valued runtime states.
+
+        Raises:
+            ValueError: If any of the template's trial structures uses a TriggerType that is not mapped to a
+                Mesoscope-VR runtime trial class. Only TriggerType.INTERACTION and TriggerType.OCCUPANCY_DISARM are
+                mapped to runtime trial classes.
         """
         trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial] = {}
         for trial_name, trial_structure in template.trial_structures.items():

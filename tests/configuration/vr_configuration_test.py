@@ -482,14 +482,8 @@ def test_task_template_helpers() -> None:
     assert "B" in cue_map
     assert cue_map["A"].code == 1
 
-    code_map = template._cue_name_to_code
-    assert code_map == {"A": 1, "B": 2}
-
     length = template._get_trial_length_cm(trial_name="trial1")
     assert length == 100.0
-
-    codes = template._get_trial_cue_codes(trial_name="trial1")
-    assert codes == [1, 2]
 
 
 def test_task_template_yaml_round_trip(tmp_path: Path) -> None:

@@ -60,8 +60,8 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
     Combines working directory, data root, templates directory, and per-category credentials status into a single
     report. Only the working directory is required for ``slsa mcp`` to function. The task templates directory is
     needed only when authoring task templates or experiment configurations. Credentials are needed only by hosts
-    that integrate with the corresponding external service (for example, Google credentials are used to fetch
-    subject metadata or water-restriction logs from Google Sheets). ``overall_ok`` reflects the required
+    that integrate with the corresponding external service (for example, Google credentials are used to read
+    subject metadata from and write water-restriction logs to Google Sheets). ``overall_ok`` reflects the required
     components only — optional components contribute ``configured`` and ``ok`` per-component but do not gate the
     aggregate. System configuration mount checks are not included here — those live with the acquisition runtime
     package (sl-experiment).
@@ -438,8 +438,9 @@ def describe_template_schema_tool() -> dict[str, Any]:
     Use the returned schema to construct a valid payload for ``write_template_tool``.
 
     Returns:
-        A response dict with ``schema`` containing the TaskTemplate schema and ``nested_classes`` mapping
-        each nested dataclass name to its individual schema.
+        A response dict with ``schema`` containing the TaskTemplate schema. The ``schema`` carries a
+        ``nested_classes`` sub-mapping of each nested dataclass name (Cue, TrialStructure, VREnvironment) to its
+        individual schema.
     """
     schema = describe_dataclass(cls=TaskTemplate)
     schema["nested_classes"] = {
@@ -519,8 +520,9 @@ def read_experiment_configuration_tool(file_path: str, acquisition_system: str) 
             to parse the file with.
 
     Returns:
-        A response dict with ``data`` (the full experiment configuration payload), ``acquisition_system``, and
-        ``file_path``.
+        On success, a response dict with ``data`` (the full experiment configuration payload),
+        ``acquisition_system``, and ``file_path``. On failure, a dict with ``success`` false and ``error`` (the
+        ``acquisition_system`` key is present only on success).
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
@@ -555,8 +557,9 @@ def write_experiment_configuration_tool(
         overwrite: Determines whether to overwrite an existing experiment configuration file.
 
     Returns:
-        A response dict with ``file_path``, ``data`` (the validated configuration payload), and
-        ``acquisition_system``.
+        On success, a response dict with ``file_path``, ``data`` (the validated configuration payload), and
+        ``acquisition_system``. On failure (validation error, or an existing file when ``overwrite`` is False), a
+        dict with ``success`` false and ``error`` (the ``acquisition_system`` key is present only on success).
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):

@@ -1,7 +1,9 @@
 """Provides MCP tools for interacting with the Unity Editor via the McpBridge HTTP relay.
 
 All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be
-running with the plugin active.
+running with the plugin active. On success each tool returns the McpBridge response payload verbatim; when the
+bridge is unreachable or returns an invalid payload, the tool returns a ``{"success": False, "error": <message>}``
+dict instead.
 """
 
 from __future__ import annotations

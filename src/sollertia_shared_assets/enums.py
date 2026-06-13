@@ -40,7 +40,7 @@ class SessionTypes(StrEnum):
 
 
 class ReadAssets(StrEnum):
-    """Enumerates the external data-asset formats the platform reads and caches as on-disk dataclasses.
+    """Defines the external data-asset formats the platform reads and caches as on-disk dataclasses.
 
     Each member's string value is the canonical identifier for the read-asset format. Members are durable translation
     contracts added by Sollertia platform maintainers together with a matching ``READ_ASSET_REGISTRY`` entry; this is
@@ -53,7 +53,7 @@ class ReadAssets(StrEnum):
 
 
 class CredentialsTypes(StrEnum):
-    """Enumerates the credentials categories supported by the Sollertia platform.
+    """Defines the credentials categories supported by the Sollertia platform.
 
     Each member's string value is the canonical identifier for the credentials' category. Members are durable
     contracts added by Sollertia platform maintainers together with a matching ``CREDENTIALS_FILE_REGISTRY`` entry;
