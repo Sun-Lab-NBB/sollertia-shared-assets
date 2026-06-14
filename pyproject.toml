@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "9.0.0rc2"
+version = "9.0.0"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -61,8 +61,7 @@ dependencies = [
 
     # MCP and HTTP
     "mcp>=1,<2",
-    # Constraint pin (not imported directly): prevents mcp from resolving a pre-release httpx
-    # that fails to load at import time.
+    # Constraint pin (not imported directly): blocks mcp from resolving a broken pre-release httpx.
     "httpx>=0.28,<1",
 ]
 
@@ -102,10 +101,10 @@ packages = ["src/sollertia_shared_assets"]
 
 # Ruff Configuration.
 [tool.ruff]
-line-length = 120         # The maximum column length is set to 120 for this project.
+line-length = 120         # Deviates from the commonly used '80' standard.
 indent-width = 4          # Same as black, indents are 4 spaces
 target-version = "py314"  # Targets the lowest supported version of python
-src = ["src"]             # The name of the source directory
+src = ["src"]             # The name of the root source code directory
 
 # Excludes 'service' .py files, such as the sphinx configuration file, from linting.
 extend-exclude = ["conf.py"]
@@ -168,7 +167,7 @@ convention = "google"
 [tool.ruff.lint.isort]
 case-sensitive = true              # Takes case into account when sorting imports
 combine-as-imports = true          # Combines multiple "as" imports for the same package
-force-wrap-aliases = true          # Wraps "as" imports so that each uses a separate line (after combining for package)
+force-wrap-aliases = true          # Wraps "as" imports so that each uses a separate line
 force-sort-within-sections = true  # Forces "as" and "from" imports for the same package to be close
 length-sort = true                 # Places shorter imports first
 
@@ -206,12 +205,13 @@ exclude = [
     "tests/",                       # Ignores the test directory.
 ]
 
-# This is used by the 'test' tox tasks to aggregate coverage data produced during pytest runtimes.
+# Excludes the MCP server interface modules from coverage measurement.
 [tool.coverage.run]
 omit = ["*/interfaces/*"]
 
-# Maps coverage measured in site-packages to source files in src.
+# This is used by the 'test' tox tasks to aggregate coverage data produced during pytest runtimes.
 [tool.coverage.paths]
+# Maps coverage measured in site-packages to source files in src.
 source = ["src/", ".tox/*/lib/python*/site-packages/"]
 
 # Same as above, specifies the output directory for the coverage .html report
