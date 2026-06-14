@@ -259,7 +259,6 @@ def test_from_task_template_raises_on_unmapped_trigger() -> None:
     unmapped_template = SimpleNamespace(trial_structures={"weird": SimpleNamespace(trigger_type="unmapped")})
 
     with pytest.raises(ValueError, match=r"not mapped to a runtime trial class"):
-        # noinspection PyTypeChecker
         MesoscopeExperimentConfiguration.from_task_template(template=unmapped_template, unity_scene_name="Scene")
 
 

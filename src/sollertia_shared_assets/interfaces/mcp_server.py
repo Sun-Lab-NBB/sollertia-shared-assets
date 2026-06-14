@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-# noinspection PyUnusedImports
 from . import (
     data_tools,  # noqa: F401 - imported to trigger MCP tool registration.
     unity_tools,  # noqa: F401 - imported to trigger MCP tool registration.

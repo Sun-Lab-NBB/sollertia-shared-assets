@@ -42,7 +42,6 @@ def resolve_credentials_file(credentials: str | CredentialsTypes) -> str:
         )
         console.error(message=message, error=ValueError)
         # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
-        # noinspection PyUnreachableCode
         raise ValueError(message)  # pragma: no cover
 
     return CREDENTIALS_FILE_REGISTRY[CredentialsTypes(credentials)]

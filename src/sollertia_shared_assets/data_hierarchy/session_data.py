@@ -402,7 +402,6 @@ class SessionData(YamlConfig):
             console.error(message=message, error=ValueError)
 
         # Microsecond UTC timestamps as session names give unique, totally-ordered identifiers across hosts.
-        # noinspection PyStringConversionWithoutDunderMethod
         session_name = str(get_timestamp(time_separator="-", output_format=TimestampFormats.STRING))
 
         # Prevents creating new sessions for non-existent projects.
