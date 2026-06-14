@@ -57,7 +57,6 @@ class MesoscopeGasPuffTrial:
     """The duration, in milliseconds, for which to deliver the gas puff when the animal fails the trial."""
 
 
-# noinspection PyArgumentList - PyCharm misreports the YamlConfig-derived dataclass __init__ signature.
 @dataclass
 class MesoscopeExperimentConfiguration(YamlConfig):
     """Defines an experiment session that uses the Mesoscope-VR data acquisition system.

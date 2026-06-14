@@ -77,6 +77,24 @@ def test_assert_registry_coverage_raises_on_missing_credentials_entry(monkeypatc
         registries._assert_registry_coverage()
 
 
+def test_assert_registry_coverage_raises_on_missing_system_session_types(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies the coverage check raises when an acquisition system declares no session types."""
+    monkeypatch.setattr(registries, "SYSTEM_SESSION_TYPES", {})
+    with pytest.raises(RuntimeError, match=r"SYSTEM_SESSION_TYPES is missing"):
+        registries._assert_registry_coverage()
+
+
+def test_assert_registry_coverage_raises_on_orphan_session_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies the coverage check raises when a session type is claimed by no acquisition system."""
+    monkeypatch.setattr(
+        registries,
+        "SYSTEM_SESSION_TYPES",
+        {AcquisitionSystems.MESOSCOPE_VR: frozenset({SessionTypes.LICK_TRAINING})},
+    )
+    with pytest.raises(RuntimeError, match=r"SYSTEM_SESSION_TYPES does not claim"):
+        registries._assert_registry_coverage()
+
+
 def test_assert_descriptor_contract_passes_for_current_state() -> None:
     """Verifies every registered descriptor declares the incomplete field."""
     registries._assert_descriptor_contract()

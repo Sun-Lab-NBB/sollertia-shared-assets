@@ -100,21 +100,18 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
         if not is_dataclass(target):
             return {"type": _describe_type(type_hint=target)}
 
-        # noinspection PyBroadException
         try:
             hints = get_type_hints(target)
         except Exception:
             hints = {}
 
         schema: dict[str, Any] = {"class": target.__name__, "fields": {}}
-        # noinspection PyDataclass
         for field_definition in fields(target):
             type_hint = hints.get(field_definition.name, field_definition.type)
             field_schema: dict[str, Any] = {"type": _describe_type(type_hint=type_hint)}
             if field_definition.default is not MISSING:
                 field_schema["default"] = serialize(value=field_definition.default)
             elif field_definition.default_factory is not MISSING:
-                # noinspection PyBroadException
                 try:
                     field_schema["default"] = serialize(value=field_definition.default_factory())
                 except Exception:
@@ -154,7 +151,6 @@ def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> di
         for argument in get_args(type_hint):
             yield from _iter(type_hint=argument)
 
-    # noinspection PyBroadException
     try:
         hints = get_type_hints(cls)
     except Exception:
@@ -308,5 +304,4 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
         descriptor = descriptor_class.from_yaml(file_path=descriptor_path)
     except Exception as exception:
         return None, str(exception)
-    # noinspection PyUnresolvedReferences
     return bool(descriptor.incomplete), None  # type: ignore[attr-defined]

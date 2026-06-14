@@ -118,6 +118,15 @@ def test_animal_data_for_root() -> None:
     assert rebound.session_path(session_name="s1") == _SERVER_ROOT / "alpha" / "mouse1" / "s1"
 
 
+def test_animal_data_exists(tmp_path: Path) -> None:
+    """Verifies that exists reflects the presence of the animal directory on disk."""
+    animal = AnimalData(root=tmp_path, project_name="alpha", animal_id="mouse1")
+    assert not animal.exists()
+
+    animal.path.mkdir(parents=True)
+    assert animal.exists()
+
+
 def test_discover_projects_markers_strategy(tmp_path: Path) -> None:
     """Verifies that the markers strategy buckets projects by SessionData identity and ignores stray directories."""
     _write_session_marker(root=tmp_path, project_name="beta", animal_id="mouse1", session_name="s1")
@@ -141,6 +150,13 @@ def test_discover_projects_directories_strategy(tmp_path: Path) -> None:
     assert [project.project_name for project in projects] == ["alpha", "beta"]
 
 
+def test_discover_projects_directories_strategy_missing_root_returns_empty(tmp_path: Path) -> None:
+    """Verifies that the directories strategy returns an empty list when the data root does not exist."""
+    missing_root = tmp_path / "does_not_exist"
+
+    assert discover_projects(root_path=missing_root, strategy="directories") == []
+
+
 def test_iter_project_animals_excludes_non_animal_directories(tmp_path: Path) -> None:
     """Verifies that animal iteration skips the configuration directory, dataset directories, and hidden ones."""
     project = ProjectData(root=tmp_path, project_name="alpha")
@@ -156,3 +172,22 @@ def test_iter_project_animals_excludes_non_animal_directories(tmp_path: Path) ->
     animals = list(iter_project_animals(project=project))
 
     assert [animal.animal_id for animal in animals] == ["mouse1", "mouse2"]
+
+
+def test_iter_project_animals_missing_project_directory_yields_nothing(tmp_path: Path) -> None:
+    """Verifies that animal iteration yields nothing when the project directory does not exist."""
+    project = ProjectData(root=tmp_path, project_name="ghost")
+
+    assert list(iter_project_animals(project=project)) == []
+
+
+def test_iter_project_animals_skips_non_directory_children(tmp_path: Path) -> None:
+    """Verifies that animal iteration skips regular files among the project's children."""
+    project = ProjectData(root=tmp_path, project_name="alpha")
+    project.path.mkdir(parents=True)
+    project.path.joinpath("mouse1").mkdir()
+    project.path.joinpath("stray_file.txt").write_text("not an animal")
+
+    animals = list(iter_project_animals(project=project))
+
+    assert [animal.animal_id for animal in animals] == ["mouse1"]

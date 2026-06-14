@@ -134,7 +134,7 @@ workflow components.
 
 Start the MCP server using the CLI:
 
-```bash
+```
 slsa mcp
 ```
 
@@ -161,7 +161,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
 | `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
-| `filter_sessions_tool`                          | Filters discovered session entries by \date range and animal- or session-name criteria         |
+| `filter_sessions_tool`                          | Filters discovered session entries by date range and animal- or session-name criteria          |
 | `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy and status; optionally surfaces empty directories  |
 | `get_platform_environment_status_tool`          | Reports the status of the working directory, data root, templates directory, and credentials   |
 | `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
@@ -245,7 +245,7 @@ Sollertia Platform automation pipelines require that mamba is installed through 
 2. If the downloaded distribution is stored as a compressed archive, unpack it using the
    appropriate decompression tool.
 3. `cd` to the root directory of the prepared project distribution.
-4. Install the core Sollertia Platform development dependencies into the ***base*** mamba environment via the
+4. Install the core development dependencies into the ***base*** mamba environment via the
    `mamba install tox uv tox-uv` command.
 5. Use the `tox -e create` command to create the project-specific development environment followed
    by `tox -e install` command to install the project into that environment as a library.

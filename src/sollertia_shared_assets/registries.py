@@ -100,7 +100,6 @@ EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = 
 """Maps each acquisition system to its experiment configuration dataclass. Every registered class satisfies the
 experiment-configuration contract; the configuration and template-creation tools dispatch through this registry."""
 
-# noinspection PyTypeChecker
 SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
 }
@@ -161,7 +160,6 @@ def resolve_read_asset(read_asset: str | ReadAssets) -> type[YamlConfig]:
         )
         console.error(message=message, error=ValueError)
         # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
-        # noinspection PyUnreachableCode
         raise ValueError(message)  # pragma: no cover
 
     return READ_ASSET_REGISTRY[ReadAssets(read_asset)]
