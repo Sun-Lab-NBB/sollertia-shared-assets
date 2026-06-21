@@ -76,7 +76,7 @@ def get_credentials_path(category: str) -> None:  # pragma: no cover
 
 @get_group.command("templates", context_settings=_CONTEXT_SETTINGS)
 def get_templates_directory() -> None:  # pragma: no cover
-    """Reports the configured sollertia-unity-tasks task templates directory."""
+    """Reports the configured sollertia-virtual-reality task templates directory."""
     console.echo(message=f"Task templates directory: {get_task_templates_directory()}.")
 
 
@@ -175,10 +175,10 @@ def configure_credentials(category: str, file: Path) -> None:  # pragma: no cove
     "--directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the sollertia-unity-tasks project's Configurations (Template) directory.",
+    help="The absolute path to the sollertia-virtual-reality project's Configurations (Template) directory.",
 )
 def configure_task_templates_directory(directory: Path) -> None:  # pragma: no cover
-    """Sets the path to the sollertia-unity-tasks task templates directory."""
+    """Sets the path to the sollertia-virtual-reality task templates directory."""
     set_task_templates_directory(path=directory)
 
 

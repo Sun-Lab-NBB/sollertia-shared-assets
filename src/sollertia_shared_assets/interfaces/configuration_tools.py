@@ -269,7 +269,7 @@ def set_credentials_tool(credentials: str, file_path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def read_task_templates_directory_tool() -> dict[str, Any]:
-    """Returns the configured path to the sollertia-unity-tasks task templates directory.
+    """Returns the configured path to the sollertia-virtual-reality task templates directory.
 
     Returns:
         A response dict with ``task_templates_directory`` containing the path.
@@ -283,7 +283,7 @@ def read_task_templates_directory_tool() -> dict[str, Any]:
 
 @mcp.tool()
 def set_task_templates_directory_tool(directory: str) -> dict[str, Any]:
-    """Sets the path to the sollertia-unity-tasks task templates directory.
+    """Sets the path to the sollertia-virtual-reality task templates directory.
 
     Args:
         directory: The absolute path to the task templates directory.
@@ -589,7 +589,7 @@ def create_experiment_from_vr_template_tool(
     Loads the task template at ``template_path`` and builds the experiment configuration through the acquisition
     system's experiment-configuration class, which maps the template's trial structures to runtime trials and seeds
     ``state_count`` default-valued runtime states. Then writes the result to ``file_path``. The embedded Unity scene
-    name is inferred from the template filename, mirroring how sollertia-unity-tasks derives the scene name at task
+    name is inferred from the template filename, mirroring how sollertia-virtual-reality derives the scene name at task
     creation. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values.
 
     The generated configuration's trial parameters take the acquisition system's built-in defaults. To author a
