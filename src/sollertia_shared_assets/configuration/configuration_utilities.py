@@ -140,13 +140,13 @@ def get_data_root() -> Path:
 
 
 def set_task_templates_directory(path: Path) -> None:
-    """Sets the path to the sollertia-unity-tasks project's Configurations (Template) directory.
+    """Sets the path to the sollertia-virtual-reality project's Configurations (Template) directory.
 
     Persists the path under ``platformdirs``-managed application data so it is reused by subsequent ``slsa mcp``
     sessions on the same local machine (PC).
 
     Args:
-        path: The path to the sollertia-unity-tasks project's Configurations (Template) directory.
+        path: The path to the sollertia-virtual-reality project's Configurations (Template) directory.
 
     Raises:
         FileNotFoundError: If the specified directory does not exist at the provided path.
@@ -162,7 +162,8 @@ def set_task_templates_directory(path: Path) -> None:
     if not path.is_dir():
         message = (
             f"Unable to set the task templates directory path. The specified path ({path}) does not point to a "
-            f"directory. Provide the path to the sollertia-unity-tasks project's Configurations (Template) directory."
+            f"directory. Provide the path to the sollertia-virtual-reality project's Configurations "
+            f"(Template) directory."
         )
         console.error(message=message, error=ValueError)
 
@@ -178,7 +179,7 @@ def set_task_templates_directory(path: Path) -> None:
 
 
 def get_task_templates_directory() -> Path:
-    """Resolves and returns the path to the sollertia-unity-tasks project's Configurations (Template) directory.
+    """Resolves and returns the path to the sollertia-virtual-reality project's Configurations (Template) directory.
 
     Returns:
         The path to the task templates directory.

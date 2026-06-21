@@ -22,7 +22,7 @@ _TRIAL_NAME_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
 """Matches trial names that are safe to embed in Unity segment prefab filenames.
 
 Restricts trial names to ASCII letters, digits, and underscores so the ``TemplateName_TrialName``
-segment naming scheme used by ``sollertia-unity-tasks`` cannot be corrupted by path separators,
+segment naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path separators,
 whitespace, or punctuation introduced in a template. Mirrors the equivalent check on the Unity
 side in ``ConfigLoader.cs``.
 """
@@ -183,7 +183,7 @@ class TaskTemplate(YamlConfig):
         parameters (rewards, guidance, experiment states) are not included here — those live on the matching
         runtime trial classes defined by each acquisition system and are joined by trial name.
 
-        This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-unity-tasks
+        This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-virtual-reality
         project.
     """
 

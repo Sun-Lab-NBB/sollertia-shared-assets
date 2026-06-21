@@ -33,8 +33,8 @@ appropriate skill results in style violations that block release.
 ## Cross-referenced library verification
 
 This library depends on `ataraxis-base-utilities`, `ataraxis-time`, and `ataraxis-data-structures`, and is itself
-consumed by `sollertia-experiment`, `sollertia-forgery`, and the `sollertia-unity-tasks` McpBridge. Local clones of all
-of these typically live alongside this repository under `/home/cyberaxolotl/Desktop/GitHubRepos/`.
+consumed by `sollertia-experiment`, `sollertia-forgery`, and the `sollertia-virtual-reality` McpBridge. Local
+clones of all of these typically live alongside this repository under `/home/cyberaxolotl/Desktop/GitHubRepos/`.
 
 **Before writing code that interacts with a cross-referenced library, you MUST:**
 
@@ -135,7 +135,7 @@ contracts, or canonical filenames ripple through three downstream libraries:
   directory itself (per-project artifacts like `<working_dir>/<project>/manifest.feather`) and its `configuration/`
   subdirectory (where the forgery server configuration is persisted), the `ProcessingTrackers` enum,
   `MesoscopeHardwareState`, and `MesoscopeExperimentConfiguration`.
-- **sollertia-unity-tasks** (Unity Editor McpBridge plugin). Consumed by `interfaces/unity_tools.py` over HTTP
+- **sollertia-virtual-reality** (Unity Editor McpBridge plugin). Consumed by `interfaces/unity_tools.py` over HTTP
   localhost; the plugin itself is authored on the Unity side.
 
 You MUST maintain backwards compatibility for any class, constant, or filename that is exported through

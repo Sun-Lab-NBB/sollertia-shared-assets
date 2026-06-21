@@ -25,9 +25,9 @@ shared assets both depend on.
 The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, subjects, hardware
 state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
 configuration and an MCP server with tools for agentic configuration management, session operations, and Unity Editor
-integration. A subset of the MCP tools relay commands to a running Unity Editor instance via the McpBridge plugin from
-[sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks). This subset enables agents to generate
-task prefabs, manage scenes, and control Play Mode.
+integration. A subset of the MCP tools relay commands to a running Unity Editor instance via the McpBridge plugin
+from [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality). This subset enables agents
+to generate task prefabs, manage scenes, and control Play Mode.
 
 ___
 
@@ -59,8 +59,8 @@ ___
   [Google service account credentials JSON file](https://cloud.google.com/iam/docs/service-account-overview),
   required only when downstream Sollertia libraries fetch subject metadata or water-restriction logs from Google Sheets.
 - An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
-  [sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks), required only by the MCP tools that
-  generate task prefabs, manage scenes, and control Play Mode.
+  [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality), required only by the MCP
+  tools that generate task prefabs, manage scenes, and control Play Mode.
 
 For users, all other library dependencies are installed automatically by all supported installation methods. For
 developers, see the [Developers](#developers) section for information on installing additional development
@@ -112,13 +112,13 @@ This library provides the `slsa` CLI that exposes the following commands and com
 | `get directory`         | Reports the configured local Sollertia platform working directory     |
 | `get data-root`         | Reports the configured local Sollertia platform data root             |
 | `get credentials`       | Reports the path to the requested category's credentials file         |
-| `get templates`         | Reports the configured sollertia-unity-tasks task templates directory |
+| `get templates`         | Reports the configured sollertia-virtual-reality task templates directory |
 | `get projects`          | Lists the projects stored under the data root                         |
 | `get experiments`       | Lists the experiment configurations available for a project           |
 | `configure directory`   | Sets the local Sollertia platform working directory                   |
 | `configure data-root`   | Sets the local Sollertia platform data root                           |
 | `configure credentials` | Copies a credentials file into the platform credentials directory     |
-| `configure templates`   | Sets the path to the sollertia-unity-tasks task templates directory   |
+| `configure templates`   | Sets the path to the sollertia-virtual-reality task templates directory   |
 | `configure project`     | Creates a project directory structure for data acquisition            |
 
 Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage
@@ -207,9 +207,9 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 ***Note,*** tools that interact with Unity (`clone_zone_prefab_tool`, `create_task_tool`, `delete_asset_tool`,
 `delete_task_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`,
 `inspect_scene_tool`, `list_assets_tool`, `list_scenes_tool`, `open_scene_tool`, `read_task_parameters_tool`,
-`write_task_parameters_tool`) require the Unity Editor to be running on the local machine with the McpBridge plugin from
-[sollertia-unity-tasks](https://github.com/Sun-Lab-NBB/sollertia-unity-tasks) active. These tools relay commands to the
-Editor via HTTP.
+`write_task_parameters_tool`) require the Unity Editor to be running on the local machine with the McpBridge plugin
+from [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality) active. These tools relay
+commands to the Editor via HTTP.
 
 #### Client Registration
 
@@ -480,7 +480,7 @@ not require a branch in every system.
 **Step 3: Update downstream libraries**
 
 A new trigger type also requires Unity-side assets — the zone prefab and the task-generation pipeline — in
-sollertia-unity-tasks. The unity plugin's `/zone-prefabs` and `/task-generator` skills own that work; it is out of
+sollertia-virtual-reality. The unity plugin's `/zone-prefabs` and `/task-generator` skills own that work; it is out of
 scope for this library.
 
 ### Adding a New Read Asset
