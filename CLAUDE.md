@@ -103,7 +103,7 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 | Module              | File                                | Surface                                                            |
 |---------------------|-------------------------------------|--------------------------------------------------------------------|
 | CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands        |
-| Server bootstrap    | `interfaces/mcp_server.py`          | Imports tool modules to trigger registration; exposes `run_server` |
+| Server bootstrap    | `interfaces/mcp_server.py`          | Auto-imports `*_tools.py` to register; exposes `run_server`        |
 | Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, response helpers, serialization, validators      |
 | Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, credentials, templates dir, experiments    |
 | Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, surgery, etc.          |
