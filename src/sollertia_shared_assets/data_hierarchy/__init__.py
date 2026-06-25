@@ -2,6 +2,12 @@
 data acquisition and processing machines.
 """
 
+from .dataset_data import (
+    DatasetData,
+    DatasetFiles,
+    DatasetAnimal,
+    DatasetSession,
+)
 from .session_data import (
     RAW_DATA_DIRECTORY,
     PROCESSED_DATA_DIRECTORY,
@@ -37,6 +43,10 @@ __all__ = [
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
     "AnimalData",
+    "DatasetAnimal",
+    "DatasetData",
+    "DatasetFiles",
+    "DatasetSession",
     "Directories",
     "ProcessedData",
     "ProcessingTrackers",
