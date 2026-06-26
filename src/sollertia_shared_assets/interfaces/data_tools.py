@@ -379,24 +379,19 @@ def list_processing_trackers_tool() -> dict[str, Any]:
     descriptions: dict[ProcessingTrackers, str] = {
         ProcessingTrackers.CHECKSUM: "Tracks the outcome of integrity checks performed by the checksum verification "
         "pipeline.",
-        ProcessingTrackers.BEHAVIOR: "Tracks the outcome of behavior-data extraction performed by the "
-        "sollertia-forgery behavior-processing pipeline.",
-        ProcessingTrackers.CAMERA: "Tracks the outcome of camera-timestamp extraction performed by the "
-        "ataraxis-video-system log-processing pipeline.",
-        ProcessingTrackers.VIDEO: "Tracks the outcome of DeepLabCut processing and re-packaging performed by the "
-        "sollertia-forgery video-processing pipeline.",
-        ProcessingTrackers.MICROCONTROLLER: "Tracks the outcome of microcontroller-event extraction performed by "
-        "the ataraxis-communication-interface log-processing pipeline.",
-        ProcessingTrackers.CINDRA_SINGLE_RECORDING: "Tracks the outcome of single-recording neural imaging analysis "
-        "performed by cindra's single-recording pipeline.",
+        ProcessingTrackers.RUNTIME: "Tracks the outcome of runtime-data extraction performed by the "
+        "sollertia-forgery runtime-processing pipeline.",
+        ProcessingTrackers.MICROCONTROLLER: "Tracks the outcome of microcontroller extraction and module parsing "
+        "performed by the sollertia-forgery microcontroller-processing pipeline.",
+        ProcessingTrackers.VIDEO: "Tracks the outcome of camera-timestamp extraction and pose-estimation re-packaging "
+        "performed by the sollertia-forgery video-processing pipeline.",
+        ProcessingTrackers.TWO_PHOTON: "Tracks the outcome of single-recording two-photon (calcium-imaging) analysis. "
+        "Written by cindra's single-recording pipeline and read by sollertia-forgery.",
         ProcessingTrackers.CINDRA_MULTI_RECORDING: "Tracks the outcome of multi-recording neural imaging analysis "
         "performed by cindra's multi-recording pipeline.",
         ProcessingTrackers.FORGING: "Tracks the outcome of dataset forging performed by the sollertia-forgery "
         "dataset-forging pipeline.",
-        ProcessingTrackers.ANALYSIS: "Tracks the outcome of dataset analysis performed by the sollertia-forgery "
-        "analysis pipeline.",
         ProcessingTrackers.MANIFEST: "Tracks the outcome of project manifest generation.",
-        ProcessingTrackers.TRANSFER: "Tracks the outcome of batch session transfer and deletion jobs.",
     }
     entries: list[dict[str, Any]] = [
         {"name": member.name, "filename": member.value, "description": descriptions[member]}

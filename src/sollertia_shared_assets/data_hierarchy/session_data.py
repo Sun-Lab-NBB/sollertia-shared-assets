@@ -68,19 +68,24 @@ class Directories(StrEnum):
     """
 
     BEHAVIOR_DATA = "behavior_data"
-    """Behavior data directory. Contains raw DataLogger NPZ archives under ``raw_data`` and processed behavior feather
-    files under ``processed_data``."""
+    """Raw behavior data directory under ``raw_data``. Contains the DataLogger NPZ archives captured during
+    acquisition, including the raw microcontroller and runtime messages. Processed outputs no longer live here: the
+    runtime pipeline writes to ``runtime_data`` and the microcontroller pipeline to ``microcontroller_data``."""
     CAMERA_DATA = "camera_data"
-    """Camera data directory. Stores the raw camera recordings under ``raw_data`` and the outputs of the
-    sollertia-forgery video-processing pipeline (DeepLabCut pose estimation followed by re-packaging) under
-    ``processed_data``."""
-    CAMERA_TIMESTAMPS = "camera_timestamps"
-    """Camera timestamps directory under ``processed_data``. Stores the per-frame timing data extracted by the
-    ataraxis-video-system log-processing pipeline."""
+    """Raw camera data directory under ``raw_data``. Stores the raw camera recordings captured during acquisition.
+    Processed video outputs live under the separate ``video_data`` directory."""
+    RUNTIME_DATA = "runtime_data"
+    """Runtime data directory under ``processed_data``. Holds the runtime-extracted behavior data and the runtime
+    processing tracker produced by the sollertia-forgery runtime-processing pipeline."""
+    VIDEO_DATA = "video_data"
+    """Video data directory under ``processed_data``. Holds the per-frame camera timestamps extracted from the camera
+    log archives and the video processing tracker, and is the destination for sollertia-forgery pose-estimation
+    outputs. Collapses the former separate ``camera_timestamps`` and processed ``camera_data`` directories."""
     MICROCONTROLLER_DATA = "microcontroller_data"
-    """Microcontroller data directory under ``processed_data``. Stores the extracted microcontroller data produced by
-    the ataraxis-communication-interface log-processing pipeline. Microcontroller raw data is bundled into the
-    DataLogger archives under ``raw_data/behavior_data`` rather than living in a dedicated raw-side directory."""
+    """Microcontroller data directory under ``processed_data``. Holds the extracted and parsed microcontroller data and
+    the microcontroller processing tracker produced by the sollertia-forgery microcontroller-processing pipeline.
+    Microcontroller raw data is bundled into the DataLogger archives under ``raw_data/behavior_data`` rather than
+    living in a dedicated raw-side directory."""
     CINDRA = "cindra"
     """Cindra output directory under ``processed_data``. The root of cindra's single-recording and multi-recording
     outputs. Cindra is reusable by any photometry-data-generating acquisition system."""
@@ -95,28 +100,26 @@ class ProcessingTrackers(StrEnum):
     """
 
     CHECKSUM = "checksum_processing_tracker.yaml"
-    """Tracker for the checksum verification pipeline."""
-    BEHAVIOR = "behavior_processing_tracker.yaml"
-    """Tracker for the behavior processing pipeline."""
-    CAMERA = "camera_processing_tracker.yaml"
-    """Tracker for the ataraxis-video-system camera timestamp processing pipeline."""
-    VIDEO = "video_processing_tracker.yaml"
-    """Tracker for the sollertia-forgery video processing pipeline (re-packaging of DeepLabCut outputs)."""
+    """Tracker for the checksum verification pipeline. Lives at the ``raw_data`` root."""
+    RUNTIME = "runtime_processing_tracker.yaml"
+    """Tracker for the sollertia-forgery runtime-processing pipeline (runtime DataLogger decode and behavior-data
+    extraction). Lives under ``processed_data/runtime_data``."""
     MICROCONTROLLER = "microcontroller_processing_tracker.yaml"
-    """Tracker for the ataraxis-communication-interface microcontroller log processing pipeline."""
-    CINDRA_SINGLE_RECORDING = "single_recording_tracker.yaml"
-    """Tracker for cindra's single-recording pipeline."""
+    """Tracker for the sollertia-forgery microcontroller-processing pipeline (ataraxis-communication-interface log
+    extraction followed by module parsing). Lives under ``processed_data/microcontroller_data``."""
+    VIDEO = "video_processing_tracker.yaml"
+    """Tracker for the sollertia-forgery video-processing pipeline (camera-timestamp extraction and pose-estimation
+    re-packaging). Lives under ``processed_data/video_data``."""
+    TWO_PHOTON = "single_recording_tracker.yaml"
+    """Tracker for the two-photon (calcium-imaging) processing stage. The filename is owned and written by cindra's
+    single-recording pipeline; sollertia-forgery only reads it. Lives under ``processed_data/cindra``."""
     CINDRA_MULTI_RECORDING = "multi_recording_tracker.yaml"
-    """Tracker for cindra's multi-recording pipeline."""
+    """Tracker for cindra's multi-recording pipeline. Written by cindra per dataset under
+    ``processed_data/cindra/multi_recording`` and read by the project manifest."""
     FORGING = "forging_tracker.yaml"
-    """Tracker for the sollertia-forgery dataset-forging pipeline."""
-    ANALYSIS = "analysis_tracker.yaml"
-    """Tracker for the sollertia-forgery analysis pipeline."""
+    """Tracker for the sollertia-forgery dataset-forging pipeline. Lives at the forged dataset root."""
     MANIFEST = "manifest_processing_tracker.yaml"
-    """Tracker for the project manifest generation pipeline."""
-    TRANSFER = "transfer_processing_tracker.yaml"
-    """Tracker for batch session transfer and deletion jobs. Location is specified by the caller, since transfer jobs
-    are not bound to a single session or dataset."""
+    """Tracker for the project manifest generation pipeline. Lives at the project root."""
 
 
 @dataclass(slots=True)
@@ -201,35 +204,32 @@ class ProcessedData:
         fields here.
     """
 
-    behavior_data_path: Path
-    """Holds the extracted behavior data produced by the sollertia-forgery behavior-processing pipeline."""
-    behavior_tracker_path: Path
-    """Tracks the outcome of behavior-data extraction performed by the sollertia-forgery behavior-processing
-    pipeline."""
-    camera_timestamps_path: Path
-    """Holds the per-frame camera timing data extracted by the ataraxis-video-system log-processing pipeline, used to
-    align the camera recordings with the rest of the session's data."""
-    camera_tracker_path: Path
-    """Tracks the outcome of camera-timestamp extraction performed by the ataraxis-video-system log-processing
-    pipeline."""
+    runtime_data_path: Path
+    """Holds the runtime-extracted behavior data produced by the sollertia-forgery runtime-processing pipeline."""
+    runtime_tracker_path: Path
+    """Tracks the outcome of the sollertia-forgery runtime-processing pipeline. Resolves to
+    ``runtime_data/runtime_processing_tracker.yaml``."""
     video_data_path: Path
-    """Holds the DeepLabCut pose-estimation output re-packaged by the sollertia-forgery video-processing pipeline."""
+    """Holds the per-frame camera timestamps extracted from the camera log archives and the re-packaged pose-estimation
+    output produced by the sollertia-forgery video-processing pipeline. Collapses the former separate camera-timestamps
+    and processed camera-data directories."""
     video_tracker_path: Path
-    """Tracks the outcome of DeepLabCut processing and re-packaging performed by the sollertia-forgery video-processing
-    pipeline."""
+    """Tracks the outcome of the sollertia-forgery video-processing pipeline. Resolves to
+    ``video_data/video_processing_tracker.yaml``."""
     microcontroller_data_path: Path
-    """Holds the extracted microcontroller data produced by the ataraxis-communication-interface log-processing
+    """Holds the extracted and parsed microcontroller data produced by the sollertia-forgery microcontroller-processing
     pipeline."""
     microcontroller_tracker_path: Path
-    """Tracks the outcome of microcontroller-event extraction performed by the ataraxis-communication-interface
-    log-processing pipeline."""
+    """Tracks the outcome of the sollertia-forgery microcontroller-processing pipeline. Resolves to
+    ``microcontroller_data/microcontroller_processing_tracker.yaml``."""
     cindra_data_path: Path
     """Acts as the root for both single-recording and multi-recording cindra outputs. Cindra is reusable by any
     photometry-data-generating acquisition system on the Sollertia platform, which is why these fields live on the
     generic ProcessedData rather than on an acquisition-system-specific dataclass."""
-    cindra_single_recording_tracker_path: Path
-    """Tracks the outcome of single-recording neural imaging analysis performed by cindra's single-recording
-    pipeline."""
+    two_photon_tracker_path: Path
+    """Tracks the outcome of the two-photon (calcium-imaging) processing stage. The tracker file is written by cindra's
+    single-recording pipeline and only read by sollertia-forgery. Resolves to
+    ``cindra/single_recording_tracker.yaml``."""
     cindra_multi_recording_path: Path
     """Acts as the root for cindra's multi-recording analysis outputs. Each child holds the multi-day analysis output
     produced by cindra's multi-recording pipeline for a particular dataset that this session participates in."""
@@ -244,22 +244,19 @@ class ProcessedData:
         Returns:
             A ProcessedData instance whose fields are absolute paths under the input root.
         """
-        behavior_data_path = root.joinpath(Directories.BEHAVIOR_DATA)
-        camera_timestamps_path = root.joinpath(Directories.CAMERA_TIMESTAMPS)
-        video_data_path = root.joinpath(Directories.CAMERA_DATA)
+        runtime_data_path = root.joinpath(Directories.RUNTIME_DATA)
+        video_data_path = root.joinpath(Directories.VIDEO_DATA)
         microcontroller_data_path = root.joinpath(Directories.MICROCONTROLLER_DATA)
         cindra_data_path = root.joinpath(Directories.CINDRA)
         return cls(
-            behavior_data_path=behavior_data_path,
-            behavior_tracker_path=behavior_data_path.joinpath(ProcessingTrackers.BEHAVIOR),
-            camera_timestamps_path=camera_timestamps_path,
-            camera_tracker_path=camera_timestamps_path.joinpath(ProcessingTrackers.CAMERA),
+            runtime_data_path=runtime_data_path,
+            runtime_tracker_path=runtime_data_path.joinpath(ProcessingTrackers.RUNTIME),
             video_data_path=video_data_path,
             video_tracker_path=video_data_path.joinpath(ProcessingTrackers.VIDEO),
             microcontroller_data_path=microcontroller_data_path,
             microcontroller_tracker_path=microcontroller_data_path.joinpath(ProcessingTrackers.MICROCONTROLLER),
             cindra_data_path=cindra_data_path,
-            cindra_single_recording_tracker_path=cindra_data_path.joinpath(ProcessingTrackers.CINDRA_SINGLE_RECORDING),
+            two_photon_tracker_path=cindra_data_path.joinpath(ProcessingTrackers.TWO_PHOTON),
             cindra_multi_recording_path=cindra_data_path.joinpath(Directories.MULTI_RECORDING),
         )
 

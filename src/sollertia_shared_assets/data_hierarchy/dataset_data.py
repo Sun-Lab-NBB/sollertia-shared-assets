@@ -1,15 +1,9 @@
 """Provides the system-agnostic forged-dataset data hierarchy shared across all Sollertia platform machines.
 
 A forged dataset aggregates multiple data acquisition sessions of the same type, recorded across different animals
-by the same acquisition system, into a single self-contained hierarchy. This module defines the dataset container
-classes (``DatasetData``, ``DatasetSession``, ``DatasetAnimal``) and the canonical filenames (``DatasetFiles``)
-written into a forged dataset, alongside the session and project hierarchies in this package.
-
-The dataset is system-agnostic at the data layer: every session's assembled ``data.feather`` can be loaded by
-polars regardless of which columns it contains. The companion per-dataset ``data_descriptions.feather`` records the
-human-readable meaning of every column the dataset's acquisition system can emit, so consumers can interpret the
-data without reaching back into the acquisition system. The descriptions are pre-baked by the donating acquisition
-system and bound once per dataset, since every session in a dataset shares the same data format.
+by the same acquisition system, into a single system-agnostic self-contained hierarchy. The dataset is system-agnostic
+at the data layer: every session's assembled ``data.feather`` can be loaded by polars regardless of which columns it
+contains.
 """
 
 from __future__ import annotations
@@ -18,6 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 from dataclasses import field, dataclass
 
+import polars as pl
 from ataraxis_base_utilities import console, ensure_directory_exists
 from ataraxis_data_structures import YamlConfig
 
@@ -74,12 +69,7 @@ class DatasetSession:
 
     @property
     def vr_configuration_path(self) -> Path:
-        """Returns the path to the session's ``vr_configuration.yaml`` file within the dataset hierarchy.
-
-        The forging pipeline re-exports the session's shared VR configuration (the task template carrying the cue
-        sequence, VR environment, and per-trial geometry) alongside ``data.feather`` so downstream consumers can
-        reconstruct canonical per-trial position without reaching back into the raw session.
-        """
+        """Returns the path to the session's ``vr_configuration.yaml`` file within the dataset hierarchy."""
         return self.session_path.joinpath(RawDataFiles.VR_CONFIGURATION)
 
 
@@ -88,7 +78,7 @@ class DatasetAnimal:
     """Defines a single animal included in a forged dataset.
 
     Combines the animal identity metadata with the resolved path to the animal's directory within the dataset
-    hierarchy. Per-animal artifacts (surgery metadata) are co-located in this directory and exposed as derived
+    hierarchy. Per-animal artifacts (such as surgery metadata) are co-located in this directory and exposed as derived
     properties.
     """
 
@@ -302,9 +292,6 @@ class DatasetData(YamlConfig):
         Args:
             column_descriptions: The mapping from each column name to its human-readable description.
         """
-        # polars is imported lazily so that slsa consumers that never touch datasets do not pay the import-time cost.
-        import polars as pl  # noqa: PLC0415
-
         pl.DataFrame(
             {"column": list(column_descriptions), "description": list(column_descriptions.values())},
             schema={"column": pl.String, "description": pl.String},
@@ -331,9 +318,6 @@ class DatasetData(YamlConfig):
                 f"'{descriptions_path}'."
             )
             console.error(message=message, error=FileNotFoundError)
-
-        # polars is imported lazily so that slsa consumers that never touch datasets do not pay the import-time cost.
-        import polars as pl  # noqa: PLC0415
 
         descriptions = pl.read_ipc(descriptions_path)
         return dict(zip(descriptions["column"], descriptions["description"], strict=True))
