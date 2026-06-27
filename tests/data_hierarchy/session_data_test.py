@@ -562,10 +562,7 @@ def test_session_data_paths_on_default_instance() -> None:
 
     assert session.raw_data.hardware_state_path == Path(RawDataFiles.HARDWARE_STATE)
     assert session.processed_data.runtime_data_path == Path(Directories.RUNTIME_DATA)
-    assert (
-        session.processed_data.two_photon_tracker_path
-        == Path(Directories.CINDRA) / ProcessingTrackers.TWO_PHOTON
-    )
+    assert session.processed_data.two_photon_tracker_path == Path(Directories.CINDRA) / ProcessingTrackers.TWO_PHOTON
 
 
 def test_session_data_sub_dataclass_attributes_unset_without_build() -> None:
