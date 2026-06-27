@@ -335,7 +335,7 @@ The required-asset policy lives in `SessionData.required_raw_assets` (`data_hier
 session inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
 requires `session_descriptor.yaml` and `system_configuration.yaml`; `experiment_configuration.yaml` is required
 whenever the session has an `experiment_name`; and `vr_configuration.yaml` is required for any session type listed in
-`SESSION_TYPES_USING_VR_TASK` (`registries.py`). If the new session type runs the linear infinite corridor task, add
+`SESSION_TYPES_USING_VR_TASK` (`registries.py`). If the new session type uses VR, add
 it to that frozenset; if it requires some other extra asset, extend `required_raw_assets` accordingly.
 
 **Step 5: Update downstream libraries**

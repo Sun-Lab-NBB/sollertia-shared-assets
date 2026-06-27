@@ -3,7 +3,7 @@ them.
 
 This module is the single canonical surface for wiring new capabilities into the library, and it holds two governance
 tiers. The system registries — descriptor, hardware state, experiment configuration, system raw data, the
-system/session-type association, and the corridor-task gate — form the designed extension point. They grow whenever a
+system/session-type association, and the VR-task gate — form the designed extension point. They grow whenever a
 new acquisition system or session type is added, following the recipe owned by the /library-extension skill. The
 contract registries — read assets and credentials — are durable translation contracts curated by Sollertia platform
 maintainers; adding an entry there is a platform-contract decision, not a routine extension.
@@ -121,9 +121,9 @@ SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
 type that is not paired with the session's acquisition system."""
 
 SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
-"""The session types that run the linear infinite corridor task and therefore write a ``vr_configuration.yaml``
-task-template snapshot. ``SessionData.required_raw_assets`` consults this set to decide whether a session of a given
-type requires the snapshot. Training and window-checking sessions run no task and are absent here."""
+"""The session types that use VR and therefore write a ``vr_configuration.yaml`` task-template snapshot.
+``SessionData.required_raw_assets`` consults this set to decide whether a session of a given type requires the
+snapshot. Training and window-checking sessions run no VR task and are absent here."""
 
 READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
     ReadAssets.SURGERY_DATA: SurgeryData,

@@ -524,23 +524,12 @@ def test_session_data_processed_data_directory_paths() -> None:
     """Verifies that processed-data directory paths resolve to processed_data_path / <Directories member>."""
     session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
-    assert session.processed_data.behavior_data_path == _SENTINEL_PROCESSED_PATH / Directories.BEHAVIOR_DATA
+    assert session.processed_data.runtime_data_path == _SENTINEL_PROCESSED_PATH / Directories.RUNTIME_DATA
     assert session.processed_data.cindra_data_path == _SENTINEL_PROCESSED_PATH / Directories.CINDRA
-    assert session.processed_data.camera_timestamps_path == _SENTINEL_PROCESSED_PATH / Directories.CAMERA_TIMESTAMPS
-    assert session.processed_data.video_data_path == _SENTINEL_PROCESSED_PATH / Directories.CAMERA_DATA
+    assert session.processed_data.video_data_path == _SENTINEL_PROCESSED_PATH / Directories.VIDEO_DATA
     assert (
         session.processed_data.microcontroller_data_path == _SENTINEL_PROCESSED_PATH / Directories.MICROCONTROLLER_DATA
     )
-
-
-def test_directories_enum_disambiguation() -> None:
-    """Verifies that raw-side and processed-side fields sharing a Directories value resolve to distinct paths
-    anchored on the correct parent.
-    """
-    session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
-
-    assert session.raw_data.camera_data_path != session.processed_data.video_data_path
-    assert session.raw_data.behavior_data_path != session.processed_data.behavior_data_path
 
 
 def test_session_data_processing_tracker_paths() -> None:
@@ -548,17 +537,13 @@ def test_session_data_processing_tracker_paths() -> None:
     session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     processed = session.processed_data
-    assert processed.behavior_tracker_path == processed.behavior_data_path / ProcessingTrackers.BEHAVIOR
-    assert processed.camera_tracker_path == processed.camera_timestamps_path / ProcessingTrackers.CAMERA
+    assert processed.runtime_tracker_path == processed.runtime_data_path / ProcessingTrackers.RUNTIME
     assert processed.video_tracker_path == processed.video_data_path / ProcessingTrackers.VIDEO
     assert (
         processed.microcontroller_tracker_path
         == processed.microcontroller_data_path / ProcessingTrackers.MICROCONTROLLER
     )
-    assert (
-        processed.cindra_single_recording_tracker_path
-        == processed.cindra_data_path / ProcessingTrackers.CINDRA_SINGLE_RECORDING
-    )
+    assert processed.two_photon_tracker_path == processed.cindra_data_path / ProcessingTrackers.TWO_PHOTON
     assert processed.cindra_multi_recording_path == processed.cindra_data_path / Directories.MULTI_RECORDING
 
 
@@ -576,10 +561,10 @@ def test_session_data_paths_on_default_instance() -> None:
     session._build_sub_dataclasses()
 
     assert session.raw_data.hardware_state_path == Path(RawDataFiles.HARDWARE_STATE)
-    assert session.processed_data.behavior_data_path == Path(Directories.BEHAVIOR_DATA)
+    assert session.processed_data.runtime_data_path == Path(Directories.RUNTIME_DATA)
     assert (
-        session.processed_data.cindra_single_recording_tracker_path
-        == Path(Directories.CINDRA) / ProcessingTrackers.CINDRA_SINGLE_RECORDING
+        session.processed_data.two_photon_tracker_path
+        == Path(Directories.CINDRA) / ProcessingTrackers.TWO_PHOTON
     )
 
 
@@ -692,16 +677,18 @@ def test_directories_enum_is_string_enum() -> None:
     assert isinstance(Directories.CINDRA, str)
     assert Directories.CINDRA == "cindra"
     assert Directories.MULTI_RECORDING == "multi_recording"
+    assert Directories.RUNTIME_DATA == "runtime_data"
+    assert Directories.VIDEO_DATA == "video_data"
 
 
 def test_processing_trackers_enum_is_string_enum() -> None:
     """Verifies that ProcessingTrackers members are strings (StrEnum)."""
-    assert isinstance(ProcessingTrackers.BEHAVIOR, str)
+    assert isinstance(ProcessingTrackers.CHECKSUM, str)
     assert ProcessingTrackers.CHECKSUM == "checksum_processing_tracker.yaml"
-    assert ProcessingTrackers.CINDRA_SINGLE_RECORDING == "single_recording_tracker.yaml"
-    assert ProcessingTrackers.CINDRA_MULTI_RECORDING == "multi_recording_tracker.yaml"
+    assert ProcessingTrackers.RUNTIME == "runtime_processing_tracker.yaml"
+    assert ProcessingTrackers.MICROCONTROLLER == "microcontroller_processing_tracker.yaml"
     assert ProcessingTrackers.VIDEO == "video_processing_tracker.yaml"
+    assert ProcessingTrackers.TWO_PHOTON == "single_recording_tracker.yaml"
+    assert ProcessingTrackers.CINDRA_MULTI_RECORDING == "multi_recording_tracker.yaml"
     assert ProcessingTrackers.FORGING == "forging_tracker.yaml"
-    assert ProcessingTrackers.ANALYSIS == "analysis_tracker.yaml"
     assert ProcessingTrackers.MANIFEST == "manifest_processing_tracker.yaml"
-    assert ProcessingTrackers.TRANSFER == "transfer_processing_tracker.yaml"
