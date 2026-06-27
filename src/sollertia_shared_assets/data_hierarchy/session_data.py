@@ -51,7 +51,7 @@ class RawDataFiles(StrEnum):
     """The experiment configuration YAML copied into the session for experiment sessions only."""
     VR_CONFIGURATION = "vr_configuration.yaml"
     """The linear infinite corridor task template YAML (cues, VR environment, trial structures) cached into the
-    session at acquisition time. Written only for sessions that run the corridor task."""
+    session at acquisition time. Written only for sessions that use VR."""
     SYSTEM_CONFIGURATION = "system_configuration.yaml"
     """The system configuration YAML copied into the session by the acquisition runtime."""
     CHECKSUM = "ax_checksum.txt"
@@ -69,8 +69,7 @@ class Directories(StrEnum):
 
     BEHAVIOR_DATA = "behavior_data"
     """Raw behavior data directory under ``raw_data``. Contains the DataLogger NPZ archives captured during
-    acquisition, including the raw microcontroller and runtime messages. Processed outputs no longer live here: the
-    runtime pipeline writes to ``runtime_data`` and the microcontroller pipeline to ``microcontroller_data``."""
+    acquisition, including the raw microcontroller and runtime messages."""
     CAMERA_DATA = "camera_data"
     """Raw camera data directory under ``raw_data``. Stores the raw camera recordings captured during acquisition.
     Processed video outputs live under the separate ``video_data`` directory."""
@@ -152,7 +151,7 @@ class RawData:
     session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
     """Stores the linear infinite corridor task template (cues, VR environment, trial structures) active when the
-    session was acquired. Written only for sessions that run the corridor task, so callers should check ``.exists()``
+    session was acquired. Written only for sessions that use VR, so callers should check ``.exists()``
     before reading. Parsed via ``TaskTemplate``."""
     checksum_path: Path
     """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
@@ -211,8 +210,7 @@ class ProcessedData:
     ``runtime_data/runtime_processing_tracker.yaml``."""
     video_data_path: Path
     """Holds the per-frame camera timestamps extracted from the camera log archives and the re-packaged pose-estimation
-    output produced by the sollertia-forgery video-processing pipeline. Collapses the former separate camera-timestamps
-    and processed camera-data directories."""
+    output produced by the sollertia-forgery video-processing pipeline."""
     video_tracker_path: Path
     """Tracks the outcome of the sollertia-forgery video-processing pipeline. Resolves to
     ``video_data/video_processing_tracker.yaml``."""
@@ -515,7 +513,7 @@ class SessionData(YamlConfig):
 
         Every session requires the session descriptor and the system configuration snapshot. Experiment sessions
         (those with an ``experiment_name``) additionally require the experiment configuration snapshot, and sessions
-        whose type runs the corridor task (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
+        whose type uses VR (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
         configuration snapshot. The session-inspection tooling pairs each returned path with its on-disk presence to
         report missing required assets, so this method is the single source of truth for the required-asset policy.
 

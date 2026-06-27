@@ -29,8 +29,10 @@ class DatasetFiles(StrEnum):
         contracts live here: every system's forged session writes a per-session ``data.feather``, and every forged
         dataset carries a single per-dataset ``data_descriptions.feather`` mapping each emittable column name to its
         human-readable description. Shared raw-data assets re-exported alongside the data keep their canonical
-        ``RawDataFiles`` names: the VR configuration and session descriptor at session granularity, and the
-        per-animal surgery metadata at animal granularity.
+        ``RawDataFiles`` names: the session descriptor, VR configuration, and experiment configuration at session
+        granularity, and the per-animal surgery metadata at animal granularity. The session descriptor is universal,
+        but the VR and experiment configurations are present only for the session types that carry them (sessions that
+        use VR and experiment sessions, respectively), so a forged session exposes whichever subset it actually holds.
     """
 
     DATA = "data.feather"
@@ -69,8 +71,19 @@ class DatasetSession:
 
     @property
     def vr_configuration_path(self) -> Path:
-        """Returns the path to the session's ``vr_configuration.yaml`` file within the dataset hierarchy."""
+        """Returns the path to the session's ``vr_configuration.yaml`` file within the dataset hierarchy.
+
+        Only sessions that use VR carry this asset, so callers should check ``.is_file()`` before reading.
+        """
         return self.session_path.joinpath(RawDataFiles.VR_CONFIGURATION)
+
+    @property
+    def experiment_configuration_path(self) -> Path:
+        """Returns the path to the session's ``experiment_configuration.yaml`` file within the dataset hierarchy.
+
+        Only experiment session types carry this asset, so callers should check ``.is_file()`` before reading.
+        """
+        return self.session_path.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
 
 
 @dataclass(frozen=True, slots=True)
