@@ -361,6 +361,60 @@ class DatasetData(YamlConfig):
 
         return descriptions[column]
 
+    def verify_data_descriptions(self) -> None:
+        """Verifies that every column written into any session's ``data.feather`` is described by the dataset.
+
+        Reads the per-dataset ``data_descriptions.feather`` mapping, then scans the schema of every session's
+        assembled ``data.feather`` (without loading the data) and confirms each column name appears in the mapping.
+        The contract is one-directional: a described column that no session emits is permitted (columns can be
+        conditionally emitted), but a column written into a session's feather with no matching description is a
+        violation.
+
+        Notes:
+            Intended to run once the dataset is fully composed (every session's ``data.feather`` written). The
+            forging pipeline invokes it after assembly so an acquisition system that emits an undescribed column
+            fails the run rather than producing a dataset whose assembled data cannot be fully interpreted.
+
+        Raises:
+            FileNotFoundError: If the dataset's ``data_descriptions.feather`` companion file does not exist, or if
+                any session's ``data.feather`` file does not exist.
+            ValueError: If any session's ``data.feather`` contains a column with no description recorded for this
+                dataset. The error names every undescribed column together with the sessions that emit it.
+        """
+        described_columns = set(self.column_descriptions())
+
+        # Maps each undescribed column to the sessions that emit it, so a single error reports every offending
+        # (column, session) pairing rather than aborting on the first violation.
+        undescribed: dict[str, list[str]] = {}
+        for session in self.sessions:
+            data_path = session.data_path
+            if not data_path.is_file():
+                message = (
+                    f"Unable to verify the column descriptions for the '{self.name}' dataset. The session "
+                    f"'{session.session}' (animal '{session.animal}') does not have an assembled "
+                    f"'{DatasetFiles.DATA}' file at '{data_path}'."
+                )
+                console.error(message=message, error=FileNotFoundError)
+
+            # ``read_ipc_schema`` reads only the Arrow IPC schema from the file footer, so the column names are
+            # resolved without materializing any of the session's data.
+            for column in pl.read_ipc_schema(data_path):
+                if column not in described_columns:
+                    undescribed.setdefault(column, []).append(session.session)
+
+        if undescribed:
+            offenders = "; ".join(
+                f"'{column}' (emitted by {', '.join(sorted(sessions))})"
+                for column, sessions in sorted(undescribed.items())
+            )
+            message = (
+                f"Unable to verify the column descriptions for the '{self.name}' dataset. Every column written into "
+                f"a session's '{DatasetFiles.DATA}' must have a matching description in the dataset's "
+                f"'{DatasetFiles.DESCRIPTIONS}' companion file, but the following columns are undescribed: "
+                f"{offenders}."
+            )
+            console.error(message=message, error=ValueError)
+
     @property
     def animals(self) -> tuple[DatasetAnimal, ...]:
         """Returns a tuple of DatasetAnimal instances, one per unique animal in the dataset.
