@@ -4,11 +4,13 @@ sollertia_shared_assets.data_hierarchy.dataset_data.
 
 from pathlib import Path
 
+import polars as pl
 import pytest
+
 from sollertia_shared_assets import (
     DatasetData,
-    SessionTypes,
     DatasetFiles,
+    SessionTypes,
     DatasetSession,
     AcquisitionSystems,
 )
@@ -384,3 +386,56 @@ def test_dataset_data_column_descriptions_errors_when_feather_missing(tmp_path: 
 
     with pytest.raises(FileNotFoundError, match="data_descriptions.feather"):
         dataset_data.column_descriptions()
+
+
+# Tests for verify_data_descriptions()
+
+
+def _write_session_data(dataset_data: DatasetData, columns: tuple[str, ...]) -> None:
+    """Writes a single-row ``data.feather`` carrying the given columns into the dataset's first session."""
+    session_path = dataset_data.sessions[0].data_path
+    pl.DataFrame({column: [0] for column in columns}).write_ipc(file=session_path)
+
+
+def test_dataset_data_verify_data_descriptions_passes_when_all_columns_described(tmp_path: Path) -> None:
+    """Verifies that verify_data_descriptions() accepts a session whose every column is described."""
+    dataset_data = _make_dataset(tmp_path, COLUMN_DESCRIPTIONS)
+    _write_session_data(dataset_data, ("time_us", "lick"))
+
+    dataset_data.verify_data_descriptions()
+
+
+def test_dataset_data_verify_data_descriptions_allows_unused_descriptions(tmp_path: Path) -> None:
+    """Verifies the check is one-directional: a described column no session emits is permitted."""
+    dataset_data = _make_dataset(tmp_path, COLUMN_DESCRIPTIONS)
+    # Emits only a subset of the described columns; the unused 'lick' description must not trigger a violation.
+    _write_session_data(dataset_data, ("time_us",))
+
+    dataset_data.verify_data_descriptions()
+
+
+def test_dataset_data_verify_data_descriptions_raises_on_undescribed_column(tmp_path: Path) -> None:
+    """Verifies that verify_data_descriptions() raises ValueError naming an undescribed written column."""
+    dataset_data = _make_dataset(tmp_path, COLUMN_DESCRIPTIONS)
+    _write_session_data(dataset_data, ("time_us", "lick", "mystery_column"))
+
+    with pytest.raises(ValueError, match="mystery_column"):
+        dataset_data.verify_data_descriptions()
+
+
+def test_dataset_data_verify_data_descriptions_errors_when_session_feather_missing(tmp_path: Path) -> None:
+    """Verifies that verify_data_descriptions() raises FileNotFoundError when a session's data.feather is absent."""
+    dataset_data = _make_dataset(tmp_path, COLUMN_DESCRIPTIONS)
+
+    with pytest.raises(FileNotFoundError, match="data.feather"):
+        dataset_data.verify_data_descriptions()
+
+
+def test_dataset_data_verify_data_descriptions_errors_when_descriptions_missing(tmp_path: Path) -> None:
+    """Verifies that verify_data_descriptions() surfaces a missing descriptions feather as FileNotFoundError."""
+    dataset_data = _make_dataset(tmp_path, COLUMN_DESCRIPTIONS)
+    _write_session_data(dataset_data, ("time_us", "lick"))
+    dataset_data.descriptions_path.unlink()
+
+    with pytest.raises(FileNotFoundError, match="data_descriptions.feather"):
+        dataset_data.verify_data_descriptions()
