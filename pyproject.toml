@@ -50,6 +50,9 @@ dependencies = [
     "platformdirs>=4,<5",
     "click>=8,<9",
 
+    # Natural sorting of discovered project, experiment, and animal names for human-friendly ordering
+    "natsort>=8,<9",
+
     # Date parsing (used by session-discovery filter helpers)
     "python-dateutil>=2,<3",
 
