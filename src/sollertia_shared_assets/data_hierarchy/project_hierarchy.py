@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
+from natsort import natsorted
+
 from ..configuration import CONFIGURATION_DIRECTORY
 
 if TYPE_CHECKING:
@@ -74,16 +76,16 @@ class ProjectData:
         return ProjectData(root=root, project_name=self.project_name)
 
     def experiment_configs(self) -> tuple[Path, ...]:
-        """Returns the sorted experiment configuration YAML paths under the project's configuration directory.
+        """Returns the naturally-sorted experiment configuration YAML paths under the project's configuration directory.
 
         Returns:
-            A tuple of the ``.yaml`` file paths directly under the configuration directory, empty when the
-            directory does not exist.
+            A tuple of the ``.yaml`` file paths directly under the configuration directory, ordered by natural
+            (human-friendly) sort of their filenames, empty when the directory does not exist.
         """
         configuration_directory = self.configuration_directory
         if not configuration_directory.is_dir():
             return ()
-        return tuple(sorted(configuration_directory.glob("*.yaml")))
+        return tuple(natsorted(configuration_directory.glob("*.yaml")))
 
     def create(self) -> ProjectData:
         """Creates the project's directory structure under the data root.

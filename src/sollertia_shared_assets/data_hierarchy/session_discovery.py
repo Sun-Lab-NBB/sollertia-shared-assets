@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from natsort import natsorted
 from dateutil import parser
 
 from .session_data import SessionData, RawDataFiles
@@ -113,13 +114,13 @@ def discover_projects(root_path: Path, strategy: Literal["markers", "directories
             (``directories``).
 
     Returns:
-        A list of ``ProjectData`` views anchored on the data root, sorted by project name.
+        A list of ``ProjectData`` views anchored on the data root, naturally sorted by project name.
     """
     if strategy == "directories":
         return _discover_projects_by_directory(root_path=root_path)
 
     project_names = {session.project_name for session in iterate_sessions(root_path=root_path)}
-    return [ProjectData(root=root_path, project_name=name) for name in sorted(project_names)]
+    return [ProjectData(root=root_path, project_name=name) for name in natsorted(project_names)]
 
 
 def iter_project_animals(project: ProjectData) -> Iterator[AnimalData]:
@@ -133,12 +134,12 @@ def iter_project_animals(project: ProjectData) -> Iterator[AnimalData]:
         project: The ``ProjectData`` view whose animal directories are discovered.
 
     Yields:
-        Each ``AnimalData`` view for an animal directory under the project, in sorted order.
+        Each ``AnimalData`` view for an animal directory under the project, in natural (human-friendly) sort order.
     """
     project_path = project.path
     if not project_path.is_dir():
         return
-    for child in sorted(project_path.iterdir()):
+    for child in natsorted(project_path.iterdir()):
         if _is_animal_directory(path=child):
             yield project.animal(animal_id=child.name)
 
@@ -177,12 +178,12 @@ def get_projects_for_animal(root_path: Path, animal_id: str) -> tuple[str, ...]:
         animal_id: The unique identifier of the animal whose projects are discovered.
 
     Returns:
-        A sorted tuple of project names that include the animal.
+        A naturally-sorted tuple of project names that include the animal.
     """
     matching_projects = {
         session.project_name for session in iterate_sessions(root_path=root_path) if session.animal_id == animal_id
     }
-    return tuple(sorted(matching_projects))
+    return tuple(natsorted(matching_projects))
 
 
 def filter_sessions(
@@ -326,13 +327,14 @@ def _discover_projects_by_directory(root_path: Path) -> list[ProjectData]:
         root_path: The absolute path to the data root to scan.
 
     Returns:
-        A list of ``ProjectData`` views for the non-hidden directories directly under the root, sorted by name.
+        A list of ``ProjectData`` views for the non-hidden directories directly under the root, naturally sorted
+        by name.
     """
     if not root_path.is_dir():
         return []
     return [
         ProjectData(root=root_path, project_name=child.name)
-        for child in sorted(root_path.iterdir())
+        for child in natsorted(root_path.iterdir())
         if child.is_dir() and not child.name.startswith(".")
     ]
 
