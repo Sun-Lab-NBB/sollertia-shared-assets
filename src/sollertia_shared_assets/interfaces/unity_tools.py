@@ -63,7 +63,8 @@ def delete_task_tool(template_name: str) -> dict[str, Any]:
     """Removes every Unity artifact that ``create_task_tool`` produces for a given template in a single call.
 
     Removes the scene plus its ``savedFullScreenViews`` companion, the task prefab, and every segment prefab
-    whose filename begins with the template basename. Mirrors ``create_task_tool`` — the two tools cover the
+    the template owns (resolved by the longest matching template basename, so a template whose name prefixes
+    another does not sweep the longer template's segments). Mirrors ``create_task_tool`` — the two tools cover the
     full lifecycle of a task's generated artifacts. Cue prefabs and cue materials are intentionally not removed
     because they are shared
     across every template that declares a matching ``(name, length_cm)`` identity; deleting them
