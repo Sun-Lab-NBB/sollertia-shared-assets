@@ -173,6 +173,17 @@ class TrialStructure:
             )
             console.error(message=message, error=ValueError)
 
+        # Occupancy trigger modes read occupancy_duration_ms at runtime, so it is required for them. Non-occupancy
+        # modes ignore the field, so its value there is irrelevant. StrEnum members compare equal to their string
+        # values, so this covers both a raw string and a coerced TriggerType.
+        occupancy_types = (TriggerType.OCCUPANCY_DISARM, TriggerType.OCCUPANCY_ARM, TriggerType.OCCUPANCY_TRIGGER)
+        if self.trigger_type in occupancy_types and self.occupancy_duration_ms is None:
+            message = (
+                f"Unable to initialize TrialStructure. The trigger_type '{self.trigger_type}' is an occupancy mode, "
+                "so occupancy_duration_ms is required, but it is unset."
+            )
+            console.error(message=message, error=ValueError)
+
 
 @dataclass
 class TaskTemplate(YamlConfig):
