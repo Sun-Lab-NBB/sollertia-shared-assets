@@ -549,6 +549,14 @@ class SessionData(YamlConfig):
 
         Notes:
             Resolves the destination path directly from ``raw_data_path`` so the method works on instances that have
-            not yet been routed through ``_build_sub_dataclasses``.
+            not yet been routed through ``_build_sub_dataclasses``. Persists ``raw_data_path`` and
+            ``processed_data_path`` as their portable defaults, since ``load`` re-resolves both from the file's
+            on-disk location, so the acquisition host's absolute paths never enter the saved file.
         """
-        self.to_yaml(file_path=self.raw_data_path.joinpath(RawDataFiles.SESSION_DATA))
+        destination = self.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
+        live_paths = self.raw_data_path, self.processed_data_path
+        self.raw_data_path, self.processed_data_path = Path(), Path()
+        try:
+            self.to_yaml(file_path=destination)
+        finally:
+            self.raw_data_path, self.processed_data_path = live_paths
