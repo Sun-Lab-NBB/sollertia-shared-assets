@@ -340,17 +340,20 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy: P
     assert "acquisition_system: mesoscope" in content
 
 
-def test_session_data_save_serializes_path_fields(sample_session_hierarchy: Path) -> None:
-    """Verifies that save() serializes the raw and processed data root paths as YAML scalars and writes the marker
-    file at ``raw_data_path / session_data.yaml``.
+def test_session_data_save_persists_portable_default_paths(sample_session_hierarchy: Path) -> None:
+    """Verifies that save() persists the raw and processed data roots as their portable defaults, restores the live
+    in-memory paths, and writes the marker file at ``raw_data_path / session_data.yaml``.
     """
     session = _write_session_marker(session_root=sample_session_hierarchy, session_type=SessionTypes.RUN_TRAINING)
 
     marker_path = session.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
     assert marker_path.exists()
     content = marker_path.read_text()
-    assert f"raw_data_path: {session.raw_data_path.as_posix()}" in content
+    assert "raw_data_path: ." in content
     assert "processed_data_path: ." in content
+
+    # save() restores the live paths after serialization so downstream steps keep the resolved locations.
+    assert session.raw_data_path == sample_session_hierarchy / "raw_data"
 
 
 def test_session_data_create_raises_error_if_project_does_not_exist(clean_working_directory: Path) -> None:

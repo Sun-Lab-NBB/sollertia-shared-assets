@@ -159,6 +159,7 @@ def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
                 stimulus_location_cm=90.0,
                 show_stimulus_collision_boundary=False,
                 trigger_type=TriggerType.OCCUPANCY_DISARM,
+                occupancy_duration_ms=1000.0,
             ),
         }
     )
@@ -202,6 +203,7 @@ def test_from_task_template_seeds_gas_puff_guided_states() -> None:
                 stimulus_location_cm=90.0,
                 show_stimulus_collision_boundary=False,
                 trigger_type=TriggerType.OCCUPANCY_DISARM,
+                occupancy_duration_ms=1000.0,
             ),
         }
     )
@@ -231,6 +233,7 @@ def test_from_task_template_maps_supported_trigger_types() -> None:
                     stimulus_location_cm=90.0,
                     show_stimulus_collision_boundary=False,
                     trigger_type=trigger_type,
+                    occupancy_duration_ms=1000.0,
                 ),
             }
         )
@@ -247,6 +250,7 @@ def test_from_task_template_maps_supported_trigger_types() -> None:
                     stimulus_location_cm=90.0,
                     show_stimulus_collision_boundary=False,
                     trigger_type=trigger_type,
+                    occupancy_duration_ms=1000.0,
                 ),
             }
         )
