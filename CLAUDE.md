@@ -157,7 +157,7 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 | `src/sollertia_shared_assets/credentials.py`  | Credentials toolset (`resolve_credentials_file`, `set_credentials`, `get_credentials`)                                               |
 | `src/sollertia_shared_assets/configuration/`  | Persistent host settings and the shared VR-task / experiment configuration primitives                                                |
 | `src/sollertia_shared_assets/data_classes/`   | Read-asset contract dataclasses (currently `surgery_data.py`); registry-free by design                                               |
-| `src/sollertia_shared_assets/data_hierarchy/` | `SessionData`, the project/animal hierarchy views, and the session-discovery helpers                                                 |
+| `src/sollertia_shared_assets/data_hierarchy/` | `SessionData`, `DatasetData`, the project/animal hierarchy views, and the session-discovery helpers                                  |
 | `src/sollertia_shared_assets/mesoscope_vr/`   | Mesoscope-VR system subpackage: experiment configuration, runtime data, raw-data layout                                              |
 | `src/sollertia_shared_assets/interfaces/`     | `slsa` CLI and FastMCP server with all MCP tool modules                                                                              |
 | `tests/`                                      | Test suite mirroring the source layout (MCP tools excluded)                                                                          |
@@ -199,6 +199,13 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   Descriptor and hardware-state classes are dispatched by `SessionTypes` and `AcquisitionSystems` enum membership.
   The `data_classes/` package holds only read-asset contract dataclasses; contract modules export plain dataclasses
   and never consume the registries.
+  `DatasetData` (in `data_hierarchy/dataset_data.py`) is the sibling entry point for a forged dataset, the
+  aggregate that `sollertia-forgery` assembles from many sessions of one session type and acquisition system. It
+  carries a full hierarchy lifecycle: `create()` mints the dataset and its per-animal and per-session directories,
+  `load()` rehydrates one and re-resolves every path against the marker's on-disk location, `add_sessions()` appends
+  sessions to an existing dataset, and `remove_animal()` drops one animal with its directory tree. The mutators
+  enforce structural invariants alone, so whether a given session belongs in a given dataset is decided by the
+  consuming pipeline rather than here.
 - **Interface layer**: A single `FastMCP` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and dataclass-introspection helpers; the dispatch registries and their import-time checks live in the
   top-level `registries.py` module, not here. Tool modules import the instance and register `@mcp.tool()` functions.

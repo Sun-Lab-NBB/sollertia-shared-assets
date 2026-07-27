@@ -14,7 +14,7 @@ from dataclasses import field, dataclass
 
 import polars as pl
 from ataraxis_base_utilities import console, ensure_directory_exists
-from ataraxis_data_structures import YamlConfig
+from ataraxis_data_structures import YamlConfig, delete_directory
 
 from ..enums import SessionTypes, AcquisitionSystems
 from .session_data import RawDataFiles
@@ -289,6 +289,109 @@ class DatasetData(YamlConfig):
     def save(self) -> None:
         """Caches the instance's data to the dataset's root directory as a 'dataset.yaml' file."""
         self.to_yaml(file_path=self.dataset_data_path)
+
+    def add_sessions(self, sessions: tuple[DatasetSession, ...] | set[DatasetSession]) -> tuple[DatasetSession, ...]:
+        """Adds the specified sessions to the dataset and materializes their directories in the dataset hierarchy.
+
+        Notes:
+            The append counterpart to create(). Each added session's directory is created under the dataset root and
+            the updated dataset marker is written to disk, so the hierarchy and the marker stay consistent. The
+            session_path attribute of each input instance is ignored and replaced with the resolved path inside the
+            dataset hierarchy, matching how create() treats its input.
+
+            The method enforces the dataset's structural invariants alone. Deciding whether a session belongs in a
+            given dataset, such as verifying its session type or its acquisition system, is left to the caller.
+
+        Args:
+            sessions: The DatasetSession instances that identify the sessions to add to the dataset.
+
+        Returns:
+            The added DatasetSession instances, each carrying its resolved path inside the dataset hierarchy.
+
+        Raises:
+            ValueError: If no sessions are provided, or if any provided session is already part of the dataset or is
+                repeated within the provided collection.
+        """
+        # Converts sessions to tuple if provided as set.
+        if isinstance(sessions, set):
+            sessions = tuple(sessions)
+
+        if not sessions:
+            message = (
+                f"Unable to add sessions to the '{self.name}' forged dataset. The 'sessions' argument must contain "
+                f"at least one DatasetSession instance, but got an empty collection."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Screens the whole request against the dataset's membership before creating any directory, so a rejected
+        # request leaves the hierarchy untouched. Each accepted pair joins the set, which also catches a request that
+        # names the same animal and session twice.
+        known_sessions = {(session.animal, session.session) for session in self.sessions}
+        duplicates: list[str] = []
+        for session in sessions:
+            identity = (session.animal, session.session)
+            if identity in known_sessions:
+                duplicates.append(f"{session.animal}/{session.session}")
+            known_sessions.add(identity)
+
+        if duplicates:
+            message = (
+                f"Unable to add sessions to the '{self.name}' forged dataset. Every added session must be absent "
+                f"from the dataset and named once in the request, but the following violate this: "
+                f"{', '.join(sorted(duplicates))}."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Creates each added session's subdirectory and rebuilds the session with its resolved path.
+        dataset_path = self.dataset_data_path.parent
+        added: list[DatasetSession] = []
+        for session in sessions:
+            session_path = dataset_path.joinpath(session.animal, session.session)
+            ensure_directory_exists(path=session_path)
+            added.append(DatasetSession(session=session.session, animal=session.animal, session_path=session_path))
+
+        self.sessions = (*self.sessions, *added)
+        self.save()
+
+        return tuple(added)
+
+    def remove_animal(self, animal: str) -> tuple[DatasetSession, ...]:
+        """Removes the specified animal and every session it performed from the dataset.
+
+        Notes:
+            The removal counterpart to create(), which materializes the per-animal directories this method deletes.
+            The animal's directory is removed together with everything under it, including the assembled data of every
+            session it holds and the per-animal artifacts co-located there, and the updated dataset marker is written
+            to disk. Pairing this method with add_sessions() rebuilds one animal while every other animal in the
+            dataset keeps its data.
+
+        Args:
+            animal: The unique identifier of the animal to remove from the dataset.
+
+        Returns:
+            The DatasetSession instances removed from the dataset.
+
+        Raises:
+            ValueError: If the specified animal is not part of the dataset.
+        """
+        removed = self.get_sessions_for_animal(animal)
+        if not removed:
+            message = (
+                f"Unable to remove the animal '{animal}' from the '{self.name}' forged dataset. The animal must be "
+                f"part of the dataset, but no sessions belonging to it were found."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Clears the animal's directory before rewriting the marker, so an interrupted removal leaves a marker that
+        # still describes the data present on disk.
+        animal_path = self.get_animal(animal).animal_path
+        if animal_path.is_dir():
+            delete_directory(directory_path=animal_path)
+
+        self.sessions = tuple(session for session in self.sessions if session.animal != animal)
+        self.save()
+
+        return removed
 
     @property
     def descriptions_path(self) -> Path:
