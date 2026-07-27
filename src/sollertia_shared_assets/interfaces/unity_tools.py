@@ -395,7 +395,7 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
     """
     relay_arguments = arguments if arguments is not None else {}
     payload = json.dumps({"tool": tool, "args": relay_arguments}).encode("utf-8")
-    request = urllib.request.Request(  # noqa: S310 - hardcoded localhost URL for the Unity Editor bridge.
+    request = urllib.request.Request(
         url=_UNITY_BRIDGE_URL,
         data=payload,
         headers={"Content-Type": "application/json"},

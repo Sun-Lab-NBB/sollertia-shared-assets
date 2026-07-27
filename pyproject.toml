@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "9.1.0rc3"
+version = "9.1.0rc4"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -128,6 +128,7 @@ lint.ignore = [
     "PLR0912", # Sometimes complex functions are necessary
     "PLR0915", # Sometimes complex type definitions are necessary
     "PLR0911", # Sometimes complex return graphs are necessary
+    "PLR0917", # Call sites pass keyword arguments, so the positional count is immaterial
     "COM812",  # Conflicts with the formatter
     "ISC001",  # Conflicts with the formatter
     "PT001",   # https://github.com/astral-sh/ruff/issues/8796#issuecomment-182590771
@@ -135,6 +136,7 @@ lint.ignore = [
     "D107",    # __init__ is documented inside the main class docstring where applicable
     "D205",    # Bugs out for file descriptions
     "PLW0603", # While global statement usage is not ideal, it streamlines certain development patterns
+    "CPY001",  # The license is declared in the LICENSE file and the project metadata
 ]
 
 # Additional formatting configurations

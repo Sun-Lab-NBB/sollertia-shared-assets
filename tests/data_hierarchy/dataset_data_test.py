@@ -322,6 +322,202 @@ def test_dataset_data_get_session_not_found(tmp_path: Path) -> None:
         dataset_data.get_session(animal="animal_z", session="2024-01-15-12-30-45-999999")
 
 
+# Tests for the add_sessions and remove_animal hierarchy mutators
+
+
+def _make_hierarchy_dataset(tmp_path: Path, sessions: tuple[DatasetSession, ...]) -> DatasetData:
+    """Creates a dataset holding the provided sessions, used by the add_sessions and remove_animal tests."""
+    return DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+
+def test_dataset_data_add_sessions_appends_and_materializes(tmp_path: Path) -> None:
+    """Verifies that add_sessions() appends the sessions, creates their directories, and persists the marker."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    added = dataset_data.add_sessions(
+        sessions=(DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),)
+    )
+
+    dataset_root = tmp_path / "test_dataset"
+    assert len(added) == 1
+    assert added[0].session_path == dataset_root / "animal_b" / "2024-01-16-09-15-22-000002"
+    assert added[0].session_path.is_dir()
+    assert len(dataset_data.sessions) == 2
+
+    # The marker is rewritten in place, so a fresh load sees the appended session.
+    reloaded = DatasetData.load(dataset_path=dataset_root)
+    assert {session.session for session in reloaded.sessions} == {
+        "2024-01-15-12-30-45-000001",
+        "2024-01-16-09-15-22-000002",
+    }
+    assert tuple(animal.animal for animal in reloaded.animals) == ("animal_a", "animal_b")
+
+
+def test_dataset_data_add_sessions_resolves_session_paths(tmp_path: Path) -> None:
+    """Verifies that add_sessions() replaces the input session_path with the path inside the dataset hierarchy."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    added = dataset_data.add_sessions(
+        sessions=(
+            DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b", session_path=Path("/ignored")),
+        )
+    )
+
+    assert added[0].session_path == tmp_path / "test_dataset" / "animal_b" / "2024-01-16-09-15-22-000002"
+
+
+def test_dataset_data_add_sessions_accepts_set_of_sessions(tmp_path: Path) -> None:
+    """Verifies that add_sessions() accepts a set of DatasetSession instances."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    added = dataset_data.add_sessions(
+        sessions={
+            DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+            DatasetSession(session="2024-01-17-09-15-22-000003", animal="animal_c"),
+        }
+    )
+
+    assert len(added) == 2
+    assert len(dataset_data.sessions) == 3
+
+
+def test_dataset_data_add_sessions_rejects_empty_collection(tmp_path: Path) -> None:
+    """Verifies that add_sessions() rejects an empty sessions collection."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    with pytest.raises(ValueError, match="at least one"):
+        dataset_data.add_sessions(sessions=())
+
+
+def test_dataset_data_add_sessions_rejects_session_already_in_dataset(tmp_path: Path) -> None:
+    """Verifies that add_sessions() rejects a session the dataset already holds."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    with pytest.raises(ValueError, match="animal_a/2024-01-15-12-30-45-000001"):
+        dataset_data.add_sessions(sessions=(DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),))
+
+
+def test_dataset_data_add_sessions_rejects_session_repeated_in_request(tmp_path: Path) -> None:
+    """Verifies that add_sessions() rejects a request naming the same animal and session twice."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    with pytest.raises(ValueError, match="animal_b/2024-01-16-09-15-22-000002"):
+        dataset_data.add_sessions(
+            sessions=(
+                DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+                DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+            )
+        )
+
+
+def test_dataset_data_add_sessions_leaves_hierarchy_untouched_when_rejected(tmp_path: Path) -> None:
+    """Verifies that a rejected add_sessions() request creates no directory for its acceptable entries."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    with pytest.raises(ValueError, match="animal_a/2024-01-15-12-30-45-000001"):
+        dataset_data.add_sessions(
+            sessions=(
+                DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+                DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),
+            )
+        )
+
+    assert not (tmp_path / "test_dataset" / "animal_b").exists()
+    assert len(dataset_data.sessions) == 1
+
+
+def test_dataset_data_remove_animal_drops_sessions_and_directory(tmp_path: Path) -> None:
+    """Verifies that remove_animal() deletes the animal's directory tree and rewrites the dataset marker."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path,
+        (
+            DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),
+            DatasetSession(session="2024-01-15-12-30-45-000002", animal="animal_a"),
+            DatasetSession(session="2024-01-16-09-15-22-000003", animal="animal_b"),
+        ),
+    )
+    dataset_root = tmp_path / "test_dataset"
+
+    # Writes a payload into the removed animal's hierarchy to confirm the whole tree is cleared.
+    (dataset_root / "animal_a" / "2024-01-15-12-30-45-000001" / "data.feather").write_bytes(b"payload")
+    (dataset_root / "animal_a" / "surgery_metadata.yaml").write_text("animal: animal_a")
+
+    removed = dataset_data.remove_animal(animal="animal_a")
+
+    assert {session.session for session in removed} == {
+        "2024-01-15-12-30-45-000001",
+        "2024-01-15-12-30-45-000002",
+    }
+    assert not (dataset_root / "animal_a").exists()
+    assert (dataset_root / "animal_b" / "2024-01-16-09-15-22-000003").is_dir()
+
+    reloaded = DatasetData.load(dataset_path=dataset_root)
+    assert tuple(animal.animal for animal in reloaded.animals) == ("animal_b",)
+
+
+def test_dataset_data_remove_animal_rejects_unknown_animal(tmp_path: Path) -> None:
+    """Verifies that remove_animal() rejects an animal the dataset does not hold."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    with pytest.raises(ValueError, match="must be part of the dataset"):
+        dataset_data.remove_animal(animal="animal_z")
+
+    assert (tmp_path / "test_dataset" / "animal_a").is_dir()
+    assert len(dataset_data.sessions) == 1
+
+
+def test_dataset_data_remove_animal_then_add_sessions_rebuilds_animal(tmp_path: Path) -> None:
+    """Verifies that pairing remove_animal() with add_sessions() replaces one animal's session set."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path,
+        (
+            DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),
+            DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+        ),
+    )
+
+    dataset_data.remove_animal(animal="animal_a")
+    dataset_data.add_sessions(
+        sessions=(
+            DatasetSession(session="2024-01-17-10-00-00-000003", animal="animal_a"),
+            DatasetSession(session="2024-01-18-10-00-00-000004", animal="animal_a"),
+        )
+    )
+
+    reloaded = DatasetData.load(dataset_path=tmp_path / "test_dataset")
+    animal_a_sessions = {session.session for session in reloaded.get_sessions_for_animal(animal="animal_a")}
+
+    assert animal_a_sessions == {"2024-01-17-10-00-00-000003", "2024-01-18-10-00-00-000004"}
+    assert {session.session for session in reloaded.get_sessions_for_animal(animal="animal_b")} == {
+        "2024-01-16-09-15-22-000002"
+    }
+    assert not (tmp_path / "test_dataset" / "animal_a" / "2024-01-15-12-30-45-000001").exists()
+
+
 # Tests for the per-dataset column-descriptions feather
 
 
