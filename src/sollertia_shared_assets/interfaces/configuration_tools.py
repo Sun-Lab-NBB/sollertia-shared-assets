@@ -63,8 +63,8 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
     that integrate with the corresponding external service (for example, Google credentials are used to read
     subject metadata from and write water-restriction logs to Google Sheets). ``overall_ok`` reflects the required
     components only — optional components contribute ``configured`` and ``ok`` per-component but do not gate the
-    aggregate. System configuration mount checks are not included here — those live with the acquisition runtime
-    package (sl-experiment).
+    aggregate. System configuration mount checks live with the acquisition runtime package,
+    sollertia-experiment.
 
     Returns:
         A response dict with ``overall_ok`` (the aggregate health flag, computed from required components only)
