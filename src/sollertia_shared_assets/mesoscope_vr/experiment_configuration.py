@@ -127,8 +127,9 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 message = (
                     f"Unable to build a MesoscopeExperimentConfiguration from the task template. Trial '{trial_name}' "
                     f"uses trigger type '{trial_structure.trigger_type}', which is not mapped to a runtime trial class "
-                    f"in MesoscopeExperimentConfiguration.from_task_template. Every TriggerType the template can carry "
-                    f"must have a matching branch here."
+                    f"in MesoscopeExperimentConfiguration.from_task_template. Mesoscope-VR maps the INTERACTION and "
+                    f"OCCUPANCY_DISARM trigger types. Use one of them in the template, or add a branch here if "
+                    f"Mesoscope-VR should support this trigger type."
                 )
                 console.error(message=message, error=ValueError)
 
