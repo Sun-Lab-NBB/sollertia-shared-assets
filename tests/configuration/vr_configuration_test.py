@@ -380,6 +380,19 @@ def test_trial_structure_non_positive_occupancy_duration_raises_error() -> None:
         )
 
 
+def test_trial_structure_occupancy_mode_without_duration_raises_error() -> None:
+    """Verifies that an occupancy-mode TrialStructure with an unset occupancy_duration_ms raises ValueError."""
+    with pytest.raises(ValueError, match=r"is an occupancy mode"):
+        TrialStructure(
+            cue_sequence=["A"],
+            stimulus_trigger_zone_start_cm=0.0,
+            stimulus_trigger_zone_end_cm=10.0,
+            stimulus_location_cm=5.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.OCCUPANCY_ARM,
+        )
+
+
 def test_task_template_duplicate_cue_sequence_raises_error() -> None:
     """Verifies that two trials sharing an identical cue sequence raise ValueError."""
     trial_structures = {

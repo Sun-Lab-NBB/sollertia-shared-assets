@@ -62,7 +62,7 @@ class _SystemRawDataBuilder(Protocol):
     """Structural type for system-specific raw data dataclasses registered in ``SYSTEM_RAW_DATA_REGISTRY``."""
 
     @classmethod
-    def build(cls, root: Path) -> Any:  # noqa: ANN401
+    def build(cls, root: Path) -> Any:
         """Resolves all system-specific raw-asset paths under the session's ``raw_data`` directory.
 
         Conforming implementations construct and return a dataclass instance whose fields hold absolute paths
@@ -250,7 +250,7 @@ def _assert_descriptor_contract() -> None:
         console.error(message=message, error=RuntimeError)
 
 
-def _experiment_builder_signature_gaps(builder: Any, contract_parameters: tuple[str, ...]) -> list[str]:  # noqa: ANN401
+def _experiment_builder_signature_gaps(builder: Any, contract_parameters: tuple[str, ...]) -> list[str]:
     """Resolves the ways a ``from_task_template`` builder violates the generic creation tool's call convention.
 
     ``create_experiment_from_vr_template_tool`` calls every registered builder with exactly the contract keyword

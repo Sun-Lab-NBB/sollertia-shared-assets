@@ -189,14 +189,15 @@ cython_debug/
 # OSx
 .DS_Store
 
-# Project files that are part of the general Sollertia Platform C-Python project architecture that should not be uploaded to and
-# from Github
+# Project files that are part of the general Sollertia Platform C-Python project architecture that should not be
+# uploaded to and from Github
 /cmake-build-debug/
 /reports/
 /docs/source/doxygen/
 /docs/build/
 /stubs/
 /.pypirc
+/.netlifyrc
 
 # Project: Add any project-specific exclusions here
 /temp

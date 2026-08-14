@@ -8,15 +8,6 @@ import pytest
 
 from sollertia_shared_assets.enums import SessionTypes, AcquisitionSystems
 from sollertia_shared_assets.registries import SYSTEM_SESSION_TYPES, SYSTEM_RAW_DATA_REGISTRY
-from sollertia_shared_assets.data_hierarchy import (
-    RawData,
-    AnimalData,
-    Directories,
-    SessionData,
-    RawDataFiles,
-    ProcessedData,
-    ProcessingTrackers,
-)
 from sollertia_shared_assets.mesoscope_vr import MesoscopeRawData, MesoscopeExperimentConfiguration
 from sollertia_shared_assets.configuration import (
     Cue,
@@ -26,6 +17,15 @@ from sollertia_shared_assets.configuration import (
     TrialStructure,
     set_working_directory,
     set_task_templates_directory,
+)
+from sollertia_shared_assets.data_hierarchy import (
+    RawData,
+    AnimalData,
+    Directories,
+    SessionData,
+    RawDataFiles,
+    ProcessedData,
+    ProcessingTrackers,
 )
 
 _DEFAULT_PYTHON_VERSION: str = "3.14.4"
