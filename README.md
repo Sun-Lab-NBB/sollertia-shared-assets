@@ -190,6 +190,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
 | `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                       |
 | `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
+| `refresh_monitors_tool`                         | Re-detects the Unity Editor host monitors and returns a refreshed Task Parameters snapshot     |
 | `set_credentials_tool`                          | Copies a credentials file into the platform credentials directory under its canonical name     |
 | `set_data_root_tool`                            | Sets the local Sollertia platform data root                                                    |
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                  |
@@ -207,9 +208,9 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 ***Note,*** tools that interact with Unity (`clone_zone_prefab_tool`, `create_task_tool`, `delete_asset_tool`,
 `delete_task_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`,
 `inspect_scene_tool`, `list_assets_tool`, `list_scenes_tool`, `open_scene_tool`, `read_task_parameters_tool`,
-`write_task_parameters_tool`) require the Unity Editor to be running on the local machine with the McpBridge plugin
-from [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality) active. These tools relay
-commands to the Editor via HTTP.
+`refresh_monitors_tool`, `write_task_parameters_tool`) require the Unity Editor to be running on the local machine
+with the McpBridge plugin from [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality)
+active. These tools relay commands to the Editor via HTTP.
 
 #### Client Registration
 

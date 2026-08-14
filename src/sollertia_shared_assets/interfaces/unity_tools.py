@@ -383,6 +383,29 @@ def write_task_parameters_tool(
     return _unity_relay(tool="write_task_parameters", arguments=relay_arguments)
 
 
+@mcp.tool()
+def refresh_monitors_tool() -> dict[str, Any]:
+    """Re-detects the system monitors attached to the Unity Editor host and returns a fresh snapshot.
+
+    The agentic counterpart of the Camera Mapping section's Refresh Monitor Positions button, sharing the
+    same Unity-side code path so both re-detect identically. Existing camera assignments carry across by
+    monitor index, so removing a monitor from the middle of the arrangement shifts every later assignment
+    up by one slot. The refreshed list is not persisted to the scene's companion asset until a camera
+    assignment is written via :func:`write_task_parameters_tool`.
+
+    The bridge builds its monitor enumeration once per scene and reuses it across requests, so call this
+    after physically changing the monitor arrangement. A snapshot that already matches the hardware needs
+    no refresh.
+
+    Requires the Unity Editor to be running with the McpBridge plugin active.
+
+    Returns:
+        A post-refresh snapshot in the same shape as :func:`read_task_parameters_tool`, whose
+        ``state.camera_mapping`` list reflects the re-detected monitor geometry.
+    """
+    return _unity_relay(tool="refresh_monitors")
+
+
 def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     """Relays a tool call to the Unity Editor's McpBridge HTTP listener.
 
