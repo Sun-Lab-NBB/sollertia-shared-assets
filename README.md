@@ -72,21 +72,20 @@ ___
 
 ### Source
 
-***Note,*** installation from source is ***highly discouraged*** for anyone who is not an active
-project developer.
+***Note,*** installation from source is ***highly discouraged*** for anyone who is not an active project developer.
 
-1. Download this repository to the local machine using the preferred method, such as git-cloning.
-   Use one of the [stable releases](https://github.com/Sun-Lab-NBB/sollertia-shared-assets/tags)
-   that include precompiled binary and source code distribution (sdist) wheels.
-2. If the downloaded distribution is stored as a compressed archive, unpack it using the
-   appropriate decompression tool.
+1. Download this repository to the local machine using the preferred method, such as git-cloning. Use one of the
+   [stable releases](https://github.com/Sun-Lab-NBB/sollertia-shared-assets/tags) that include precompiled binary and
+   source code distribution (sdist) wheels.
+2. If the downloaded distribution is stored as a compressed archive, unpack it using the appropriate decompression
+   tool.
 3. `cd` to the root directory of the prepared project distribution.
 4. Run `pip install .` to install the project and its dependencies.
 
 ### pip
 
-Use the following command to install the library and all of its dependencies via
-[pip](https://pip.pypa.io/en/stable/): `pip install sollertia-shared-assets`
+Use the following command to install the library and all of its dependencies via [pip](https://pip.pypa.io/en/stable/):
+`pip install sollertia-shared-assets`
 
 ___
 
@@ -95,8 +94,8 @@ ___
 Most library components are intended to be used via other Sollertia platform libraries. For details on using shared
 assets for data acquisition and preprocessing, see the
 [sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-experiment) library. For details on using shared assets
-for data processing and dataset formation, see the
-[sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery) library.
+for data processing and dataset formation, see the [sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)
+library.
 
 ***Warning!*** End users should not use any component of this library directly or install this library into any Python
 environment. All assets from this library are intended to be used exclusively by developers working on other Sollertia
@@ -106,23 +105,22 @@ platform libraries.
 
 This library provides the `slsa` CLI that exposes the following commands and command groups:
 
-| Command                 | Description                                                           |
-|-------------------------|-----------------------------------------------------------------------|
-| `mcp`                   | Starts the MCP server for agentic configuration management            |
-| `get directory`         | Reports the configured local Sollertia platform working directory     |
-| `get data-root`         | Reports the configured local Sollertia platform data root             |
-| `get credentials`       | Reports the path to the requested category's credentials file         |
+| Command                 | Description                                                               |
+|-------------------------|---------------------------------------------------------------------------|
+| `mcp`                   | Starts the MCP server for agentic configuration management                |
+| `get directory`         | Reports the configured local Sollertia platform working directory         |
+| `get data-root`         | Reports the configured local Sollertia platform data root                 |
+| `get credentials`       | Reports the path to the requested category's credentials file             |
 | `get templates`         | Reports the configured sollertia-virtual-reality task templates directory |
-| `get projects`          | Lists the projects stored under the data root                         |
-| `get experiments`       | Lists the experiment configurations available for a project           |
-| `configure directory`   | Sets the local Sollertia platform working directory                   |
-| `configure data-root`   | Sets the local Sollertia platform data root                           |
-| `configure credentials` | Copies a credentials file into the platform credentials directory     |
+| `get projects`          | Lists the projects stored under the data root                             |
+| `get experiments`       | Lists the experiment configurations available for a project               |
+| `configure directory`   | Sets the local Sollertia platform working directory                       |
+| `configure data-root`   | Sets the local Sollertia platform data root                               |
+| `configure credentials` | Copies a credentials file into the platform credentials directory         |
 | `configure templates`   | Sets the path to the sollertia-virtual-reality task templates directory   |
-| `configure project`     | Creates a project directory structure for data acquisition            |
+| `configure project`     | Creates a project directory structure for data acquisition                |
 
-Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage
-information.
+Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage information.
 
 ### MCP Server
 
@@ -134,7 +132,7 @@ workflow components.
 
 Start the MCP server using the CLI:
 
-```
+```bash
 slsa mcp
 ```
 
@@ -143,67 +141,67 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 
 #### Available Tools
 
-| Tool                                            | Description                                                                                    |
-|-------------------------------------------------|------------------------------------------------------------------------------------------------|
-| `clone_zone_prefab_tool`                        | Clones a canonical base zone prefab into a new trigger-zone prefab                             |
-| `create_experiment_from_vr_template_tool`       | Creates an experiment configuration from a Unity VR task template using sensible defaults      |
-| `create_project_tool`                           | Creates the on-disk directory structure for a new project under a data root                    |
-| `create_task_tool`                              | Builds a Unity task end-to-end from a template: task prefab plus matching scene in one call    |
-| `delete_asset_tool`                             | Deletes a non-scene Unity asset (cue prefabs, materials) within the InfiniteCorridorTask root  |
-| `delete_task_tool`                              | Removes a Unity task end-to-end: scene, scene companion, task prefab, and every segment prefab |
-| `describe_experiment_configuration_schema_tool` | Returns the schema for the experiment configuration of a given acquisition system              |
-| `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                                               |
-| `describe_session_descriptor_schema_tool`       | Returns the schema for the descriptor associated with a given session type                     |
-| `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for a given acquisition system                               |
-| `describe_data_asset_schema_tool`               | Returns the read-asset dataclass schema for the given data_asset                               |
-| `describe_template_schema_tool`                 | Returns the schema for TaskTemplate and nested Cue, TrialStructure, and VREnvironment          |
-| `discover_experiments_tool`                     | Discovers all experiment configuration YAML files under the data root                          |
-| `discover_templates_tool`                       | Lists all task templates in the configured templates directory                                 |
-| `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                                                           |
-| `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                                                            |
-| `filter_sessions_tool`                          | Filters discovered session entries by date range and animal- or session-name criteria          |
-| `get_data_root_overview_tool`                   | Builds the project/animal/session hierarchy and status; optionally surfaces empty directories  |
-| `get_platform_environment_status_tool`          | Reports the status of the working directory, data root, templates directory, and credentials   |
-| `get_play_state_tool`                           | Returns the current Unity Editor play state and active scene name                              |
-| `inspect_prefab_tool`                           | Returns the full hierarchy, components, transforms, and collider details of a prefab           |
-| `inspect_scene_tool`                            | Returns the active scene's metadata, dirty flag, and recursive root GameObject hierarchy       |
-| `inspect_sessions_tool`                         | Produces a detailed health and inventory report for one or more sessions                       |
-| `list_assets_tool`                              | Lists Unity assets of a given type within a search path                                        |
-| `list_processing_trackers_tool`                 | Enumerates the canonical ProcessingTracker filenames written by each pipeline                  |
-| `list_scenes_tool`                              | Lists all Unity scene assets and identifies the currently active scene                         |
-| `list_session_type_support_tool`                | Returns the full mapping of each acquisition system to the session types it can run            |
-| `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems supported by the Sollertia platform                         |
-| `list_supported_credentials_tool`               | Enumerates the credentials categories supported by the Sollertia platform                      |
-| `list_supported_data_assets_tool`               | Enumerates the read-asset data formats supported by the Sollertia platform                     |
-| `list_supported_session_types_tool`             | Enumerates session types, optionally scoped to one acquisition system                          |
-| `list_supported_trial_types_tool`               | Enumerates the trial classes supported by an acquisition system's experiment configuration     |
-| `list_supported_trigger_types_tool`             | Enumerates the trigger type values supported by trial structures                               |
-| `open_scene_tool`                               | Opens a Unity scene in the Editor with explicit unsaved-edits handling                         |
-| `read_credentials_tool`                         | Returns the path to the requested credentials file in the platform credentials directory       |
-| `read_data_root_tool`                           | Returns the configured Sollertia platform data root path                                       |
-| `read_experiment_configuration_tool`            | Loads an experiment configuration YAML (project source or per-session frozen snapshot)         |
-| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema                                      |
-| `read_session_descriptor_tool`                  | Loads a session descriptor YAML using the descriptor class for the given session type          |
-| `read_session_hardware_state_tool`              | Loads a hardware-state YAML for a session using the class for the given acquisition system     |
-| `read_data_asset_tool`                          | Loads a read-asset YAML, parsing it with the dataclass for the given data_asset                |
-| `read_task_parameters_tool`                     | Reads the Unity Editor's Task Parameters window state, options, and per-control visibility     |
-| `read_task_templates_directory_tool`            | Returns the configured path to the task templates directory                                    |
-| `read_template_tool`                            | Loads a TaskTemplate YAML (live template or per-session frozen snapshot)                       |
-| `read_working_directory_tool`                   | Returns the configured Sollertia platform working directory path                               |
-| `refresh_monitors_tool`                         | Re-detects the Unity Editor host monitors and returns a refreshed Task Parameters snapshot     |
-| `set_credentials_tool`                          | Copies a credentials file into the platform credentials directory under its canonical name     |
-| `set_data_root_tool`                            | Sets the local Sollertia platform data root                                                    |
-| `set_task_templates_directory_tool`             | Sets the path to the task templates directory                                                  |
-| `set_working_directory_tool`                    | Sets the local Sollertia platform working directory                                            |
-| `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML for a project                                       |
-| `validate_template_tool`                        | Validates a TaskTemplate (live or session snapshot) against its schema and constraints         |
-| `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML for a project                             |
-| `write_session_data_tool`                       | Creates or replaces a session_data.yaml file, validated against the SessionData schema         |
-| `write_session_descriptor_tool`                 | Creates or replaces a session descriptor YAML for a session                                    |
-| `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML using the acquisition-system dataclass     |
-| `write_data_asset_tool`                         | Creates or replaces a read-asset YAML, validated against the given data_asset's dataclass      |
-| `write_task_parameters_tool`                    | Writes a subset of the Unity Editor's Task Parameters fields atomically in one relay call      |
-| `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML in the configured templates directory             |
+| Tool                                            | Description                                                       |
+|-------------------------------------------------|-------------------------------------------------------------------|
+| `clone_zone_prefab_tool`                        | Clones a canonical base zone prefab into a trigger-zone prefab    |
+| `create_experiment_from_vr_template_tool`       | Creates an experiment configuration from a Unity VR task template |
+| `create_project_tool`                           | Creates the on-disk directory structure for a new project         |
+| `create_task_tool`                              | Creates a Unity task end-to-end from a YAML task template         |
+| `delete_asset_tool`                             | Deletes a non-scene Unity asset and refreshes the AssetDatabase   |
+| `delete_task_tool`                              | Removes every Unity artifact created for a given task template    |
+| `describe_experiment_configuration_schema_tool` | Returns the experiment configuration schema for a system          |
+| `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                  |
+| `describe_session_descriptor_schema_tool`       | Returns the descriptor schema for a given session type            |
+| `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for an acquisition system       |
+| `describe_data_asset_schema_tool`               | Returns the read-asset dataclass schema for a data asset          |
+| `describe_template_schema_tool`                 | Returns the TaskTemplate schema and its nested class schemas      |
+| `discover_experiments_tool`                     | Discovers every experiment configuration YAML under the data root |
+| `discover_templates_tool`                       | Lists the task templates in the configured templates directory    |
+| `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                              |
+| `exit_play_mode_tool`                           | Exits Play Mode in the Unity Editor                               |
+| `filter_sessions_tool`                          | Filters session entries by date range and inclusion criteria      |
+| `get_data_root_overview_tool`                   | Groups session markers into a project, animal, session tree       |
+| `get_platform_environment_status_tool`          | Reports the health of the platform configuration components       |
+| `get_play_state_tool`                           | Returns the Unity Editor play state and active scene name         |
+| `inspect_prefab_tool`                           | Returns a prefab's hierarchy, components, and collider details    |
+| `inspect_scene_tool`                            | Returns the active scene's metadata and object hierarchy          |
+| `inspect_sessions_tool`                         | Produces a health and inventory report for each session path      |
+| `list_assets_tool`                              | Lists Unity assets of a given type within a search path           |
+| `list_processing_trackers_tool`                 | Enumerates the ProcessingTracker filenames each pipeline writes   |
+| `list_scenes_tool`                              | Lists every Unity scene and identifies the active one             |
+| `list_session_type_support_tool`                | Maps each acquisition system to the session types it can run      |
+| `list_supported_acquisition_systems_tool`       | Enumerates the acquisition systems the platform supports          |
+| `list_supported_credentials_tool`               | Enumerates the credentials categories the platform supports       |
+| `list_supported_data_assets_tool`               | Enumerates the read-asset data formats the platform supports      |
+| `list_supported_session_types_tool`             | Enumerates session types, optionally scoped to one system         |
+| `list_supported_trial_types_tool`               | Enumerates a system's experiment configuration trial classes      |
+| `list_supported_trigger_types_tool`             | Enumerates the trigger types supported by trial structures        |
+| `open_scene_tool`                               | Opens a Unity scene, applying the unsaved-changes policy          |
+| `read_credentials_tool`                         | Returns the path to the requested credentials file                |
+| `read_data_root_tool`                           | Returns the configured Sollertia platform data root path          |
+| `read_experiment_configuration_tool`            | Loads an experiment configuration YAML for a system               |
+| `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema         |
+| `read_session_descriptor_tool`                  | Loads a session descriptor YAML for a given session type          |
+| `read_session_hardware_state_tool`              | Loads a hardware-state YAML for an acquisition system             |
+| `read_data_asset_tool`                          | Loads a read-asset YAML for a given data asset                    |
+| `read_task_parameters_tool`                     | Reads every field of the Unity Task Parameters window             |
+| `read_task_templates_directory_tool`            | Returns the configured task templates directory path              |
+| `read_template_tool`                            | Loads a TaskTemplate YAML, live or per-session snapshot           |
+| `read_working_directory_tool`                   | Returns the configured platform working directory path            |
+| `refresh_monitors_tool`                         | Re-detects the Unity Editor host monitors and returns a snapshot  |
+| `set_credentials_tool`                          | Copies a credentials file into the platform credentials directory |
+| `set_data_root_tool`                            | Sets the local Sollertia platform data root                       |
+| `set_task_templates_directory_tool`             | Sets the path to the task templates directory                     |
+| `set_working_directory_tool`                    | Sets the local Sollertia platform working directory               |
+| `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML against its schema     |
+| `validate_template_tool`                        | Validates a TaskTemplate against its schema and constraints       |
+| `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML              |
+| `write_session_data_tool`                       | Creates or replaces a validated session_data.yaml file            |
+| `write_session_descriptor_tool`                 | Creates or replaces a session's descriptor YAML                   |
+| `write_session_hardware_state_tool`             | Creates or replaces a session's hardware-state YAML               |
+| `write_data_asset_tool`                         | Creates or replaces a validated read-asset YAML                   |
+| `write_task_parameters_tool`                    | Writes a subset of the Task Parameters fields atomically          |
+| `write_template_tool`                           | Creates or replaces a live TaskTemplate YAML                      |
 
 ***Note,*** tools that interact with Unity (`clone_zone_prefab_tool`, `create_task_tool`, `delete_asset_tool`,
 `delete_task_tool`, `enter_play_mode_tool`, `exit_play_mode_tool`, `get_play_state_tool`, `inspect_prefab_tool`,
@@ -226,74 +224,71 @@ ___
 See the [API documentation](https://sollertia-shared-assets-api-docs.netlify.app/) for the detailed description of the
 methods and classes exposed by components of this library.
 
-***Note,*** the API documentation includes additional details about the `slsa` CLI commands and their
-parameters beyond what is covered in the [CLI Commands](#cli-commands) section above.
+***Note,*** the API documentation includes additional details about the `slsa` CLI commands and their parameters
+beyond what is covered in the [CLI Commands](#cli-commands) section above.
 
 ___
 
 ## Developers
 
-This section provides installation, dependency, and build-system instructions for the developers
-that want to modify the source code of this library.
+This section provides installation, dependency, and build-system instructions for the developers that want to modify
+the source code of this library.
 
 ### Installing the Project
 
-***Note,*** this installation method requires **mamba version 2.3.2 or above**. Currently, all
-Sollertia Platform automation pipelines require that mamba is installed through the
-[miniforge3](https://github.com/conda-forge/miniforge) installer.
+***Note,*** this installation method requires **mamba version 2.3.2 or above**. Currently, all automation pipelines
+require that mamba is installed through the [miniforge3](https://github.com/conda-forge/miniforge) installer.
 
 1. Download this repository to the local machine using the preferred method, such as git-cloning.
-2. If the downloaded distribution is stored as a compressed archive, unpack it using the
-   appropriate decompression tool.
+2. If the downloaded distribution is stored as a compressed archive, unpack it using the appropriate decompression
+   tool.
 3. `cd` to the root directory of the prepared project distribution.
 4. Install the core development dependencies into the ***base*** mamba environment via the
    `mamba install tox uv tox-uv` command.
-5. Use the `tox -e create` command to create the project-specific development environment followed
-   by `tox -e install` command to install the project into that environment as a library.
+5. Use the `tox -e create` command to create the project-specific development environment followed by `tox -e install`
+   command to install the project into that environment as a library.
 
 ### Additional Dependencies
 
-In addition to installing the project and all user dependencies, install the following
-dependencies:
+In addition to installing the project and all user dependencies, install the following dependencies:
 
-1. [Python](https://www.python.org/downloads/) distributions, one for each version supported by
-   the developed project. Currently, this library supports Python 3.14 only. It is recommended to
-   use a tool like [pyenv](https://github.com/pyenv/pyenv) to install and manage the required
-   versions.
+1. [Python](https://www.python.org/downloads/) distributions, one for each version supported by the developed project.
+   Currently, this library supports Python 3.14 only. It is recommended to use a tool like
+   [pyenv](https://github.com/pyenv/pyenv) to install and manage the required versions.
 
 ### Development Automation
 
 This project uses `tox` for development automation. The following tox environments are available:
 
-| Environment    | Description                                                  |
-|----------------|--------------------------------------------------------------|
-| `lint`         | Runs ruff formatting, ruff linting, and mypy type checking   |
-| `stubs`        | Generates py.typed marker and .pyi stub files                |
-| `py314-test`   | Runs the test suite via pytest for Python 3.14               |
-| `coverage`     | Aggregates test coverage into an HTML report                 |
-| `docs`         | Builds the API documentation via Sphinx                      |
-| `build`        | Builds sdist and wheel distributions                         |
-| `upload`       | Uploads distributions to PyPI via twine                      |
-| `install`      | Builds and installs the project into its mamba environment   |
-| `uninstall`    | Uninstalls the project from its mamba environment            |
-| `create`       | Creates the project's mamba development environment          |
-| `remove`       | Removes the project's mamba development environment          |
-| `provision`    | Recreates the mamba environment from scratch                 |
-| `export`       | Exports the mamba environment as .yml and spec.txt files     |
-| `import`       | Creates or updates the mamba environment from a .yml file    |
+| Environment    | Description                                                 |
+|----------------|-------------------------------------------------------------|
+| `lint`         | Runs ruff formatting, ruff linting, and mypy type checking  |
+| `stubs`        | Generates py.typed marker and .pyi stub files               |
+| `{py314}-test` | Runs the test suite via pytest and aggregates coverage data |
+| `coverage`     | Aggregates test coverage and applies the 100% coverage gate |
+| `docs`         | Builds the API documentation via Sphinx                     |
+| `build`        | Builds sdist and wheel distributions                        |
+| `upload`       | Uploads distributions to PyPI via twine                     |
+| `deploy`       | Uploads the built documentation to the Netlify site         |
+| `install`      | Builds and installs the project into its mamba environment  |
+| `uninstall`    | Uninstalls the project from its mamba environment           |
+| `create`       | Creates the project's mamba development environment         |
+| `remove`       | Removes the project's mamba development environment         |
+| `provision`    | Recreates the mamba environment from scratch                |
+| `export`       | Exports the mamba environment as a .yml file                |
+| `import`       | Creates or updates the mamba environment from a .yml file   |
 
 Run any environment using `tox -e ENVIRONMENT`. For example, `tox -e lint`.
 
-***Note,*** all pull requests for this project have to successfully complete the `tox` task before
-being merged. To expedite the task's runtime, use the `tox --parallel` command to run some tasks
-in parallel.
+***Note,*** all pull requests for this project have to successfully complete the `tox` task before being merged. To
+expedite the task's runtime, use the `tox --parallel` command to run some tasks in parallel.
 
 ### Adding New Session Types
 
 A session type identifies the high-level activity performed during acquisition (e.g., training, experiment,
 window-checking). Each type has its own descriptor dataclass that captures the type-specific task parameters and
 outcome metadata, persisted as `session_descriptor.yaml` inside the session's `raw_data` directory. The descriptor
-filename is flat across all types — only the parsing class varies, and is dispatched via `DESCRIPTOR_REGISTRY`.
+filename is flat across all types, only the parsing class varies, and it is dispatched via `DESCRIPTOR_REGISTRY`.
 
 **Step 1: Extend the SessionTypes enum and pair it with an acquisition system**
 
@@ -317,11 +312,11 @@ acquisition system.
 
 Add a `<Type>Descriptor` dataclass inheriting from `YamlConfig` that captures the task parameters and outcome
 metadata for the new session type. Each acquisition system keeps its runtime dataclasses in the `runtime_data.py`
-module of its own subpackage; add the descriptor to the subpackage of the system that runs the new session type. Use
-`LickTrainingDescriptor` or `RunTrainingDescriptor` in `mesoscope_vr/runtime_data.py` as reference. The descriptor must
-declare an `incomplete: bool = True` field, which the session-inspection tooling reads to decide whether a session is
-complete; the import-time `_assert_descriptor_contract` check fails if it is missing. Export the new class from the
-subpackage's `__init__.py`.
+module of its own subpackage, so add the descriptor to the subpackage of the system that runs the new session type.
+Use `LickTrainingDescriptor` or `RunTrainingDescriptor` in `mesoscope_vr/runtime_data.py` as reference. The descriptor
+must declare an `incomplete: bool = True` field, which the session-inspection tooling reads to decide whether a
+session is complete. The import-time `_assert_descriptor_contract` check fails if it is missing. Export the new class
+from the subpackage's `__init__.py`.
 
 **Step 3: Register the descriptor**
 
@@ -333,11 +328,11 @@ In `registries.py` (the registry hub):
 **Step 4: Update required-asset checks (if applicable)**
 
 The required-asset policy lives in `SessionData.required_raw_assets` (`data_hierarchy/session_data.py`), and the
-session inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch: every session
-requires `session_descriptor.yaml` and `system_configuration.yaml`; `experiment_configuration.yaml` is required
-whenever the session has an `experiment_name`; and `vr_configuration.yaml` is required for any session type listed in
-`SESSION_TYPES_USING_VR_TASK` (`registries.py`). If the new session type uses VR, add
-it to that frozenset; if it requires some other extra asset, extend `required_raw_assets` accordingly.
+session inventory tool delegates to it. The policy is data-driven rather than a per-session-type branch. Every session
+requires `session_descriptor.yaml` and `system_configuration.yaml`. The `experiment_configuration.yaml` asset is
+required whenever the session has an `experiment_name`, and `vr_configuration.yaml` is required for any session type
+listed in `SESSION_TYPES_USING_VR_TASK` (`registries.py`). If the new session type uses VR, add it to that frozenset.
+If it requires some other extra asset, extend `required_raw_assets` accordingly.
 
 **Step 5: Update downstream libraries**
 
@@ -352,9 +347,9 @@ data dataclass that resolves the system's unique on-disk assets. All of these cl
 own subpackage (e.g., `mesoscope_vr/`). Three registries dispatch parsing and builder classes by `AcquisitionSystems`
 value: `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, and `SYSTEM_RAW_DATA_REGISTRY`. Each system
 must also declare the session types it can run in `SYSTEM_SESSION_TYPES`. Every registry, the `SYSTEM_SESSION_TYPES`
-association, and the import-time checks that guard them are defined — fully populated — in the top-level
-`registries.py` module. System-level hardware and software configuration classes live in the acquisition runtime
-package (sollertia-experiment).
+association, and the import-time checks that guard them are defined, fully populated, in the top-level `registries.py`
+module. System-level hardware and software configuration classes live in the acquisition runtime package
+(sollertia-experiment).
 
 **Step 1: Extend the AcquisitionSystems enum**
 
@@ -372,19 +367,19 @@ Create a new `<system>/` subpackage (a sibling of `mesoscope_vr/`) holding the n
 every class from the subpackage's `__init__.py`. The Mesoscope-VR subpackage is the reference for both the module
 split and the contents:
 
-1. `<system>/runtime_data.py` — a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records the
-   configuration of every active hardware module on the new system, plus the system's per-session-type descriptors.
-   Each descriptor must declare an `incomplete: bool = True` field, enforced by the import-time
+1. `<system>/runtime_data.py` defines a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records
+   the configuration of every active hardware module on the new system, plus the system's per-session-type
+   descriptors. Each descriptor must declare an `incomplete: bool = True` field, enforced by the import-time
    `_assert_descriptor_contract` check. Use `mesoscope_vr/runtime_data.py` as reference.
-2. `<system>/experiment_configuration.py` — a `<System>ExperimentConfiguration` dataclass inheriting from
+2. `<system>/experiment_configuration.py` defines a `<System>ExperimentConfiguration` dataclass inheriting from
    `YamlConfig` that captures the runtime experiment parameters for the new system. Every
    `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field (a mapping of
    `ExperimentState`, the experiment state machine that every experiment runs as), a `trial_structures` field (the
    trials the experiment runs, whose concrete trial classes vary per system), a `unity_scene_name` field (the linear
    infinite corridor task the experiment runs), and a `from_task_template` classmethod that builds the configuration
-   from a task template. Fields beyond that contract are system-specific. Use
-   `mesoscope_vr/experiment_configuration.py` as reference.
-3. `<system>/raw_data.py` — a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all
+   from a task template. Fields beyond that contract are system-specific. Use `mesoscope_vr/experiment_configuration.py`
+   as reference.
+3. `<system>/raw_data.py` defines a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all
    system-specific raw assets and exposes a `build(cls, root: Path) -> <System>RawData` classmethod that resolves
    every field against the session's `raw_data` directory. Optionally add `<System>RawDataFiles` and/or
    `<System>Directories` `StrEnum` classes that enumerate any canonical filenames or subdirectories unique to the
@@ -453,8 +448,8 @@ does not surface in the tooling.
 **Step 4: Map a trigger to the trial class**
 
 Update that configuration's `from_task_template` so the trial's `TriggerType` instantiates the new class (the trigger
-may itself be new — see "Adding a New Trigger Type"). A trigger that no branch handles raises, so every trigger the
-template can carry on this system needs a branch.
+may itself be new, as covered by "Adding a New Trigger Type"). A trigger that no branch handles raises, so every
+trigger the template can carry on this system needs a branch.
 
 ***Note,*** the import-time `_assert_experiment_configuration_contract` check confirms the contract fields and the
 `from_task_template` builder, but it does not verify the trial union or the trigger mapping. Cover a new trial class
@@ -463,7 +458,7 @@ in the experiment-configuration tests.
 ### Adding a New Trigger Type
 
 A `TriggerType` identifies the corridor condition that resolves a trial (an interaction, an occupancy event, and so
-on). The enum is platform-wide; each acquisition system maps only the subset of trigger types it supports to its
+on). The enum is platform-wide, and each acquisition system maps only the subset of trigger types it supports to its
 runtime trial classes.
 
 **Step 1: Extend the TriggerType enum**
@@ -473,16 +468,16 @@ In `configuration/vr_configuration.py`, add a new member to `TriggerType`.
 **Step 2: Map the trigger on each supporting system**
 
 For every acquisition system that supports the new trigger, add the matching branch to that system's
-`from_task_template`, instantiating the runtime trial class the trigger maps to (which may itself be new — see "Adding
-a New Trial Class"). A system that does not support the trigger adds no branch; its `from_task_template` then raises
-for that trigger, which is the intended "unsupported on this system" signal. A new `TriggerType` member therefore does
-not require a branch in every system.
+`from_task_template`, instantiating the runtime trial class the trigger maps to (which may itself be new, as covered
+by "Adding a New Trial Class"). A system that does not support the trigger adds no branch, so its `from_task_template`
+raises for that trigger, which is the intended "unsupported on this system" signal. A new `TriggerType` member
+therefore does not require a branch in every system.
 
 **Step 3: Update downstream libraries**
 
-A new trigger type also requires Unity-side assets — the zone prefab and the task-generation pipeline — in
-sollertia-virtual-reality. The unity plugin's `/zone-prefabs` and `/task-generator` skills own that work; it is out of
-scope for this library.
+A new trigger type also requires Unity-side assets in sollertia-virtual-reality, namely the zone prefab and the
+task-generation pipeline. The unity plugin's `/zone-prefabs` and `/task-generator` skills own that work, which is out
+of scope for this library.
 
 ### Adding a New Read Asset
 
@@ -490,12 +485,12 @@ A **read asset** is metadata the platform reads from an external, human-maintain
 log Google Sheet). The concrete architecture decision is that every read asset is translated by the acquisition
 library (sollertia-experiment) into a typed dataclass and cached on disk in a standardized format. Downstream
 consumers (notably sollertia-forgery) then interact only with that on-disk dataclass and never touch the external
-source. Because the dataclass is the canonical format, it is reusable regardless of the upstream storage — the
+source. Because the dataclass is the canonical format, it is reusable regardless of the upstream storage, as the
 acquisition library translates whatever source it reads (Google Sheets or otherwise) into it.
 
 This applies only to assets the platform **reads**. Assets the platform only **writes** to an external source (for
 example, the water-restriction log) have no on-disk representation to standardize, so they need no dataclass and no
-registry entry — they are owned entirely by the writing library.
+registry entry. They are owned entirely by the writing library.
 
 `ReadAssets` (in `enums.py`) enumerates the supported read-asset formats and `READ_ASSET_REGISTRY` (in
 `registries.py`) maps each to its on-disk dataclass. The contract dataclasses themselves live in the `data_classes/`
@@ -537,34 +532,34 @@ The parity check catches a forgotten registry entry at import time, naming the m
 
 Coordinate with sollertia-experiment, which reads the external source, translates it into the new dataclass, and
 caches it on disk for sollertia-forgery to consume. This is the only place that knows the source's storage-specific
-representation; the dataclass keeps every downstream consumer storage-agnostic.
+representation, and the dataclass keeps every downstream consumer storage-agnostic.
 
 ### AI-Assisted Development
 
 Claude Code skills and AI development assets for this project are distributed through two marketplaces:
 
 - [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace:
-  - **assets** plugin — registers the `slsa mcp` server with compatible MCP clients and provides configuration and
-    data skills for working directory setup, session discovery, session data, descriptors, hardware state, subject
-    metadata, task templates, experiment configuration, library extension, and MCP environment setup. The server also
-    fronts the Unity Editor relay that the **unity** plugin's skills drive.
-  - **unity** plugin — Unity Editor skills that drive the `McpBridge` relay tools served by the `slsa mcp` server,
-    document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger zone prefabs.
+  - **assets** plugin, which registers the `slsa mcp` server with compatible MCP clients and provides configuration
+    and data skills for working directory setup, session discovery, session data, descriptors, hardware state,
+    subject metadata, task templates, experiment configuration, library extension, and MCP environment setup. The
+    server also fronts the Unity Editor relay that the **unity** plugin's skills drive.
+  - **unity** plugin, which provides Unity Editor skills that drive the `McpBridge` relay tools served by the
+    `slsa mcp` server, document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger
+    zone prefabs.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
-  - **automation** plugin — shared development skills that enforce Sollertia Platform coding conventions (Python
-    style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose codebase
-    exploration tools.
+  - **automation** plugin, which provides shared development skills that enforce Sollertia Platform coding
+    conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose
+    codebase exploration tools.
 
 Install all three plugins to make the full skill set available to compatible AI coding agents. The **unity** plugin
 depends on the **assets** plugin for the backing `slsa mcp` server that drives the Unity Editor relay.
 
 ### Automation Troubleshooting
 
-Many packages used in `tox` automation pipelines (uv, mypy, ruff) and `tox` itself may experience
-runtime failures. In most cases, this is related to their caching behavior. If an unintelligible
-error is encountered with any of the automation components, deleting the corresponding cache
-directories (`.tox`, `.ruff_cache`, `.mypy_cache`, etc.) manually or via a CLI command typically
-resolves the issue.
+Many packages used in `tox` automation pipelines (uv, mypy, ruff) and `tox` itself may experience runtime failures. In
+most cases, this is related to their caching behavior. If an unintelligible error is encountered with any of the
+automation components, deleting the corresponding cache directories (`.tox`, `.ruff_cache`, `.mypy_cache`, etc.)
+manually or via a CLI command typically resolves the issue.
 
 ___
 
@@ -586,14 +581,12 @@ ___
 
 ## License
 
-This project is licensed under the Apache 2.0 License: see the [LICENSE](LICENSE) file for
-details.
+This project is licensed under the Apache 2.0 License: see the [LICENSE](LICENSE) file for details.
 
 ___
 
 ## Acknowledgments
 
-- All Sun lab [members](https://neuroai.github.io/sunlab/people) for providing the inspiration
-  and comments during the development of this library.
-- The creators of all other dependencies and projects listed in the
-  [pyproject.toml](pyproject.toml) file.
+- All Sun lab [members](https://neuroai.github.io/sunlab/people) for providing the inspiration and comments during the
+  development of this library.
+- The creators of all other dependencies and projects listed in the [pyproject.toml](pyproject.toml) file.

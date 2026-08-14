@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "9.1.0rc4"
+version = "10.0.0"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -27,8 +27,8 @@ classifiers = [
     # Development status
     "Development Status :: 5 - Production/Stable",
     # Intended audience and project topic
-    "Intended Audience :: Developers",
-    "Topic :: Software Development",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
     # Supported Python Versions
     "Programming Language :: Python :: 3.14",
     # Supported Operating Systems
@@ -71,7 +71,7 @@ dependencies = [
     "httpx>=0.28,<1",
 ]
 
-# Project URLs. Points to the GitHub repository and the hosted API documentation.
+# Project repository and hosted documentation URLs.
 [project.urls]
 Homepage = "https://github.com/Sun-Lab-NBB/sollertia-shared-assets"
 Documentation = "https://sollertia-shared-assets-api-docs.netlify.app/"
@@ -89,15 +89,14 @@ dev = [
     "tox-uv>=1,<2",
 
     # Development Automation
-    "ataraxis-automation>=8,<9",
+    "ataraxis-automation>=9,<10",
 
     # Type stubs
     "types-python-dateutil>=2,<3",
     "types-pyyaml>=6,<7",
 ]
 
-# Specifies files that should not be included in the source-code distribution but are also not
-# part of gitignore.
+# Specifies files that should not be included in the source-code distribution.
 [tool.hatch.build.targets.sdist]
 exclude = [".github", "recipe"]
 
@@ -107,10 +106,10 @@ packages = ["src/sollertia_shared_assets"]
 
 # Ruff Configuration.
 [tool.ruff]
-line-length = 120         # Deviates from the commonly used '80' standard.
-indent-width = 4          # Same as black, indents are 4 spaces
+line-length = 120
+indent-width = 4
 target-version = "py314"  # Targets the lowest supported version of python
-src = ["src"]             # The name of the root source code directory
+src = ["src"]
 
 # Excludes 'service' .py files, such as the sphinx configuration file, from linting.
 extend-exclude = ["conf.py"]
@@ -118,32 +117,33 @@ extend-exclude = ["conf.py"]
 # Checks for all potential violations and uses the exclusions below to target-disable specific ones.
 lint.select = ["ALL"]
 
-# General ignore directives
 lint.ignore = [
+    # Universal lint.ignore corpus. Present in every Ataraxis framework and Sollertia platform project.
     "W291",    # Conflicts with docstring formatting
-    "TID252",  # Relative imports are important for correct asset management in this library
-    "BLE001",  # Blind except needed for robust error handling in data transfer and MCP tools
+    "ANN401",  # While suboptimal, ANY is a helpful type when used with caution
+    "BLE001",  # Broad exception handling is necessary at library boundaries
     "C901",    # Sometimes complex functions are necessary
-    "PLR0913", # Sometimes complex functions are necessary
-    "PLR0912", # Sometimes complex functions are necessary
-    "PLR0915", # Sometimes complex type definitions are necessary
     "PLR0911", # Sometimes complex return graphs are necessary
-    "PLR0917", # Call sites pass keyword arguments, so the positional count is immaterial
+    "PLR0912", # Sometimes complex functions are necessary
+    "PLR0913", # Sometimes complex functions are necessary
+    "PLR0915", # Sometimes functions with many statements are necessary
+    "PLR0917", # PLR0913 already covers argument counts, and call sites pass keyword arguments
     "COM812",  # Conflicts with the formatter
     "ISC001",  # Conflicts with the formatter
-    "PT001",   # https://github.com/astral-sh/ruff/issues/8796#issuecomment-182590771
+    "PT001",   # https://github.com/astral-sh/ruff/issues/8796#issuecomment-1825907715
     "PT023",   # https://github.com/astral-sh/ruff/issues/8796#issuecomment-1825907715
     "D107",    # __init__ is documented inside the main class docstring where applicable
     "D205",    # Bugs out for file descriptions
     "PLW0603", # While global statement usage is not ideal, it streamlines certain development patterns
-    "CPY001",  # The license is declared in the LICENSE file and the project metadata
+    "TID252",  # Conflicts with the library import management strategy, which requires parent-relative imports
+    "CPY001",  # The license is declared in the LICENSE file and the license and license-files metadata fields
 ]
 
 # Additional formatting configurations
 [tool.ruff.format]
-quote-style = "double"             # Uses double quotes for strings
-indent-style = "space"             # Uses space for indents
-skip-magic-trailing-comma = false  # Like black, ignores trailing commas
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false  # Like black, honors magic trailing commas
 line-ending = "auto"               # Automatically detects and standardizes line-ending character
 
 # Docstrings and comments' line length
@@ -160,20 +160,26 @@ convention = "google"
     "F401", # Imported but unused
     "F403", # Wildcard imports
 ]
-"**/tests/**/*.py" = [
-    "ANN",     # Type annotations are not required in tests
-    "D",       # Docstring enforcement is relaxed in tests
-    "INP001",  # Tests use implicit namespace packages
-    "PLR2004", # Magic values are common in test assertions
-    "PT006",   # Parametrize argument-name style is a project choice
-    "S101",    # Assert statements are how pytest tests verify behavior
-    "SLF001",  # Private member access is needed for testing internals
-    "T201",    # Print statements are allowed in tests
+"tests/**/*.py" = [
+    # Shared test corpus. These entries are present in every Ataraxis framework and Sollertia platform project.
+    "S101",    # Tests assert by design
+    "PLR2004", # Expected values are clearer inline than as named constants
+    "INP001",  # The test directory is not an importable package
+    "SLF001",  # Tests exercise private module members directly
+    "PT006",   # Parametrize argument names are declared as a single comma-separated string
+    "ARG001",  # Pytest injects fixtures that individual tests may not reference
+    "T201",    # Diagnostic prints are how a test reports intermediate state
+    "D",       # Test names and inline comments carry the intent that docstrings carry in library code
+    "ANN",     # Test functions and mock helpers do not need annotations
+
+    # Project-specific
+    "S108",    # Hardcoded '/tmp' paths are string fixtures that the path-grammar tests never open
+    "RUF043",  # Expected-error patterns quote the message verbatim, metacharacters included
 ]
 
-# Import-sorting (isort) configuration.
+# Import sorting and grouping configurations
 [tool.ruff.lint.isort]
-case-sensitive = true              # Takes case into account when sorting imports
+case-sensitive = true
 combine-as-imports = true          # Combines multiple "as" imports for the same package
 force-wrap-aliases = true          # Wraps "as" imports so that each uses a separate line
 force-sort-within-sections = true  # Forces "as" and "from" imports for the same package to be close
@@ -181,7 +187,7 @@ length-sort = true                 # Places shorter imports first
 
 # MyPy configuration section.
 [tool.mypy]
-# Strict mode settings (equivalent to --strict)
+# Strict mode settings (--strict), plus the unused-config warning that --strict does not enable
 warn_unused_configs = true
 disallow_any_generics = true
 disallow_subclassing_any = true
@@ -196,38 +202,53 @@ warn_return_any = true
 no_implicit_reexport = true
 strict_equality = true
 
-# Extra checks (equivalent to --extra-checks)
 extra_checks = true
 
-# Pretty output (equivalent to --pretty)
 pretty = true
 
 exclude = [
-    "sollertia-shared-assets-\\d+", # Ignores temporary folder created by setuptools when building the sdist
-    "venv.*/",                      # Ignores virtual environments
-    "build/",                       # Ignores the sdist directory
-    "dist/",                        # Ignores the wheel directory
-    "docs/",                        # Ignores the sphinx / doxygen directory
-    "stubs/",                       # Ignores stubs directory (stubgen output target)
-    "recipe/",                      # Ignores recipe directory (grayskull output target)
-    "tests/",                       # Ignores the test directory.
+    "sollertia-shared-assets-\\d+",  # The temporary folder created when building the sdist
+    "venv.*/",
+    "build/",
+    "dist/",
+    "docs/",
+    "stubs/",                        # stubgen output target
+    "recipe/",                       # grayskull output target
+    "tests/",
 ]
 
-# Excludes the MCP server interface modules from coverage measurement.
-[tool.coverage.run]
-omit = ["*/interfaces/*"]
+# Pytest configuration. The import mode is declared here so that a bare 'pytest' invocation resolves test modules the
+# same way the '{py}-test' tox task does.
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
 
-# This is used by the 'test' tox tasks to aggregate coverage data produced during pytest runtimes.
+# Lists the source files excluded from coverage measurement in full. The interface modules define the Click commands
+# and the MCP server tools, each of which wraps a function the test suite already covers.
+[tool.coverage.run]
+omit = [
+    "*/sollertia_shared_assets/interfaces/*",
+]
+
+# Used by the 'coverage' tox task to merge the coverage data files the '{py}-test' tasks produce.
 [tool.coverage.paths]
-# Maps coverage measured in site-packages to source files in src.
-source = ["src/", ".tox/*/lib/python*/site-packages/"]
+
+# Maps coverage measured in site-packages to source files in src. The second pattern matches the POSIX virtual
+# environment layout and the third matches the Windows layout, which omits the 'python*' path component. Both are
+# required for the 'coverage' task to merge the data measured on either host into a single record per source file.
+source = [
+    "src/",
+    ".tox/*/lib/python*/site-packages/",
+    ".tox/*/Lib/site-packages/",
+]
 
 # Same as above, specifies the output directory for the coverage .html report
 [tool.coverage.html]
 directory = "reports/coverage_html"
 
-# Specifies additional ignore directives
+# Specifies the coverage gate and additional ignore directives
 [tool.coverage.report]
+fail_under = 100     # Requires the test suite to cover every measured statement
+show_missing = true  # Lists the statements missed by the test suite, so a failed check names the lines to cover
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

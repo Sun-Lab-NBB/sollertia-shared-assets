@@ -8,12 +8,12 @@ import pytest
 import platformdirs
 
 from sollertia_shared_assets.enums import CredentialsTypes
+from sollertia_shared_assets.registries import CREDENTIALS_FILE_REGISTRY
 from sollertia_shared_assets.credentials import (
     get_credentials,
     set_credentials,
     resolve_credentials_file,
 )
-from sollertia_shared_assets.registries import CREDENTIALS_FILE_REGISTRY
 from sollertia_shared_assets.configuration import CREDENTIALS_DIRECTORY, set_working_directory
 
 if TYPE_CHECKING:

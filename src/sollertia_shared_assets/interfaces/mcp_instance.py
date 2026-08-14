@@ -30,7 +30,7 @@ mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
 """The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
 
 
-def ok_response(**payload: Any) -> dict[str, Any]:  # noqa: ANN401
+def ok_response(**payload: Any) -> dict[str, Any]:
     """Constructs a successful response dict with a ``success`` flag set to True."""
     return {"success": True, **payload}
 
@@ -40,7 +40,7 @@ def error_response(message: str) -> dict[str, Any]:
     return {"success": False, "error": message}
 
 
-def serialize(value: Any) -> Any:  # noqa: ANN401 - recursive helper accepts any serializable value.
+def serialize(value: Any) -> Any:
     """Recursively converts a dataclass, Path, Enum, mapping, or sequence into JSON-friendly Python.
 
     Args:
@@ -67,7 +67,7 @@ def serialize(value: Any) -> Any:  # noqa: ANN401 - recursive helper accepts any
     return value
 
 
-def _describe_type(type_hint: Any) -> str:  # noqa: ANN401 - introspection helper accepts arbitrary type hints.
+def _describe_type(type_hint: Any) -> str:
     """Returns a human-readable string for the given type hint."""
     if type_hint is None:
         return "None"
@@ -143,7 +143,7 @@ def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> di
         A mapping of class name to dataclass type for every dataclass referenced by the inspected field(s).
     """
 
-    def _iter(type_hint: Any) -> Iterator[type]:  # noqa: ANN401 - introspection recurses over arbitrary type hints.
+    def _iter(type_hint: Any) -> Iterator[type]:
         if isinstance(type_hint, type):
             if is_dataclass(type_hint):
                 yield type_hint

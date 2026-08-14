@@ -283,6 +283,22 @@ def test_dataset_data_get_sessions_for_animal(tmp_path: Path) -> None:
     assert all(session.animal == "animal_a" for session in animal_a_sessions)
 
 
+def test_dataset_data_get_animal_rejects_unknown_animal(tmp_path: Path) -> None:
+    """Verifies that get_animal() rejects an animal the dataset does not hold."""
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=(DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),),
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+    with pytest.raises(ValueError, match=r"Unable to look up the animal"):
+        dataset_data.get_animal(animal="animal_z")
+
+
 def test_dataset_data_get_session_found(tmp_path: Path) -> None:
     """Verifies that get_session() returns the DatasetSession matching the specified animal and session."""
     sessions = (

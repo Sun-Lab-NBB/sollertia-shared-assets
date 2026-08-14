@@ -3,6 +3,7 @@
 
 Platform Enumerations
 =====================
+
 .. automodule:: sollertia_shared_assets.enums
    :members:
    :undoc-members:
@@ -10,6 +11,7 @@ Platform Enumerations
 
 Configuration Assets
 ====================
+
 .. automodule:: sollertia_shared_assets.configuration
    :members:
    :undoc-members:
@@ -17,6 +19,7 @@ Configuration Assets
 
 Data Contract Assets
 ====================
+
 .. automodule:: sollertia_shared_assets.data_classes
    :members:
    :undoc-members:
@@ -24,6 +27,7 @@ Data Contract Assets
 
 Data Hierarchy Assets
 =====================
+
 .. automodule:: sollertia_shared_assets.data_hierarchy
    :members:
    :undoc-members:
@@ -31,6 +35,7 @@ Data Hierarchy Assets
 
 Mesoscope-VR Assets
 ===================
+
 .. automodule:: sollertia_shared_assets.mesoscope_vr
    :members:
    :undoc-members:
@@ -38,6 +43,7 @@ Mesoscope-VR Assets
 
 Dispatch Registries
 ===================
+
 .. automodule:: sollertia_shared_assets.registries
    :members:
    :undoc-members:
@@ -45,13 +51,15 @@ Dispatch Registries
 
 Credentials Toolset
 ===================
+
 .. automodule:: sollertia_shared_assets.credentials
    :members:
    :undoc-members:
    :show-inheritance:
 
-Command Line Interfaces
-=======================
+Command-Line Interface
+======================
+
 .. click:: sollertia_shared_assets.interfaces.cli:slsa_cli
    :prog: slsa
    :nested: full
