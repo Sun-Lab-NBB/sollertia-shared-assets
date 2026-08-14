@@ -206,6 +206,28 @@ def test_dataset_data_load_roundtrips_through_yaml(tmp_path: Path) -> None:
     assert len(loaded.sessions) == 2
 
 
+def test_dataset_data_load_falls_back_to_scanning_when_marker_is_not_canonical(tmp_path: Path) -> None:
+    """Verifies that load() scans the tree when the input path is not the dataset root, so a caller pointing at the
+    datasets root still resolves the single marker it holds.
+    """
+    DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=(DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),),
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+    # The datasets root holds no 'dataset.yaml' of its own, so the canonical lookup misses and the recursive scan
+    # resolves the dataset's marker instead.
+    loaded = DatasetData.load(dataset_path=tmp_path)
+
+    assert loaded.name == "test_dataset"
+    assert loaded.dataset_data_path == tmp_path / "test_dataset" / "dataset.yaml"
+
+
 def test_dataset_data_load_errors_when_no_marker(tmp_path: Path) -> None:
     """Verifies that load() raises FileNotFoundError when dataset.yaml cannot be located."""
     (tmp_path / "empty_dataset").mkdir()
