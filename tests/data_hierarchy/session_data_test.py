@@ -289,13 +289,30 @@ def test_session_data_load_raises_error_no_session_data_file(tmp_path: Path) -> 
         SessionData.load(session_path=session_path.parent)
 
 
+def test_session_data_load_falls_back_to_scanning_when_marker_is_not_canonical(
+    sample_session_hierarchy: Path,
+) -> None:
+    """Verifies that load() scans the tree when the input path is not the session root, so a caller pointing at an
+    ancestor directory still resolves the single marker it holds.
+    """
+    _write_session_marker(session_root=sample_session_hierarchy, session_type=SessionTypes.LICK_TRAINING)
+
+    # The animal directory holds no 'raw_data/session_data.yaml' of its own, so the canonical lookup misses and the
+    # recursive scan resolves the session's marker instead.
+    loaded_session = SessionData.load(session_path=sample_session_hierarchy.parent)
+
+    assert loaded_session.session_name == sample_session_hierarchy.name
+    assert loaded_session.raw_data_path == sample_session_hierarchy / "raw_data"
+
+
 def test_session_data_load_raises_error_multiple_session_data_files(tmp_path: Path) -> None:
     """Verifies that load() raises FileNotFoundError when multiple session_data.yaml files are found."""
     session_path = tmp_path / "session"
     (session_path / "first").mkdir(parents=True)
     (session_path / "second").mkdir(parents=True)
 
-    # Creates two session_data.yaml files so rglob() returns more than one match.
+    # Creates two session_data.yaml files, neither at the canonical location, so the fallback scan returns more
+    # than one match.
     (session_path / "first" / "session_data.yaml").write_text("first")
     (session_path / "second" / "session_data.yaml").write_text("second")
 
@@ -340,19 +357,19 @@ def test_session_data_save_converts_enums_to_strings(sample_session_hierarchy: P
     assert "acquisition_system: mesoscope" in content
 
 
-def test_session_data_save_persists_portable_default_paths(sample_session_hierarchy: Path) -> None:
-    """Verifies that save() persists the raw and processed data roots as their portable defaults, restores the live
-    in-memory paths, and writes the marker file at ``raw_data_path / session_data.yaml``.
+def test_session_data_save_omits_host_specific_root_paths(sample_session_hierarchy: Path) -> None:
+    """Verifies that save() keeps both root paths out of the written marker, leaves the live in-memory paths intact,
+    and writes the marker file at ``raw_data_path / session_data.yaml``.
     """
     session = _write_session_marker(session_root=sample_session_hierarchy, session_type=SessionTypes.RUN_TRAINING)
 
     marker_path = session.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
     assert marker_path.exists()
     content = marker_path.read_text()
-    assert "raw_data_path: ." in content
-    assert "processed_data_path: ." in content
+    assert "raw_data_path" not in content
+    assert "processed_data_path" not in content
 
-    # save() restores the live paths after serialization so downstream steps keep the resolved locations.
+    # The in-memory instance keeps the resolved location, so downstream steps read it without reloading.
     assert session.raw_data_path == sample_session_hierarchy / "raw_data"
 
 

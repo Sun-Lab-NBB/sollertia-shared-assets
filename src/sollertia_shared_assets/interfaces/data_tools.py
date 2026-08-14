@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from pathlib import Path
 from dataclasses import fields, dataclass
 
+from ataraxis_data_structures import index_marker_files
+
 if TYPE_CHECKING:
     from ataraxis_data_structures import YamlConfig
 
@@ -101,10 +103,25 @@ def get_data_root_overview_tool(
     flat_sessions: list[dict[str, Any]] = []
     top_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
 
+    # Indexes the session and dataset markers in a single pass over the data root, so the session walk below and the
+    # per-project dataset counts further down share one traversal instead of re-walking the tree once per project.
+    # The scan reports a directory it cannot read instead of skipping it, which is surfaced as a failed response
+    # rather than an overview that silently covers only the readable part of the tree.
+    try:
+        marker_index = index_marker_files(
+            directory=root,
+            marker_names=(RawDataFiles.SESSION_DATA, DATASET_MARKER_FILENAME),
+        )
+    except OSError as exception:
+        return error_response(
+            message=f"Unable to scan the data root {root} for session and dataset markers: {exception}"
+        )
+
+    dataset_counts = _count_datasets_by_project(root=root, markers=marker_index[DATASET_MARKER_FILENAME])
+
     # Walks every session marker under the root. Broken markers produce error-status entries but do
     # not corrupt the project / animal aggregation because their identity cannot be trusted.
-    markers = sorted(root.rglob(RawDataFiles.SESSION_DATA))
-    for marker in markers:
+    for marker in marker_index[RawDataFiles.SESSION_DATA]:
         session_root = get_session_root_from_marker(marker=marker)
         try:
             instance = SessionData.load(session_path=session_root)
@@ -147,9 +164,8 @@ def get_data_root_overview_tool(
         projects = _augment_with_directory_hierarchy(root=root, projects=projects)
 
     for project in projects:
-        experiment_count, dataset_count = _count_project_artifacts(project_path=Path(project["path"]))
-        project["experiment_count"] = experiment_count
-        project["dataset_count"] = dataset_count
+        project["experiment_count"] = _count_project_experiments(project_path=Path(project["path"]))
+        project["dataset_count"] = dataset_counts.get(project["name"], 0)
 
     total_animals = sum(len(project["animals"]) for project in projects)
 
@@ -719,7 +735,7 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
     Error-status entries (whose identity could not be trusted from SessionData) are excluded from
     aggregation; they remain in the top-level flat ``sessions`` list only. The returned per-project
     dicts do not include filesystem-derived counts such as ``experiment_count`` or ``dataset_count``;
-    callers obtain those via ``_count_project_artifacts``.
+    callers obtain those via ``_count_project_experiments`` and ``_count_datasets_by_project``.
 
     Args:
         root: The resolved data root path used to construct each project's reported ``path``.
@@ -833,21 +849,42 @@ def _augment_with_directory_hierarchy(root: Path, projects: list[dict[str, Any]]
     return [projects_by_name[name] for name in sorted(projects_by_name)]
 
 
-def _count_project_artifacts(project_path: Path) -> tuple[int, int]:
-    """Counts experiment configuration YAMLs and dataset markers under a project directory.
+def _count_project_experiments(project_path: Path) -> int:
+    """Counts the experiment configuration YAMLs declared for a project.
 
     Args:
         project_path: The path to the project directory under the data root.
 
     Returns:
-        A tuple of ``(experiment_count, dataset_count)``. Experiment count is the number of
-        ``.yaml`` files directly under ``<project>/configuration/``; dataset count is the
-        number of ``DATASET_MARKER_FILENAME`` occurrences anywhere under the project.
+        The number of ``.yaml`` files directly under ``<project>/configuration/``, and zero when that directory
+        does not exist.
     """
     configuration_directory = project_path.joinpath(CONFIGURATION_DIRECTORY)
-    experiment_count = len(list(configuration_directory.glob("*.yaml"))) if configuration_directory.is_dir() else 0
-    dataset_count = len(list(project_path.rglob(DATASET_MARKER_FILENAME))) if project_path.is_dir() else 0
-    return experiment_count, dataset_count
+    return len(list(configuration_directory.glob("*.yaml"))) if configuration_directory.is_dir() else 0
+
+
+def _count_datasets_by_project(root: Path, markers: tuple[Path, ...]) -> dict[str, int]:
+    """Buckets pre-discovered dataset markers by the project each one belongs to.
+
+    Consumes the marker paths the data root's single indexing pass already produced, so counting the datasets of
+    every project costs no additional filesystem traversal.
+
+    Args:
+        root: The resolved data root the markers were discovered under.
+        markers: The absolute paths to every ``DATASET_MARKER_FILENAME`` found under the data root.
+
+    Returns:
+        A mapping from each project name to the number of dataset markers found anywhere under it. A marker that
+        sits directly at the data root belongs to no project and is therefore not counted.
+    """
+    counts: dict[str, int] = {}
+    for marker in markers:
+        # A marker resolves to a project only when at least one directory separates it from the data root.
+        if marker.parent == root:
+            continue
+        project_name = marker.relative_to(root).parts[0]
+        counts[project_name] = counts.get(project_name, 0) + 1
+    return counts
 
 
 def _build_session_report(instance: SessionData, session_root: Path) -> dict[str, Any]:

@@ -132,7 +132,7 @@ def configure_group() -> None:  # pragma: no cover
 )
 def configure_directory(directory: Path) -> None:  # pragma: no cover
     """Sets the input directory as the local Sollertia platform working directory."""
-    ensure_directory_exists(path=directory)
+    ensure_directory_exists(path=directory, is_file=False)
     set_working_directory(path=directory)
 
 

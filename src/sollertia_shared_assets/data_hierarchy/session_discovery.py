@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from natsort import natsorted
 from dateutil import parser
+from ataraxis_data_structures import discover_marker_roots
 
 from .session_data import SessionData, RawDataFiles
 from ..configuration import CONFIGURATION_DIRECTORY
@@ -73,6 +74,10 @@ def discover_sessions(root_path: Path) -> list[Path]:
     session data, making this function suitable as a lightweight discovery primitive for both MCP
     tools and internal pipeline code.
 
+    Notes:
+        The scan raises on a directory it cannot read rather than skipping it, so a partially readable
+        data root reports the failure instead of silently returning a subset of the sessions it holds.
+
     Args:
         root_path: The absolute path to the directory to search recursively.
 
@@ -80,9 +85,12 @@ def discover_sessions(root_path: Path) -> list[Path]:
         A sorted list of absolute paths to session root directories found under ``root_path``.
 
     Raises:
-        PermissionError: If the search encounters a directory it cannot read.
+        OSError: If the root directory does not exist, is not a directory, or if the search encounters a
+            directory it cannot read.
     """
-    return sorted(get_session_root_from_marker(marker=marker) for marker in root_path.rglob(RawDataFiles.SESSION_DATA))
+    # A marker lives at '{session_root}/raw_data/session_data.yaml', so the session root sits one level above the
+    # marker's own parent.
+    return discover_marker_roots(directory=root_path, marker_name=RawDataFiles.SESSION_DATA, levels_up=1)
 
 
 def get_session_root_from_marker(marker: Path) -> Path:

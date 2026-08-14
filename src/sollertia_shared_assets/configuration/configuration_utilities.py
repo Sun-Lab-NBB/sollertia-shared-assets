@@ -6,6 +6,7 @@ from pathlib import Path
 
 import platformdirs
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
+from ataraxis_data_structures import atomic_write
 
 CONFIGURATION_DIRECTORY: str = "configuration"
 """The name of the directory that stores configuration files. Used both under the local working directory (where it
@@ -33,12 +34,16 @@ def set_working_directory(path: Path) -> None:
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = application_directory.joinpath("working_directory_path.txt")
 
-    ensure_directory_exists(path=path_file)
-    ensure_directory_exists(path=path)
-    ensure_directory_exists(path=path.joinpath(CONFIGURATION_DIRECTORY))
-    ensure_directory_exists(path=path.joinpath(CREDENTIALS_DIRECTORY))
+    # Every target is stated explicitly, since a working directory whose own name carries a dot would otherwise be
+    # read as a file path and only its parent would be created.
+    ensure_directory_exists(path=path_file, is_file=True)
+    ensure_directory_exists(path=path, is_file=False)
+    ensure_directory_exists(path=path.joinpath(CONFIGURATION_DIRECTORY), is_file=False)
+    ensure_directory_exists(path=path.joinpath(CREDENTIALS_DIRECTORY), is_file=False)
 
-    with path_file.open(mode="w") as file:
+    # The path is written atomically, so a process killed mid-write leaves the previously configured directory
+    # readable instead of truncating the record every later session resolves the working directory from.
+    with atomic_write(file_path=path_file) as file:
         file.write(str(path))
 
     console.echo(message=f"Sollertia platform working directory set to: {path}.", level=LogLevel.SUCCESS)
@@ -96,10 +101,11 @@ def set_data_root(path: Path) -> None:
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = application_directory.joinpath("data_root_path.txt")
 
-    ensure_directory_exists(path=path_file)
-    ensure_directory_exists(path=path)
+    # Stating the kind of each target keeps a data root whose own name carries a dot from being read as a file path.
+    ensure_directory_exists(path=path_file, is_file=True)
+    ensure_directory_exists(path=path, is_file=False)
 
-    with path_file.open(mode="w") as file:
+    with atomic_write(file_path=path_file) as file:
         file.write(str(path))
 
     console.echo(message=f"Sollertia platform data root set to: {path}.", level=LogLevel.SUCCESS)
@@ -170,9 +176,9 @@ def set_task_templates_directory(path: Path) -> None:
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = application_directory.joinpath("task_templates_directory_path.txt")
 
-    ensure_directory_exists(path=path_file)
+    ensure_directory_exists(path=path_file, is_file=True)
 
-    with path_file.open(mode="w") as file:
+    with atomic_write(file_path=path_file) as file:
         file.write(str(path.resolve()))
 
     console.echo(message=f"Task templates directory path set to: {path.resolve()}.", level=LogLevel.SUCCESS)

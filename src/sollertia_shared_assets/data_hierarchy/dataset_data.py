@@ -14,10 +14,16 @@ from dataclasses import field, dataclass
 
 import polars as pl
 from ataraxis_base_utilities import console, ensure_directory_exists
-from ataraxis_data_structures import YamlConfig, delete_directory
+from ataraxis_data_structures import (
+    YAML_EXCLUDE_METADATA,
+    YamlConfig,
+    delete_directory,
+    discover_marker_files,
+)
 
 from ..enums import SessionTypes, AcquisitionSystems
 from .session_data import RawDataFiles
+from .project_hierarchy import DATASET_MARKER_FILENAME
 
 
 class DatasetFiles(StrEnum):
@@ -56,8 +62,9 @@ class DatasetSession:
     """
     animal: str
     """The unique identifier of the animal that participated in the session."""
-    session_path: Path = Path()
-    """The path to the session's directory within the dataset hierarchy (dataset/animal/session)."""
+    session_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
+    """The path to the session's directory within the dataset hierarchy (dataset/animal/session). Kept out of the
+    written marker, since ``DatasetData.load`` re-resolves it from the marker's own on-disk location."""
 
     @property
     def data_path(self) -> Path:
@@ -137,9 +144,9 @@ class DatasetData(YamlConfig):
     """The name of the data acquisition system used to acquire all sessions in the dataset."""
     sessions: tuple[DatasetSession, ...] = field(default_factory=tuple)
     """The DatasetSession instances that identify and locate each session included in the dataset."""
-    dataset_data_path: Path = Path()
-    """The resolved path to this dataset's ``dataset.yaml`` file. Re-derived from the YAML's on-disk location on
-    load so the dataset remains portable across machines."""
+    dataset_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
+    """The resolved path to this dataset's ``dataset.yaml`` file. Kept out of the written marker and re-derived from
+    the YAML's on-disk location on load, so the dataset remains portable across machines."""
 
     def __post_init__(self) -> None:
         """Ensures that all fields used to define the dataset are properly initialized."""
@@ -208,14 +215,16 @@ class DatasetData(YamlConfig):
             )
             console.error(message=message, error=FileExistsError)
 
-        # Creates the dataset root directory. Downstream consumers populate it with their own files.
-        ensure_directory_exists(path=dataset_path)
+        # Creates the dataset root directory. Downstream consumers populate it with their own files. The kind of the
+        # target is stated explicitly, since a dataset whose name carries a dot would otherwise be read as a file
+        # path and only its parent would be created.
+        ensure_directory_exists(path=dataset_path, is_file=False)
 
         # Creates animal/session subdirectories and rebuilds each session with its resolved path.
         resolved_sessions: list[DatasetSession] = []
         for session in sessions:
             session_path = dataset_path.joinpath(session.animal, session.session)
-            ensure_directory_exists(path=session_path)
+            ensure_directory_exists(path=session_path, is_file=False)
             resolved_sessions.append(
                 DatasetSession(session=session.session, animal=session.animal, session_path=session_path)
             )
@@ -227,7 +236,7 @@ class DatasetData(YamlConfig):
             session_type=session_type,
             acquisition_system=acquisition_system,
             sessions=tuple(resolved_sessions),
-            dataset_data_path=dataset_path.joinpath("dataset.yaml"),
+            dataset_data_path=dataset_path.joinpath(DATASET_MARKER_FILENAME),
         )
 
         # Saves the configured instance data to disk.
@@ -255,20 +264,31 @@ class DatasetData(YamlConfig):
 
         Raises:
             FileNotFoundError: If multiple or no 'dataset.yaml' file instances are found under the input directory.
+            OSError: If the fallback scan encounters a directory it cannot read.
         """
-        # Locates the dataset.yaml file.
-        dataset_data_files = list(dataset_path.rglob("dataset.yaml"))
-        if len(dataset_data_files) != 1:
-            message = (
-                f"Unable to load the target dataset's data. Expected a single dataset.yaml file to be located "
-                f"under the directory tree specified by the input path: {dataset_path}. Instead, encountered "
-                f"{len(dataset_data_files)} candidate files. This indicates that the input path does not point to a "
-                f"valid dataset data hierarchy."
+        # Resolves the marker at its canonical location first, so loading a dataset that holds many assembled session
+        # feathers costs a single metadata query instead of a recursive walk of the whole dataset tree. The scan below
+        # still covers a caller that points at a directory other than the dataset root.
+        canonical_marker = dataset_path.joinpath(DATASET_MARKER_FILENAME)
+        if canonical_marker.is_file():
+            dataset_data_path = canonical_marker
+        else:
+            candidates = (
+                discover_marker_files(directory=dataset_path, marker_name=DATASET_MARKER_FILENAME)
+                if dataset_path.is_dir()
+                else []
             )
-            console.error(message=message, error=FileNotFoundError)
+            if len(candidates) != 1:
+                message = (
+                    f"Unable to load the target dataset's data. Expected a single dataset.yaml file to be located "
+                    f"under the directory tree specified by the input path: {dataset_path}. Instead, encountered "
+                    f"{len(candidates)} candidate files. This indicates that the input path does not point to a "
+                    f"valid dataset data hierarchy."
+                )
+                console.error(message=message, error=FileNotFoundError)
+            dataset_data_path = candidates[0]
 
         # Loads the dataset's data from the .yaml file.
-        dataset_data_path = dataset_data_files.pop()
         instance: DatasetData = cls.from_yaml(file_path=dataset_data_path)
 
         # Re-resolves the dataset_data_path and each session's session_path against the YAML file's filesystem
@@ -347,7 +367,7 @@ class DatasetData(YamlConfig):
         added: list[DatasetSession] = []
         for session in sessions:
             session_path = dataset_path.joinpath(session.animal, session.session)
-            ensure_directory_exists(path=session_path)
+            ensure_directory_exists(path=session_path, is_file=False)
             added.append(DatasetSession(session=session.session, animal=session.animal, session_path=session_path))
 
         self.sessions = (*self.sessions, *added)

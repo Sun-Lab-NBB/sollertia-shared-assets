@@ -86,7 +86,7 @@ def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
         console.error(message=message, error=ValueError)
 
     credentials_directory = get_working_directory().joinpath(CREDENTIALS_DIRECTORY)
-    ensure_directory_exists(path=credentials_directory)
+    ensure_directory_exists(path=credentials_directory, is_file=False)
 
     destination = credentials_directory.joinpath(file_name)
     shutil.copyfile(src=path, dst=destination)

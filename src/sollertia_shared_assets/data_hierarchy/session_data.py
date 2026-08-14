@@ -8,11 +8,11 @@ from enum import StrEnum
 import shutil
 from typing import TYPE_CHECKING
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import field, dataclass
 
 from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
-from ataraxis_data_structures import YamlConfig
+from ataraxis_data_structures import YAML_EXCLUDE_METADATA, YamlConfig, discover_marker_files
 
 from ..enums import SessionTypes, AcquisitionSystems
 from ..registries import (
@@ -305,10 +305,12 @@ class SessionData(YamlConfig):
     """The Python version used to acquire session's data."""
     sollertia_experiment_version: str = "5.0.0"
     """The sollertia-experiment library version used to acquire the session's data."""
-    raw_data_path: Path = Path()
-    """The path to the root directory that stores the session's raw data."""
-    processed_data_path: Path = Path()
-    """The path to the root directory that stores the session's processed data."""
+    raw_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
+    """The path to the root directory that stores the session's raw data. Kept out of the written marker, since
+    ``load`` re-resolves it from the marker's own on-disk location."""
+    processed_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
+    """The path to the root directory that stores the session's processed data. Kept out of the written marker, since
+    ``load`` re-resolves it from the marker's own on-disk location."""
 
     def __post_init__(self) -> None:
         """Coerces the string values loaded from YAML into their typed enum equivalents."""
@@ -412,7 +414,7 @@ class SessionData(YamlConfig):
         # Only the raw_data directory is created here; processed_data is owned by the processing machine and
         # is created later, on a different host, when the session is loaded for processing.
         raw_data_path = animal.session_path(session_name).joinpath(RAW_DATA_DIRECTORY)
-        ensure_directory_exists(path=raw_data_path)
+        ensure_directory_exists(path=raw_data_path, is_file=False)
 
         instance = cls(
             project_name=animal.project_name,
@@ -483,18 +485,30 @@ class SessionData(YamlConfig):
         Raises:
             FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input
                 directory.
+            OSError: If the fallback scan encounters a directory it cannot read.
         """
-        session_data_files = list(session_path.rglob(RawDataFiles.SESSION_DATA))
-        if len(session_data_files) != 1:
-            message = (
-                f"Unable to load the target session's data. Expected a single session_data.yaml file to be located "
-                f"under the directory tree specified by the input path: {session_path}. Instead, encountered "
-                f"{len(session_data_files)} candidate files. This indicates that the input path does not point to a "
-                f"valid session data hierarchy."
+        # Resolves the marker at its canonical location first, so loading a session whose raw_data holds a large
+        # number of acquisition files costs a single metadata query instead of a recursive walk of the whole session
+        # tree. The scan below still covers a caller that points at a directory other than the session root.
+        canonical_marker = session_path.joinpath(RAW_DATA_DIRECTORY, RawDataFiles.SESSION_DATA)
+        if canonical_marker.is_file():
+            session_data_path = canonical_marker
+        else:
+            candidates = (
+                discover_marker_files(directory=session_path, marker_name=RawDataFiles.SESSION_DATA)
+                if session_path.is_dir()
+                else []
             )
-            console.error(message=message, error=FileNotFoundError)
+            if len(candidates) != 1:
+                message = (
+                    f"Unable to load the target session's data. Expected a single session_data.yaml file to be "
+                    f"located under the directory tree specified by the input path: {session_path}. Instead, "
+                    f"encountered {len(candidates)} candidate files. This indicates that the input path does not "
+                    f"point to a valid session data hierarchy."
+                )
+                console.error(message=message, error=FileNotFoundError)
+            session_data_path = candidates[0]
 
-        session_data_path = session_data_files.pop()
         instance: SessionData = cls.from_yaml(file_path=session_data_path)
 
         # The method assumes that the 'donor' YAML file is always stored inside the raw_data directory of the session
@@ -549,14 +563,9 @@ class SessionData(YamlConfig):
 
         Notes:
             Resolves the destination path directly from ``raw_data_path`` so the method works on instances that have
-            not yet been routed through ``_build_sub_dataclasses``. Persists ``raw_data_path`` and
-            ``processed_data_path`` as their portable defaults, since ``load`` re-resolves both from the file's
-            on-disk location, so the acquisition host's absolute paths never enter the saved file.
+            not yet been routed through ``_build_sub_dataclasses``. Both root paths carry ``YAML_EXCLUDE_METADATA``,
+            so the acquisition host's absolute paths never enter the saved file and ``load`` re-resolves them from
+            the file's own on-disk location. The write itself is atomic, so an interrupted save leaves the previously
+            written marker intact.
         """
-        destination = self.raw_data_path.joinpath(RawDataFiles.SESSION_DATA)
-        live_paths = self.raw_data_path, self.processed_data_path
-        self.raw_data_path, self.processed_data_path = Path(), Path()
-        try:
-            self.to_yaml(file_path=destination)
-        finally:
-            self.raw_data_path, self.processed_data_path = live_paths
+        self.to_yaml(file_path=self.raw_data_path.joinpath(RawDataFiles.SESSION_DATA))
