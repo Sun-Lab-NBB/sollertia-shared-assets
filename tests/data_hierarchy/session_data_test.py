@@ -19,6 +19,7 @@ from sollertia_shared_assets.configuration import (
     set_task_templates_directory,
 )
 from sollertia_shared_assets.data_hierarchy import (
+    RAW_DATA_DIRECTORY,
     RawData,
     AnimalData,
     Directories,
@@ -267,6 +268,30 @@ def test_session_data_create_marks_with_nk_file(clean_working_directory: Path) -
     )
 
     assert session_data.raw_data_path.joinpath(RawDataFiles.NK_MARKER).exists()
+
+
+def test_session_data_create_marks_with_nk_file_before_the_session_marker(clean_working_directory: Path) -> None:
+    """Verifies that a create() failure leaves behind a session carrying the nk.bin uninitialized marker."""
+    set_working_directory(path=clean_working_directory)
+    project_path = clean_working_directory / "test_project"
+    project_path.mkdir()
+    (project_path / "configuration").mkdir()
+
+    # Names an experiment whose configuration YAML is absent, so the copy step fails after both markers are written.
+    with pytest.raises(FileNotFoundError):
+        SessionData.create(
+            animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
+            session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+            experiment_name="missing_experiment",
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        )
+
+    leftovers = list((project_path / "test_animal").glob(f"*/{RAW_DATA_DIRECTORY}"))
+    assert len(leftovers) == 1
+    assert (leftovers[0] / RawDataFiles.SESSION_DATA).is_file()
+    assert (leftovers[0] / RawDataFiles.NK_MARKER).is_file()
 
 
 def test_session_data_load_finds_session_data_yaml(sample_session_hierarchy: Path) -> None:

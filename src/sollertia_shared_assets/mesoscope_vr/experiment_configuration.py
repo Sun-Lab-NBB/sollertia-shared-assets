@@ -5,8 +5,9 @@ system.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from dataclasses import dataclass
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any
+from dataclasses import fields, dataclass
 
 from ataraxis_base_utilities import console
 from ataraxis_data_structures import YamlConfig
@@ -14,6 +15,8 @@ from ataraxis_data_structures import YamlConfig
 from ..configuration import TriggerType, ExperimentState
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from ..configuration import TaskTemplate
 
 _DEFAULT_STATE_DURATION_S: int = 60
@@ -27,6 +30,25 @@ _DEFAULT_RECOVERY_FAILED_THRESHOLD: int = 9
 
 _DEFAULT_RECOVERY_GUIDED_TRIALS: int = 3
 """Default number of guided trials issued when the recovery threshold is crossed."""
+
+_DISCRIMINATOR_FIELD: str = "trial_kind"
+"""Name of the field each runtime trial class declares to identify which class a stored trial belongs to."""
+
+
+class TrialKind(StrEnum):
+    """Defines the discriminators that identify which Mesoscope-VR runtime trial class a stored trial belongs to.
+
+    Notes:
+        Each trial class declares this discriminator with its own member as the default and rejects every other member
+        at initialization. Deserialization tries the members of the trial union in order and skips an arm whose
+        initialization raises, so the enforced discriminator is what routes a stored trial back to the class that wrote
+        it.
+    """
+
+    WATER = "water"
+    """Indicates a trial that delivers a water reward, which is a MesoscopeWaterRewardTrial."""
+    PUFF = "puff"
+    """Indicates a trial that delivers a gas puff, which is a MesoscopeGasPuffTrial."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +64,17 @@ class MesoscopeWaterRewardTrial:
     """The volume of water, in microliters, to deliver when the animal successfully completes the trial."""
     reward_tone_duration_ms: int = 300
     """The duration, in milliseconds, to sound the auditory tone when delivering the water reward."""
+    trial_kind: TrialKind = TrialKind.WATER
+    """The discriminator that identifies this trial as a water reward trial when it is read back from a YAML file."""
+
+    def __post_init__(self) -> None:
+        """Validates the trial kind discriminator."""
+        if self.trial_kind != TrialKind.WATER:
+            message = (
+                f"Unable to initialize MesoscopeWaterRewardTrial. The trial_kind must be '{TrialKind.WATER.value}', "
+                f"but got '{self.trial_kind}'."
+            )
+            console.error(message=message, error=ValueError)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +88,17 @@ class MesoscopeGasPuffTrial:
 
     puff_duration_ms: int = 100
     """The duration, in milliseconds, for which to deliver the gas puff when the animal fails the trial."""
+    trial_kind: TrialKind = TrialKind.PUFF
+    """The discriminator that identifies this trial as a gas puff trial when it is read back from a YAML file."""
+
+    def __post_init__(self) -> None:
+        """Validates the trial kind discriminator."""
+        if self.trial_kind != TrialKind.PUFF:
+            message = (
+                f"Unable to initialize MesoscopeGasPuffTrial. The trial_kind must be '{TrialKind.PUFF.value}', but "
+                f"got '{self.trial_kind}'."
+            )
+            console.error(message=message, error=ValueError)
 
 
 @dataclass
@@ -76,6 +120,31 @@ class MesoscopeExperimentConfiguration(YamlConfig):
     unity_scene_name: str
     """The Unity scene (VR task) the experiment runs in the linear infinite corridor, identifying the paired task
     template by filename stem. This contract field is required by every experiment configuration."""
+
+    def __post_init__(self) -> None:
+        """Verifies that every stored trial resolved to one of the runtime trial classes.
+
+        Notes:
+            Deserialization matches a stored trial against each member of the trial union in turn and yields the
+            unconverted mapping when no member accepts it, because the loader runs with per-field type checking
+            disabled. An unconverted trial reaches the acquisition runtime as a mapping and fails there instead of
+            here, so it is rejected at load.
+
+        Raises:
+            ValueError: If any stored trial did not resolve to a runtime trial class.
+        """
+        unresolved = sorted(
+            trial_name
+            for trial_name, trial in self.trial_structures.items()
+            if not isinstance(trial, (MesoscopeWaterRewardTrial, MesoscopeGasPuffTrial))
+        )
+        if unresolved:
+            message = (
+                f"Unable to initialize MesoscopeExperimentConfiguration. Every trial must resolve to a Mesoscope-VR "
+                f"runtime trial class, but the following did not: {', '.join(unresolved)}. Check the fields and the "
+                f"'{_DISCRIMINATOR_FIELD}' value each of them declares."
+            )
+            console.error(message=message, error=ValueError)
 
     @classmethod
     def from_task_template(
@@ -100,7 +169,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             unity_scene_name: The Unity scene name for the experiment. This should match the template YAML file
                 name so ``SessionData.create()`` can locate the corresponding VR template during snapshot export.
                 Matching is the caller's responsibility and is not validated here.
-            state_count: The number of default-valued runtime states to generate.
+            state_count: The number of default-valued runtime states to generate. Must be at least one, since an
+                experiment with no runtime states cannot be executed.
             default_reward_size_ul: Water reward volume in microliters for interaction-type trials.
             default_reward_tone_duration_ms: Reward tone duration in milliseconds for interaction-type trials.
             default_puff_duration_ms: Gas puff duration in milliseconds for occupancy-disarm trials.
@@ -110,10 +180,17 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             of default-valued runtime states.
 
         Raises:
-            ValueError: If any of the template's trial structures uses a TriggerType that is not mapped to a
-                Mesoscope-VR runtime trial class. Only TriggerType.INTERACTION and TriggerType.OCCUPANCY_DISARM are
-                mapped to runtime trial classes.
+            ValueError: If state_count is less than one, or if any of the template's trial structures uses a
+                TriggerType that is not mapped to a Mesoscope-VR runtime trial class. Only TriggerType.INTERACTION and
+                TriggerType.OCCUPANCY_DISARM are mapped to runtime trial classes.
         """
+        if state_count < 1:
+            message = (
+                f"Unable to build a MesoscopeExperimentConfiguration from the task template. The state_count must be "
+                f"at least 1, but got {state_count}."
+            )
+            console.error(message=message, error=ValueError)
+
         trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial] = {}
         for trial_name, trial_structure in template.trial_structures.items():
             if trial_structure.trigger_type == TriggerType.INTERACTION:
@@ -155,3 +232,122 @@ class MesoscopeExperimentConfiguration(YamlConfig):
             experiment_states=experiment_states,
             unity_scene_name=unity_scene_name,
         )
+
+    @classmethod
+    def restore_excluded_fields(cls, data: dict[Any, Any], file_path: Path) -> dict[Any, Any]:  # noqa: ARG003
+        """Returns the loaded mapping with a trial kind discriminator supplied for every trial that omits one.
+
+        Notes:
+            An omitted field takes its class default, so a trial carrying no discriminator would resolve to the water
+            reward class whatever fields it declares. Resolving the discriminator from those fields instead routes the
+            trial to the class that accommodates them, which lets a configuration authored without the discriminator
+            load as written.
+
+        Args:
+            data: The mapping loaded from the configuration file.
+            file_path: The path the mapping was loaded from.
+
+        Returns:
+            The loaded mapping whose every stored trial carries a trial kind discriminator.
+
+        Raises:
+            ValueError: If a stored trial declares an unrecognized discriminator, or declares fields that identify a
+                different runtime trial class than its discriminator names, or that identify two classes at once.
+        """
+        trial_structures = data.get("trial_structures")
+        if not isinstance(trial_structures, dict):
+            return data
+
+        return {
+            **data,
+            "trial_structures": {
+                trial_name: _restore_trial_kind(trial_name=trial_name, trial=trial)
+                for trial_name, trial in trial_structures.items()
+            },
+        }
+
+
+_TRIAL_CLASSES: tuple[tuple[TrialKind, type], ...] = (
+    (TrialKind.WATER, MesoscopeWaterRewardTrial),
+    (TrialKind.PUFF, MesoscopeGasPuffTrial),
+)
+"""Pairs each trial kind with the runtime trial class that declares it as its discriminator default. The pairs are
+declared below the classes they name, since a constant cannot reference a class defined after it."""
+
+
+def _restore_trial_kind(trial_name: str, trial: Any) -> Any:
+    """Returns the stored trial with its trial kind discriminator supplied and checked against the fields it declares.
+
+    Notes:
+        A trial written before the discriminator existed carries no ``trial_kind`` field, and an omitted field takes
+        its class default, which would route every such trial to the water reward class. The fields unique to one
+        runtime trial class identify the class instead. A trial declaring none of them predates the split of the two
+        classes and takes the water reward kind, which is the only kind those trials ever held. Fields belonging to
+        neither class are ignored, matching how the loader has always treated a field it does not recognize.
+
+    Args:
+        trial_name: The name the trial is stored under.
+        trial: The stored trial, which is a mapping for every trial a configuration file declares.
+
+    Returns:
+        The stored trial unchanged when it already carries a discriminator consistent with its fields, otherwise a
+        copy carrying the resolved discriminator.
+
+    Raises:
+        ValueError: If the trial declares an unrecognized discriminator, or declares fields unique to a different
+            runtime trial class than its discriminator names, or declares fields unique to two classes at once.
+    """
+    if not isinstance(trial, dict):
+        return trial
+
+    declared_fields = frozenset(trial)
+    identified = {kind for kind, unique_fields in _unique_trial_fields().items() if declared_fields & unique_fields}
+    if len(identified) > 1:
+        message = (
+            f"Unable to resolve the trial kind for the '{trial_name}' trial. The trial declares fields unique to more "
+            f"than one Mesoscope-VR runtime trial class, identifying "
+            f"{', '.join(sorted(kind.value for kind in identified))}. Remove the fields that do not belong to the "
+            f"trial's own class."
+        )
+        console.error(message=message, error=ValueError)
+
+    if _DISCRIMINATOR_FIELD not in trial:
+        resolved = next(iter(identified)) if identified else TrialKind.WATER
+        return {**trial, _DISCRIMINATOR_FIELD: resolved.value}
+
+    declared_kind = trial[_DISCRIMINATOR_FIELD]
+    valid_kinds = ", ".join(kind.value for kind, _ in _TRIAL_CLASSES)
+    if all(declared_kind != kind.value for kind, _ in _TRIAL_CLASSES):
+        message = (
+            f"Unable to resolve the trial kind for the '{trial_name}' trial. The '{_DISCRIMINATOR_FIELD}' field must "
+            f"be one of: {valid_kinds}, but got '{declared_kind}'."
+        )
+        console.error(message=message, error=ValueError)
+
+    if identified and TrialKind(declared_kind) not in identified:
+        message = (
+            f"Unable to resolve the trial kind for the '{trial_name}' trial. The '{_DISCRIMINATOR_FIELD}' field names "
+            f"'{declared_kind}', but the trial declares fields unique to "
+            f"{', '.join(sorted(kind.value for kind in identified))}. Correct whichever of the two is wrong, since "
+            f"the discriminator alone decides the class and the fields it disagrees with would be dropped."
+        )
+        console.error(message=message, error=ValueError)
+
+    return trial
+
+
+def _unique_trial_fields() -> dict[TrialKind, frozenset[str]]:
+    """Returns the fields each runtime trial class declares that no sibling trial class declares.
+
+    Returns:
+        The mapping from each trial kind to the field names unique to its runtime trial class, excluding the
+        discriminator itself.
+    """
+    declared = {
+        kind: frozenset(field_definition.name for field_definition in fields(trial_class)) - {_DISCRIMINATOR_FIELD}
+        for kind, trial_class in _TRIAL_CLASSES
+    }
+    return {
+        kind: field_names.difference(*(other for sibling, other in declared.items() if sibling != kind))
+        for kind, field_names in declared.items()
+    }

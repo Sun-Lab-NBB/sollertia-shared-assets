@@ -21,6 +21,9 @@ from .mcp_instance import (
 _UNITY_BRIDGE_URL: str = "http://localhost:8090/"
 """URL of the McpBridge HTTP listener running inside the Unity Editor."""
 
+_UNITY_BRIDGE_TIMEOUT: int = 30
+"""Number of seconds the relay waits for the Unity Editor to answer a request before it gives up."""
+
 
 @mcp.tool()
 def create_task_tool(template_name: str, unsaved_changes: Literal["save", "discard"] | None = None) -> dict[str, Any]:
@@ -427,7 +430,8 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         arguments: The tool arguments dictionary. Defaults to an empty dict when omitted.
 
     Returns:
-        The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable.
+        The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable, leaves the
+        request unanswered within the timeout, or replies with a payload that is not a JSON object.
     """
     relay_arguments = arguments if arguments is not None else {}
     payload = json.dumps({"tool": tool, "args": relay_arguments}).encode("utf-8")
@@ -439,7 +443,9 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
     )
 
     try:
-        with urllib.request.urlopen(url=request, timeout=30) as response:  # noqa: S310 - same localhost URL.
+        with urllib.request.urlopen(  # noqa: S310 - same localhost URL.
+            url=request, timeout=_UNITY_BRIDGE_TIMEOUT
+        ) as response:
             parsed = json.loads(response.read().decode("utf-8"))
     except urllib.error.URLError:
         message = (
@@ -447,8 +453,18 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
             f"McpBridge plugin loaded and listening on this address."
         )
         return error_response(message=message)
-    except json.JSONDecodeError:
-        message = "Unable to parse the Unity bridge response: the payload is not valid JSON."
+    # URLError wraps the failures of the request-sending half alone, so the connection-level failures of the
+    # response-reading half arrive as its OSError siblings and are handled below it.
+    except OSError:
+        message = (
+            f"Unable to complete the request to the Unity Editor at {_UNITY_BRIDGE_URL}. The Editor accepted the "
+            f"connection but did not answer within {_UNITY_BRIDGE_TIMEOUT} seconds or dropped it mid-response, which "
+            f"happens while its main thread is busy with a long operation such as a domain reload or an asset import. "
+            f"Wait for the Editor to become responsive and retry."
+        )
+        return error_response(message=message)
+    except json.JSONDecodeError, UnicodeDecodeError:
+        message = "Unable to parse the Unity bridge response: the payload is not valid UTF-8 encoded JSON."
         return error_response(message=message)
 
     # The bridge contract guarantees a JSON object, but verify the shape so the typed return holds.

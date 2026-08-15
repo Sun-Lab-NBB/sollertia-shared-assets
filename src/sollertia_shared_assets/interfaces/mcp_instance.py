@@ -11,6 +11,7 @@ from dataclasses import MISSING, fields, is_dataclass
 
 import yaml
 from mcp.server import MCPServer
+from ataraxis_data_structures import YAML_EXCLUDE_METADATA
 
 from ..enums import SessionTypes
 from ..registries import DESCRIPTOR_REGISTRY
@@ -29,6 +30,10 @@ runtime issue but still holds usable data."""
 mcp: MCPServer = MCPServer(name="sollertia-shared-assets")
 """The shared MCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
 
+_YAML_EXCLUDE_KEY: str = next(iter(YAML_EXCLUDE_METADATA))
+"""The dataclass field metadata key that keeps a field out of a serialized YamlConfig document, read from the library
+mapping so the two stay in step."""
+
 
 def ok_response(**payload: Any) -> dict[str, Any]:
     """Constructs a successful response dict with a ``success`` flag set to True."""
@@ -43,6 +48,10 @@ def error_response(message: str) -> dict[str, Any]:
 def serialize(value: Any) -> Any:
     """Recursively converts a dataclass, Path, Enum, mapping, or sequence into JSON-friendly Python.
 
+    Notes:
+        Fields marked with the YamlConfig exclusion metadata are dropped, matching the library serializer, so a
+        response describing a YAML asset carries the same keys the document on disk does.
+
     Args:
         value: The value to convert.
 
@@ -55,6 +64,7 @@ def serialize(value: Any) -> Any:
         return {
             field_definition.name: serialize(value=getattr(value, field_definition.name))
             for field_definition in fields(value)
+            if not field_definition.metadata.get(_YAML_EXCLUDE_KEY, False)
         }
     if isinstance(value, Path):
         return str(value)

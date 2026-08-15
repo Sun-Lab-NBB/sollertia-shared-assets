@@ -275,10 +275,10 @@ def filter_sessions_tool(
         an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``, each
         annotated with a ``filter_error`` field.
     """
-    # Builds a (session_name, animal) tuple set and a reverse map from session name to the original
-    # entry so the filter helper can operate on plain tuples and results can be rehydrated to dicts.
-    session_keys: set[tuple[str, str]] = set()
-    session_map: dict[str, dict[str, Any]] = {}
+    # Groups the input entries under their (session_name, animal) identity, which both keys the filter helper's plain
+    # tuple input and rehydrates the results. A single structure cannot disagree with itself about which entries an
+    # identity covers, and grouping rather than overwriting keeps every entry two overviews contribute for one session.
+    session_map: dict[tuple[str, str], list[dict[str, Any]]] = {}
     invalid_entries: list[dict[str, Any]] = []
 
     for entry in sessions:
@@ -289,11 +289,10 @@ def filter_sessions_tool(
             invalid_entries.append({**entry, "filter_error": "Missing required 'session_name' or 'animal' field."})
             continue
 
-        session_keys.add((str(session_name), str(animal)))
-        session_map[str(session_name)] = entry
+        session_map.setdefault((str(session_name), str(animal)), []).append(entry)
 
     filtered = filter_sessions(
-        sessions=session_keys,
+        sessions=session_map.keys(),
         start_date=start_date,
         end_date=end_date,
         include_sessions=set(include_sessions) if include_sessions else None,
@@ -303,9 +302,15 @@ def filter_sessions_tool(
         utc_timezone=utc_timezone,
     )
 
+    # Sorts on the full identity down to the session path, since the filter returns an unordered set and multiple
+    # entries may share one (session_name, animal) identity.
     filtered_entries = sorted(
-        (session_map[session_name] for session_name, _ in filtered if session_name in session_map),
-        key=lambda filtered_entry: filtered_entry.get("session_name", ""),
+        (entry for identity in filtered for entry in session_map[identity]),
+        key=lambda filtered_entry: (
+            filtered_entry.get("session_name", ""),
+            filtered_entry.get("animal", ""),
+            filtered_entry.get("session_path", ""),
+        ),
     )
 
     eligible_paths = sorted(

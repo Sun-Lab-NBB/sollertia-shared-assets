@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from sollertia_shared_assets.mesoscope_vr import (
+    TrialKind,
     MesoscopeGasPuffTrial,
     MesoscopeWaterRewardTrial,
     MesoscopeExperimentConfiguration,
@@ -32,6 +33,7 @@ def test_water_reward_trial_defaults() -> None:
     trial = MesoscopeWaterRewardTrial()
     assert trial.reward_size_ul == 5.0
     assert trial.reward_tone_duration_ms == 300
+    assert trial.trial_kind is TrialKind.WATER
 
 
 def test_water_reward_trial_initialization() -> None:
@@ -41,16 +43,29 @@ def test_water_reward_trial_initialization() -> None:
     assert trial.reward_tone_duration_ms == 250
 
 
+def test_water_reward_trial_rejects_mismatched_trial_kind() -> None:
+    """Verifies that MesoscopeWaterRewardTrial rejects a trial_kind that identifies another trial class."""
+    with pytest.raises(ValueError, match=r"The trial_kind must be 'water', but got 'puff'"):
+        MesoscopeWaterRewardTrial(trial_kind=TrialKind.PUFF)
+
+
 def test_gas_puff_trial_defaults() -> None:
     """Verifies that MesoscopeGasPuffTrial fields default to documented values."""
     trial = MesoscopeGasPuffTrial()
     assert trial.puff_duration_ms == 100
+    assert trial.trial_kind is TrialKind.PUFF
 
 
 def test_gas_puff_trial_initialization() -> None:
     """Verifies basic initialization of MesoscopeGasPuffTrial."""
     trial = MesoscopeGasPuffTrial(puff_duration_ms=150)
     assert trial.puff_duration_ms == 150
+
+
+def test_gas_puff_trial_rejects_mismatched_trial_kind() -> None:
+    """Verifies that MesoscopeGasPuffTrial rejects a trial_kind that identifies another trial class."""
+    with pytest.raises(ValueError, match=r"The trial_kind must be 'puff', but got 'water'"):
+        MesoscopeGasPuffTrial(trial_kind=TrialKind.WATER)
 
 
 def test_trial_field_types() -> None:
@@ -114,6 +129,188 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(
     assert loaded_config.unity_scene_name == sample_experiment_config.unity_scene_name
     assert list(loaded_config.trial_structures.keys()) == list(sample_experiment_config.trial_structures.keys())
     assert list(loaded_config.experiment_states.keys()) == list(sample_experiment_config.experiment_states.keys())
+
+
+def test_mesoscope_experiment_configuration_loads_trial_without_discriminator(tmp_path: Path) -> None:
+    """Verifies that a trial stored without a trial_kind key loads as a MesoscopeWaterRewardTrial."""
+    yaml_path = tmp_path / "legacy_config.yaml"
+    yaml_path.write_text(
+        "trial_structures:\n"
+        "  legacy_trial:\n"
+        "    reward_size_ul: 7.5\n"
+        "    reward_tone_duration_ms: 250\n"
+        "experiment_states:\n"
+        "  state_1:\n"
+        "    experiment_state_code: 1\n"
+        "    system_state_code: 0\n"
+        "    state_duration_s: 60.0\n"
+        "unity_scene_name: LegacyScene\n"
+    )
+
+    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+
+    trial = loaded_config.trial_structures["legacy_trial"]
+    assert isinstance(trial, MesoscopeWaterRewardTrial)
+    assert trial.reward_size_ul == 7.5
+    assert trial.reward_tone_duration_ms == 250
+    assert trial.trial_kind is TrialKind.WATER
+
+
+def test_mesoscope_experiment_configuration_loads_gas_puff_trial_without_discriminator(tmp_path: Path) -> None:
+    """Verifies that a gas-puff trial authored without a trial_kind key loads as a MesoscopeGasPuffTrial."""
+    yaml_path = tmp_path / "authored_config.yaml"
+    yaml_path.write_text(
+        "trial_structures:\n"
+        "  occ:\n"
+        "    puff_duration_ms: 250\n"
+        "experiment_states:\n"
+        "  state_1:\n"
+        "    experiment_state_code: 1\n"
+        "    system_state_code: 0\n"
+        "    state_duration_s: 60.0\n"
+        "unity_scene_name: OccScene\n"
+    )
+
+    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+
+    trial = loaded_config.trial_structures["occ"]
+    assert isinstance(trial, MesoscopeGasPuffTrial)
+    assert trial.puff_duration_ms == 250
+    assert trial.trial_kind is TrialKind.PUFF
+
+
+def test_restore_excluded_fields_returns_mapping_without_trial_structures(tmp_path: Path) -> None:
+    """Verifies that restore_excluded_fields leaves a mapping carrying no trial_structures key untouched."""
+    data = {"unity_scene_name": "Scene"}
+
+    assert MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml") == {
+        "unity_scene_name": "Scene"
+    }
+
+
+def test_restore_excluded_fields_leaves_non_mapping_trial_untouched(tmp_path: Path) -> None:
+    """Verifies that restore_excluded_fields leaves a stored trial that is not a mapping untouched."""
+    data = {"trial_structures": {"broken": None}}
+
+    restored = MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+    assert restored["trial_structures"]["broken"] is None
+
+
+def test_restore_excluded_fields_defaults_trial_carrying_unknown_fields_to_water(tmp_path: Path) -> None:
+    """Verifies that a discriminator-less trial carrying fields from a superseded schema resolves to the water kind."""
+    data = {
+        "trial_structures": {
+            "legacy": {
+                "reward_size_ul": 5.0,
+                "reward_tone_duration_ms": 300,
+                "segment_name": "A",
+                "trial_length_cm": 100.0,
+                "trigger_type": "interaction",
+            }
+        }
+    }
+
+    restored = MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+    assert restored["trial_structures"]["legacy"]["trial_kind"] == "water"
+
+
+def test_restore_excluded_fields_defaults_trial_carrying_no_unique_field_to_water(tmp_path: Path) -> None:
+    """Verifies that a discriminator-less trial declaring no field unique to either class resolves to the water kind."""
+    data = {"trial_structures": {"defaults": {}}}
+
+    restored = MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+    assert restored["trial_structures"]["defaults"]["trial_kind"] == "water"
+
+
+def test_restore_excluded_fields_rejects_trial_declaring_fields_of_both_classes(tmp_path: Path) -> None:
+    """Verifies that a trial declaring fields unique to both runtime trial classes is rejected."""
+    data = {"trial_structures": {"mixed": {"reward_size_ul": 5.0, "puff_duration_ms": 100}}}
+
+    with pytest.raises(ValueError, match="fields unique to more than one"):
+        MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+
+def test_restore_excluded_fields_rejects_unrecognized_discriminator(tmp_path: Path) -> None:
+    """Verifies that a trial declaring a trial_kind outside the TrialKind vocabulary is rejected."""
+    data = {"trial_structures": {"odd": {"reward_size_ul": 5.0, "trial_kind": "WATER"}}}
+
+    with pytest.raises(ValueError, match="must be one of"):
+        MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+
+def test_restore_excluded_fields_rejects_discriminator_contradicting_fields(tmp_path: Path) -> None:
+    """Verifies that a trial whose trial_kind names a class its fields do not belong to is rejected."""
+    data = {"trial_structures": {"mislabelled": {"reward_size_ul": 9.9, "trial_kind": "puff"}}}
+
+    with pytest.raises(ValueError, match=r"field names 'puff'"):
+        MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+
+def test_restore_excluded_fields_keeps_consistent_discriminator(tmp_path: Path) -> None:
+    """Verifies that a trial whose trial_kind agrees with its fields is returned unchanged."""
+    data = {"trial_structures": {"puff": {"puff_duration_ms": 150, "trial_kind": "puff"}}}
+
+    restored = MesoscopeExperimentConfiguration.restore_excluded_fields(data=data, file_path=tmp_path / "config.yaml")
+
+    assert restored["trial_structures"]["puff"] == {"puff_duration_ms": 150, "trial_kind": "puff"}
+
+
+def test_mesoscope_experiment_configuration_rejects_unresolved_trial() -> None:
+    """Verifies that a trial left as a mapping by the loader is rejected instead of reaching the acquisition runtime."""
+    with pytest.raises(ValueError, match="must resolve to a Mesoscope-VR runtime trial class"):
+        MesoscopeExperimentConfiguration(
+            trial_structures={"unresolved": {"reward_size_ul": 5.0}},  # type: ignore[dict-item]
+            experiment_states={},
+            unity_scene_name="Scene",
+        )
+
+
+def test_mesoscope_experiment_configuration_round_trips_gas_puff_trial(tmp_path: Path) -> None:
+    """Verifies that a gas-puff trial survives a MesoscopeExperimentConfiguration YAML round trip."""
+    config = MesoscopeExperimentConfiguration(
+        trial_structures={"puff": MesoscopeGasPuffTrial(puff_duration_ms=150)},
+        experiment_states={
+            "state1": ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0),
+        },
+        unity_scene_name="PuffScene",
+    )
+    yaml_path = tmp_path / "puff_config.yaml"
+    config.to_yaml(file_path=yaml_path)
+
+    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+
+    trial = loaded_config.trial_structures["puff"]
+    assert isinstance(trial, MesoscopeGasPuffTrial)
+    assert trial.puff_duration_ms == 150
+
+
+def test_mesoscope_experiment_configuration_round_trips_mixed_trials(tmp_path: Path) -> None:
+    """Verifies that a configuration holding both trial classes restores each trial to its own class."""
+    config = MesoscopeExperimentConfiguration(
+        trial_structures={
+            "reward": MesoscopeWaterRewardTrial(reward_size_ul=4.0, reward_tone_duration_ms=200),
+            "puff": MesoscopeGasPuffTrial(puff_duration_ms=175),
+        },
+        experiment_states={
+            "state1": ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0),
+        },
+        unity_scene_name="MixedScene",
+    )
+    yaml_path = tmp_path / "mixed_config.yaml"
+    config.to_yaml(file_path=yaml_path)
+
+    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+
+    reward_trial = loaded_config.trial_structures["reward"]
+    puff_trial = loaded_config.trial_structures["puff"]
+    assert isinstance(reward_trial, MesoscopeWaterRewardTrial)
+    assert isinstance(puff_trial, MesoscopeGasPuffTrial)
+    assert reward_trial.reward_size_ul == 4.0
+    assert reward_trial.reward_tone_duration_ms == 200
+    assert puff_trial.puff_duration_ms == 175
 
 
 def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> None:
@@ -256,6 +453,16 @@ def test_from_task_template_maps_supported_trigger_types() -> None:
         )
         with pytest.raises(ValueError, match=r"not mapped to a runtime trial class"):
             MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="Scene")
+
+
+def test_from_task_template_rejects_non_positive_state_count() -> None:
+    """Verifies that from_task_template rejects a state_count below one."""
+    template = _create_base_task_template()
+
+    with pytest.raises(ValueError, match=r"The state_count must be at least 1"):
+        MesoscopeExperimentConfiguration.from_task_template(
+            template=template, unity_scene_name="TestScene", state_count=0
+        )
 
 
 def test_from_task_template_raises_on_unmapped_trigger() -> None:

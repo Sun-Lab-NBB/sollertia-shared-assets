@@ -164,6 +164,81 @@ def test_dataset_data_create_raises_on_empty_sessions(tmp_path: Path) -> None:
         )
 
 
+def test_dataset_data_create_rejects_session_repeated_in_request(tmp_path: Path) -> None:
+    """Verifies that create() rejects a tuple naming the same animal and session twice."""
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),
+    )
+
+    with pytest.raises(ValueError, match="animal_a/2024-01-15-12-30-45-123456"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert not (tmp_path / "test_dataset").exists()
+
+
+def test_dataset_data_create_rejects_session_repeated_in_set(tmp_path: Path) -> None:
+    """Verifies that create() rejects a set whose entries name one animal and session under different paths."""
+    sessions = {
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a", session_path=Path("/first")),
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a", session_path=Path("/second")),
+    }
+
+    # The session_path field participates in the frozen dataclass hash, so the set keeps both entries and the identity
+    # screen is the only thing standing between the request and a dataset that counts the session twice.
+    assert len(sessions) == 2
+
+    with pytest.raises(ValueError, match="animal_a/2024-01-15-12-30-45-123456"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert not (tmp_path / "test_dataset").exists()
+
+
+def test_dataset_data_create_writes_marker_after_descriptions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that create() publishes the dataset marker only once the descriptions companion is on disk."""
+    failure = OSError("simulated descriptions write failure")
+
+    def _fail_descriptions(self, column_descriptions):
+        """Fails the descriptions write, standing in for an interruption partway through create()."""
+        raise failure
+
+    monkeypatch.setattr(DatasetData, "_write_column_descriptions", _fail_descriptions)
+
+    with pytest.raises(OSError, match="simulated descriptions write failure"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=(DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),),
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    # A dataset that never received its companion feather stays undiscoverable, so no consumer loads a dataset whose
+    # column_descriptions() would raise.
+    assert not (tmp_path / "test_dataset" / "dataset.yaml").exists()
+
+
 def test_dataset_data_create_rejects_existing_directory(tmp_path: Path) -> None:
     """Verifies that create() refuses to overwrite an existing dataset directory."""
     sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),)

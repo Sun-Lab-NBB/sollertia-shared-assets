@@ -190,7 +190,8 @@ class DatasetData(YamlConfig):
             An initialized DatasetData instance that stores the structure and the metadata of the created dataset.
 
         Raises:
-            ValueError: If no sessions are provided.
+            ValueError: If no sessions are provided, or if the same animal and session pair is named more than once
+                in the provided collection.
             FileExistsError: If a dataset with the same name already exists.
         """
         # Converts sessions to tuple if provided as set.
@@ -203,6 +204,14 @@ class DatasetData(YamlConfig):
                 f"DatasetSession instance, but got an empty collection."
             )
             console.error(message=message, error=ValueError)
+
+        # Screens the request before touching the filesystem, so a rejected request leaves no dataset directory behind.
+        # A set input does not dedupe on its own, since DatasetSession carries session_path into its hash.
+        _screen_duplicate_sessions(
+            sessions=sessions,
+            existing_sessions=(),
+            action=f"create the '{name}' forged dataset",
+        )
 
         # Constructs the dataset root directory path.
         dataset_path = datasets_root.joinpath(name)
@@ -239,12 +248,13 @@ class DatasetData(YamlConfig):
             dataset_data_path=dataset_path.joinpath(DATASET_MARKER_FILENAME),
         )
 
-        # Saves the configured instance data to disk.
-        instance.save()
-
-        # Writes the per-dataset column-description binding alongside the marker so every consumer can interpret the
-        # assembled feathers without depending on the acquisition system that produced them.
+        # Writes the per-dataset column-description binding so every consumer can interpret the assembled feathers
+        # without depending on the acquisition system that produced them.
         instance._write_column_descriptions(column_descriptions=column_descriptions)
+
+        # Publishes the dataset marker once every companion artifact it vouches for is on disk, so an interrupted
+        # creation never leaves a discoverable dataset whose column descriptions are missing.
+        instance.save()
 
         return instance
 
@@ -343,24 +353,11 @@ class DatasetData(YamlConfig):
             )
             console.error(message=message, error=ValueError)
 
-        # Screens the whole request against the dataset's membership before creating any directory, so a rejected
-        # request leaves the hierarchy untouched. Each accepted pair joins the set, which also catches a request that
-        # names the same animal and session twice.
-        known_sessions = {(session.animal, session.session) for session in self.sessions}
-        duplicates: list[str] = []
-        for session in sessions:
-            identity = (session.animal, session.session)
-            if identity in known_sessions:
-                duplicates.append(f"{session.animal}/{session.session}")
-            known_sessions.add(identity)
-
-        if duplicates:
-            message = (
-                f"Unable to add sessions to the '{self.name}' forged dataset. Every added session must be absent "
-                f"from the dataset and named once in the request, but the following violate this: "
-                f"{', '.join(sorted(duplicates))}."
-            )
-            console.error(message=message, error=ValueError)
+        _screen_duplicate_sessions(
+            sessions=sessions,
+            existing_sessions=self.sessions,
+            action=f"add sessions to the '{self.name}' forged dataset",
+        )
 
         # Creates each added session's subdirectory and rebuilds the session with its resolved path.
         dataset_path = self.dataset_data_path.parent
@@ -615,3 +612,40 @@ class DatasetData(YamlConfig):
         console.error(message=message, error=ValueError)
         # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
         raise ValueError(message)  # pragma: no cover
+
+
+def _screen_duplicate_sessions(
+    sessions: tuple[DatasetSession, ...],
+    existing_sessions: tuple[DatasetSession, ...],
+    action: str,
+) -> None:
+    """Rejects a request that names a session the dataset already holds or that repeats a session within itself.
+
+    Notes:
+        Both the dataset-creation and the dataset-append paths screen their whole request through this function before
+        creating any directory, so the two paths enforce one membership invariant and a rejected request leaves the
+        filesystem untouched.
+
+    Args:
+        sessions: The DatasetSession instances the request adds to the dataset.
+        existing_sessions: The DatasetSession instances the dataset already holds.
+        action: The action clause that opens the error message, such as ``create the 'name' forged dataset``.
+
+    Raises:
+        ValueError: If any requested session is already part of the dataset or is repeated within the request.
+    """
+    # Each screened pair joins the set, which also catches a request that names the same animal and session twice.
+    known_sessions = {(session.animal, session.session) for session in existing_sessions}
+    duplicates: list[str] = []
+    for session in sessions:
+        identity = (session.animal, session.session)
+        if identity in known_sessions:
+            duplicates.append(f"{session.animal}/{session.session}")
+        known_sessions.add(identity)
+
+    if duplicates:
+        message = (
+            f"Unable to {action}. Every added session must be absent from the dataset and named once in the request, "
+            f"but the following violate this: {', '.join(sorted(duplicates))}."
+        )
+        console.error(message=message, error=ValueError)

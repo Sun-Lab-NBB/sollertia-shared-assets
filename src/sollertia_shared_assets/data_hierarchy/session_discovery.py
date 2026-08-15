@@ -257,9 +257,9 @@ def filter_sessions(
     if exclude_sessions:
         filtered = {(session, animal) for session, animal in filtered if session not in exclude_sessions}
 
-    # Applies date range and session inclusion filters. Sessions are included if they fall within the
-    # date range OR are in include_sessions.
-    if start_date is not None or end_date is not None or include_sessions:
+    # Applies the date range filter, which sessions listed in include_sessions bypass. Without a date bound every
+    # remaining session already qualifies, so the block stays closed and include_sessions has nothing to reinstate.
+    if start_date is not None or end_date is not None:
         parsed_start = (
             _parse_date_boundary(date_string=start_date, is_end_date=False, utc_timezone=utc_timezone)
             if start_date

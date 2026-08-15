@@ -69,8 +69,21 @@ def get_working_directory() -> Path:
         )
         console.error(message=message, error=FileNotFoundError)
 
+    # A configured directory name is allowed to end in a space, so only a line terminator is stripped from a record
+    # left newline-terminated by a hand edit.
     with path_file.open() as file:
-        working_directory = Path(file.read().strip())
+        cached_path = file.read().rstrip("\r\n")
+
+    # Path("") resolves to the process working directory, whose existence check always passes, so an empty record is
+    # rejected here instead of silently redirecting every consumer to the current directory.
+    if not cached_path:
+        message = (
+            "Unable to resolve the path to the local Sollertia platform working directory, as the cached path record "
+            "is empty. Set the local working directory by using the 'slsa configure directory' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    working_directory = Path(cached_path)
 
     if not working_directory.exists():
         message = (
@@ -131,8 +144,21 @@ def get_data_root() -> Path:
         )
         console.error(message=message, error=FileNotFoundError)
 
+    # A configured directory name is allowed to end in a space, so only a line terminator is stripped from a record
+    # left newline-terminated by a hand edit.
     with path_file.open() as file:
-        data_root = Path(file.read().strip())
+        cached_path = file.read().rstrip("\r\n")
+
+    # Path("") resolves to the process working directory, whose existence check always passes, so an empty record is
+    # rejected here instead of silently redirecting every consumer to the current directory.
+    if not cached_path:
+        message = (
+            "Unable to resolve the path to the local Sollertia platform data root, as the cached path record is empty. "
+            "Set the local data root by using the 'slsa configure data-root' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    data_root = Path(cached_path)
 
     if not data_root.exists():
         message = (
@@ -204,8 +230,21 @@ def get_task_templates_directory() -> Path:
         )
         console.error(message=message, error=FileNotFoundError)
 
+    # A configured directory name is allowed to end in a space, so only a line terminator is stripped from a record
+    # left newline-terminated by a hand edit.
     with path_file.open() as file:
-        templates_directory = Path(file.read().strip())
+        cached_path = file.read().rstrip("\r\n")
+
+    # Path("") resolves to the process working directory, whose existence check always passes, so an empty record is
+    # rejected here instead of silently redirecting every consumer to the current directory.
+    if not cached_path:
+        message = (
+            "Unable to resolve the path to the task templates directory, as the cached path record is empty. Set the "
+            "task templates directory path by using the 'slsa configure templates' CLI command."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    templates_directory = Path(cached_path)
 
     if not templates_directory.exists():
         message = (

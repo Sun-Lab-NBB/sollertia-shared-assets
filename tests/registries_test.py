@@ -84,6 +84,13 @@ def test_assert_registry_coverage_raises_on_missing_system_session_types(monkeyp
         registries._assert_registry_coverage()
 
 
+def test_assert_registry_coverage_raises_on_empty_system_session_types(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies the coverage check raises when an acquisition system is paired with an empty session-type set."""
+    monkeypatch.setattr(registries, "SYSTEM_SESSION_TYPES", {AcquisitionSystems.MESOSCOPE_VR: frozenset()})
+    with pytest.raises(RuntimeError, match=r"SYSTEM_SESSION_TYPES is missing"):
+        registries._assert_registry_coverage()
+
+
 def test_assert_registry_coverage_raises_on_orphan_session_type(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies the coverage check raises when a session type is claimed by no acquisition system."""
     monkeypatch.setattr(
