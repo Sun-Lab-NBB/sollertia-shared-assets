@@ -19,14 +19,16 @@ _UINT8_MAX: int = 255
 _PROBABILITY_SUM_TOLERANCE: float = 0.001
 """Tolerance for validating that trial transition probabilities sum to 1.0."""
 
-_TRIAL_NAME_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
-"""Matches trial names that are safe to embed in Unity segment prefab filenames.
+_NAME_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
+"""Matches the trial and cue names that are safe to embed in Unity asset filenames.
 
-Restricts trial names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName``
-segment naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path separators,
-whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves is what
-lets a segment filename split back to exactly one owning template. Mirrors the equivalent check on
-the Unity side in ``ConfigLoader.cs``.
+Restricts both names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName``
+segment naming scheme and the ``Cue_Name_LengthCm`` cue naming scheme used by
+``sollertia-virtual-reality`` cannot be corrupted by path separators, whitespace, or punctuation
+introduced in a template. Excluding the hyphen from both halves of a segment name is what lets a
+segment filename split back to exactly one owning template. Barring whitespace from a cue name also
+keeps the space-joined cue sequence signature that Unity compares trials on unambiguous. Mirrors the
+equivalent check on the Unity side in ``ConfigLoader.cs``.
 """
 
 
@@ -83,15 +85,24 @@ class Cue:
         if not self.name:
             message = "Unable to initialize Cue. The name must be a non-empty string, but got an empty value."
             console.error(message=message, error=ValueError)
+        if not _NAME_COMPONENT_PATTERN.match(self.name):
+            message = (
+                f"Unable to initialize Cue '{self.name}'. The name must contain only ASCII letters, digits, and "
+                f"underscores, because it is embedded in the generated cue asset filename and in the cue sequence "
+                f"signature that identifies a trial."
+            )
+            console.error(message=message, error=ValueError)
         if not 0 <= self.code <= _UINT8_MAX:
             message = (
                 f"Unable to initialize Cue '{self.name}'. The code must be a uint8 value in range [0, 255], but got "
                 f"{self.code}."
             )
             console.error(message=message, error=ValueError)
-        if self.length_cm <= 0:
+        # A non-finite length passes every ordered comparison, so it would otherwise reach Unity and produce an
+        # infinite segment. The same guard covers every VREnvironment scalar below.
+        if not math.isfinite(self.length_cm) or self.length_cm <= 0:
             message = (
-                f"Unable to initialize Cue '{self.name}'. The length_cm must be greater than 0, but got "
+                f"Unable to initialize Cue '{self.name}'. The length_cm must be a positive, finite value, but got "
                 f"{self.length_cm} cm."
             )
             console.error(message=message, error=ValueError)
@@ -176,8 +187,9 @@ class TrialStructure:
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
     occupancy_duration_ms: float | None = None
     """The duration in milliseconds the animal must occupy the zone for occupancy trigger modes. Unity enforces this
-    value and the experiment configuration mirrors it. Leave null for non-occupancy trials to inherit the experiment
-    configuration's generation default."""
+    value and the experiment configuration mirrors it. Set it to None on a non-occupancy trial, because None is how a
+    template communicates that the field is unused, while 0 is a real duration and is rejected on every trial whatever
+    its trigger type."""
     transitions: dict[str, float] | None = None
     """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
     other trial names defined on the same TaskTemplate. If provided and non-empty, values must sum to 1.0. Set to
@@ -210,16 +222,20 @@ class TrialStructure:
                 )
                 console.error(message=message, error=ValueError)
 
-        if self.occupancy_duration_ms is not None and self.occupancy_duration_ms <= 0:
+        # None is how a template says the field is unused, so a non-occupancy trial leaves it None rather than 0.
+        # A supplied value is a real duration whatever the trigger type, so the positive finite range binds all of them.
+        if self.occupancy_duration_ms is not None and (
+            not math.isfinite(self.occupancy_duration_ms) or self.occupancy_duration_ms <= 0
+        ):
             message = (
-                "Unable to initialize TrialStructure. The occupancy_duration_ms must be greater than 0, but got "
-                f"{self.occupancy_duration_ms}."
+                "Unable to initialize TrialStructure. The occupancy_duration_ms must be a positive, finite value, but "
+                f"got {self.occupancy_duration_ms}."
             )
             console.error(message=message, error=ValueError)
 
-        # Occupancy trigger modes read occupancy_duration_ms at runtime, so it is required for them. Non-occupancy
-        # modes ignore the field, so its value there is irrelevant. StrEnum members compare equal to their string
-        # values, so this covers both a raw string and a coerced TriggerType.
+        # Occupancy trigger modes read occupancy_duration_ms at runtime, so it is required for them. A non-occupancy
+        # mode ignores the field at runtime and still carries None rather than a placeholder number. StrEnum members
+        # compare equal to their string values, so this covers both a raw string and a coerced TriggerType.
         occupancy_types = (TriggerType.OCCUPANCY_DISARM, TriggerType.OCCUPANCY_ARM, TriggerType.OCCUPANCY_TRIGGER)
         if self.trigger_type in occupancy_types and self.occupancy_duration_ms is None:
             message = (
@@ -285,7 +301,7 @@ class TaskTemplate(YamlConfig):
             # Rejects trial names containing characters other than ASCII letters, digits, and underscores.
             # Trial names are embedded verbatim in Unity segment prefab filenames, so any path separator or
             # whitespace would corrupt the generated filesystem layout.
-            if not _TRIAL_NAME_PATTERN.match(trial_name):
+            if not _NAME_COMPONENT_PATTERN.match(trial_name):
                 message = (
                     f"Unable to initialize TaskTemplate. Trial name '{trial_name}' is invalid. Trial names "
                     "must contain only ASCII letters, digits, and underscores (used in generated segment "
