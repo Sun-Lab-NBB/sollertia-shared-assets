@@ -110,7 +110,7 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 |---------------------|-------------------------------------|-------------------------------------------------------------------|
 | CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands       |
 | Server bootstrap    | `interfaces/mcp_server.py`          | Auto-imports `*_tools.py` to register, exposes `run_server`       |
-| Shared MCP instance | `interfaces/mcp_instance.py`        | FastMCP instance, response helpers, serialization, validators     |
+| Shared MCP instance | `interfaces/mcp_instance.py`        | MCPServer instance, response helpers, serialization, validators   |
 | Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, credentials, templates dir, experiments   |
 | Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, hardware, data assets |
 | Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                     |
@@ -165,7 +165,7 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 | `src/sollertia_shared_assets/data_classes/`   | Read-asset contract dataclasses (`surgery_data.py`), kept free of registry imports by design                                         |
 | `src/sollertia_shared_assets/data_hierarchy/` | `SessionData`, `DatasetData`, the project/animal hierarchy views, and the session-discovery helpers                                  |
 | `src/sollertia_shared_assets/mesoscope_vr/`   | Mesoscope-VR system subpackage: experiment configuration, runtime data, raw-data layout                                              |
-| `src/sollertia_shared_assets/interfaces/`     | `slsa` CLI and FastMCP server with all MCP tool modules                                                                              |
+| `src/sollertia_shared_assets/interfaces/`     | `slsa` CLI and MCP server with all MCP tool modules                                                                                  |
 | `tests/`                                      | Test suite mirroring the source layout (MCP tools excluded)                                                                          |
 | `docs/`                                       | Sphinx API documentation source                                                                                                      |
 | `envs/`                                       | Conda/mamba development environment specifications                                                                                   |
@@ -212,11 +212,13 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   sessions to an existing dataset, and `remove_animal()` drops one animal with its directory tree. The mutators
   enforce structural invariants alone, so whether a given session belongs in a given dataset is decided by the
   consuming pipeline rather than here.
-- **Interface layer**: A single `FastMCP` instance lives in `interfaces/mcp_instance.py` with shared serialization,
+- **Interface layer**: A single `MCPServer` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and dataclass-introspection helpers. The dispatch registries and their import-time checks live in the
   top-level `registries.py` module, not here. Tool modules import the instance and register `@mcp.tool()` functions.
-  The CLI (`slsa`) starts the server and exposes `configure {directory,data-root,credentials,templates,project}` and
-  `get {directory,data-root,credentials,templates,projects,experiments}` command groups.
+  `run_server()` enables JSON responses when it starts the streamable-http transport. The CLI (`slsa`) starts the
+  server and exposes `configure {directory,data-root,credentials,templates,project}` and
+  `get {directory,data-root,credentials,templates,projects,experiments}` command groups. The `mcp` command disables
+  the console on the stdio transport, since the console writes to the stdout stream that carries JSON-RPC traffic.
 - **Persistent host settings**: `configuration/configuration_utilities.py` manages three independent
   `platformdirs`-backed settings: the working directory, the data root, and the templates directory. The credentials
   toolset that copies each category's credentials file into the working directory's `credentials/` subdirectory under
@@ -276,7 +278,7 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
 - **Minimal machinery**: Prefer concrete classes, explicit `Path` fields, and `if`/`elif` dispatch over ABCs,
   `@property`-derived state, back-references, or unnecessary registries. The registries and the `SYSTEM_SESSION_TYPES`
   association listed above are necessary because they cross enum boundaries. Do not add more without justification.
-- **No tests for MCP tools**: `@mcp.tool()` functions live behind the FastMCP server and are excluded from coverage.
+- **No tests for MCP tools**: `@mcp.tool()` functions live behind the MCP server and are excluded from coverage.
   Test the helper functions they delegate to instead.
 - **Frozen acquisition snapshots**: Every per-session YAML in `raw_data/` (descriptor, hardware state, system
   configuration, experiment configuration, VR configuration, surgery metadata) is an immutable record of the

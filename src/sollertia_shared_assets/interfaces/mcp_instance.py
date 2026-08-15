@@ -1,4 +1,4 @@
-"""Provides the shared FastMCP server instance, constants, and helper functions for MCP tool modules."""
+"""Provides the shared MCP server instance, constants, and helper functions for MCP tool modules."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import contextlib
 from dataclasses import MISSING, fields, is_dataclass
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from ..enums import SessionTypes
 from ..registries import DESCRIPTOR_REGISTRY
@@ -26,8 +26,8 @@ UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
 purge target. Distinct from the descriptor's ``incomplete`` field, which marks an initialized session that hit a
 runtime issue but still holds usable data."""
 
-mcp = FastMCP(name="sollertia-shared-assets", json_response=True)
-"""The shared FastMCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
+mcp: MCPServer = MCPServer(name="sollertia-shared-assets")
+"""The shared MCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
 
 
 def ok_response(**payload: Any) -> dict[str, Any]:

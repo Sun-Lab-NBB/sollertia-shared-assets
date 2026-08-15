@@ -136,7 +136,7 @@ Start the MCP server using the CLI:
 slsa mcp
 ```
 
-The server defaults to the `stdio` transport. Use the `-t/--transport` flag to select one of `stdio`, `sse`, or
+The server defaults to the `stdio` transport. Use the `-t/--transport` flag to select either `stdio` or
 `streamable-http`.
 
 #### Available Tools
