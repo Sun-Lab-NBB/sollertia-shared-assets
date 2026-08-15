@@ -2,8 +2,9 @@
 
 All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be
 running with the plugin active. On success each tool returns the McpBridge response payload verbatim; when the
-bridge is unreachable or returns an invalid payload, the tool returns a ``{"success": False, "error": <message>}``
-dict instead.
+bridge is unreachable, leaves the request unanswered within the timeout, or returns a payload that is not a JSON
+object, the tool returns a ``{"success": False, "error": <message>}`` dict instead. A bridge-side tool rejection is
+forwarded verbatim as the bridge's own ``{"success": False, "error": ...}`` payload.
 """
 
 from __future__ import annotations
@@ -94,7 +95,8 @@ def delete_task_tool(template_name: str) -> dict[str, Any]:
             used with ``create_task_tool``.
 
     Returns:
-        A response dict with ``template_name``, ``deleted_paths`` (list of every removed asset path),
+        A response dict with ``template_name``, ``deleted_paths`` (the scene, the task prefab, and every
+        segment prefab removed; the per-scene companion is reported separately),
         ``deleted`` (boolean), and ``message`` on success. When a per-scene companion asset existed,
         the response also carries ``companion_deleted`` with the project-relative path of the removed
         companion. The call returns an error when no artifacts existed for the template.
@@ -226,7 +228,8 @@ def list_scenes_tool() -> dict[str, Any]:
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with ``scenes`` (list of project-relative scene paths) and ``active_scene``.
+        A response dict with ``scenes`` (list of project-relative scene paths) and ``active_scene`` (the
+        project-relative path of the currently active scene, not its name).
     """
     return _unity_relay(tool="list_scenes")
 

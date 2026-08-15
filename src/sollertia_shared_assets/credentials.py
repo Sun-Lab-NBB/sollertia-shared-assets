@@ -41,7 +41,7 @@ def resolve_credentials_file(credentials: str | CredentialsTypes) -> str:
             f"CredentialsTypes members: {valid}."
         )
         console.error(message=message, error=ValueError)
-        # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
+        # Unreachable: console.error() always raises. The explicit raise documents the terminating branch for readers.
         raise ValueError(message)  # pragma: no cover
 
     return CREDENTIALS_FILE_REGISTRY[CredentialsTypes(credentials)]

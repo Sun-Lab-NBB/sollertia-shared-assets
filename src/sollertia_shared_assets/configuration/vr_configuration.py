@@ -114,7 +114,8 @@ class VREnvironment:
 
     Notes:
         This class is primarily used by Unity to configure the task environment. Python parses these values
-        from the YAML configuration file but does not use them at runtime. Every field divides or sizes downstream
+        from the YAML configuration file but does not use them during acquisition; the template inspection tools
+        surface ``cue_offset_cm`` in their responses. Every field divides or sizes downstream
         corridor geometry, so the validation below rejects a value that would leave Unity with an infinite segment
         length, a zero-depth corridor, or a maze generation loop that never terminates.
     """
@@ -190,7 +191,8 @@ class TrialStructure:
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
     occupancy_duration_ms: float | None = None
     """The duration in milliseconds the animal must occupy the zone for occupancy trigger modes. Unity enforces this
-    value and the experiment configuration mirrors it. Set it to None on a non-occupancy trial, because None is how a
+    value, and the template is its single source of truth: no experiment configuration carries a copy. Set it to None
+    on a non-occupancy trial, because None is how a
     template communicates that the field is unused, while 0 is a real duration and is rejected on every trial whatever
     its trigger type."""
     transitions: dict[str, float] | None = None
@@ -271,9 +273,9 @@ class TaskTemplate(YamlConfig):
     def __post_init__(self) -> None:
         """Validates task template configuration.
 
-        Runs the full cascade of integrity checks against the loaded template: cue catalog uniqueness (codes
-        and names), per-trial cue references, transition targets, trigger types, trial name pattern, zone
-        positions within trial segment bounds, and cue-sequence uniqueness across trials.
+        Runs the full cascade of integrity checks against the loaded template, in this order: cue catalog
+        uniqueness (codes and names), trial name pattern, per-trial cue references, transition targets, trigger
+        types, zone positions within trial segment bounds, and cue-sequence uniqueness across trials.
 
         Raises:
             ValueError: If any of the validations above fails. The message identifies the offending field and

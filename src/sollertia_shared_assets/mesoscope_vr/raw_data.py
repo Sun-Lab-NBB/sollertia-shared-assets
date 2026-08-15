@@ -18,7 +18,8 @@ class MesoscopeRawDataFiles(StrEnum):
     """
 
     ZABER_POSITIONS = "zaber_positions.yaml"
-    """The Zaber motor position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
+    """The Zaber motor position snapshot written at session end by the Mesoscope-VR acquisition runtime, before the
+    motors are returned to their parking position."""
     MESOSCOPE_POSITIONS = "mesoscope_positions.yaml"
     """The Mesoscope objective position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
     WINDOW_SCREENSHOT = "window_screenshot.png"
@@ -46,8 +47,8 @@ class MesoscopeRawData:
     """
 
     zaber_positions_path: Path
-    """Captures the states of the Zaber motorized stages used by the Mesoscope-VR system at the start of the
-    session."""
+    """Captures the states of the Zaber motorized stages used by the Mesoscope-VR system, recorded at the end of the
+    session before the motors are reset."""
     mesoscope_positions_path: Path
     """Records the 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window
     during the session, allowing the same imaging field of view to be recovered in follow-up sessions."""

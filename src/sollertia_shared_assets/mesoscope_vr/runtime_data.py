@@ -47,8 +47,8 @@ class MesoscopeHardwareState(YamlConfig):
     delivered_gas_puffs: bool | None = None
     """Tracks whether the session delivered any gas puffs to the animal."""
     system_state_codes: dict[str, int] | None = None
-    """Maps integer state-codes used by the Mesoscope-VR system to communicate its states (system states) to
-    human-readable state names."""
+    """Maps the human-readable state names of the Mesoscope-VR system to the integer state-codes the system uses to
+    communicate those states (system states). Consumers that need a code-keyed lookup invert this mapping."""
 
 
 @dataclass
@@ -72,8 +72,8 @@ class LickTrainingDescriptor(YamlConfig):
     the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal
     consumes the delivered rewards."""
     water_reward_size_ul: float = 5.0
-    """The volume of water, in microliters, dispensed to the animal when it achieves the required running speed and
-    duration thresholds."""
+    """The volume of water, in microliters, dispensed to the animal on each reward of the training's pseudorandom
+    reward-delay sequence."""
     reward_tone_duration_ms: int = 300
     """The duration, in milliseconds, of the auditory tone played to the animal when it receives water rewards."""
     dispensed_water_volume_ml: float = 0.0

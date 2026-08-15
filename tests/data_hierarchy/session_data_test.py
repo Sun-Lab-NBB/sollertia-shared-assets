@@ -1,4 +1,5 @@
-"""Contains tests for the dataclasses provided by the ``data_hierarchy.session_data`` module."""
+"""Contains tests for the dataclasses and enumerations provided by the ``data_hierarchy.session_data`` module,
+together with the registry entries ``SessionData`` dispatches through."""
 
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ from sollertia_shared_assets.data_hierarchy import (
     ProcessingTrackers,
 )
 
-_DEFAULT_PYTHON_VERSION: str = "3.14.4"
+_DEFAULT_PYTHON_VERSION: str = "3.14.6"
 """Canonical Python version string for SessionData fixtures; matches SessionData.python_version default."""
 
 _DEFAULT_EXPERIMENT_VERSION: str = "5.0.0"
@@ -534,7 +535,7 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
 
 
 def test_session_data_raw_data_file_paths() -> None:
-    """Verifies that every generic raw-data file path resolves to raw_data_path / <RawDataFiles member>."""
+    """Verifies that every generic raw-data file path resolves to raw_data_path / its canonical filename."""
     session = _make_session_with_paths(raw=_SENTINEL_RAW_PATH, processed=_SENTINEL_PROCESSED_PATH)
 
     assert session.raw_data.session_data_path == _SENTINEL_RAW_PATH / RawDataFiles.SESSION_DATA
@@ -691,6 +692,21 @@ def test_session_data_create_rejects_unsupported_session_type(
         SessionData.create(
             animal=AnimalData(root=tmp_path, project_name="test_project", animal_id="test_animal"),
             session_type=SessionTypes.WINDOW_CHECKING,
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        )
+
+
+def test_session_data_create_rejects_vr_session_type_without_experiment(tmp_path: Path) -> None:
+    """Verifies that create() rejects a corridor-task session type supplied without an experiment_name."""
+    # The VR configuration snapshot is resolved from the experiment configuration's unity_scene_name, so a session
+    # type in SESSION_TYPES_USING_VR_TASK cannot satisfy required_raw_assets() without an experiment. The enforcement
+    # runs before the project-existence check, so no on-disk project is required.
+    with pytest.raises(ValueError, match=r"requires an experiment_name"):
+        SessionData.create(
+            animal=AnimalData(root=tmp_path, project_name="test_project", animal_id="test_animal"),
+            session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
             python_version=_DEFAULT_PYTHON_VERSION,
             sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,

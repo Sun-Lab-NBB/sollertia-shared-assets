@@ -15,7 +15,8 @@ from sollertia_shared_assets import (
     AcquisitionSystems,
 )
 
-# A representative column-description binding, passed to every create() call. The mapping is intentionally small;
+# A representative column-description binding, passed to nearly every create() call; the empty-mapping test passes
+# {} instead. The mapping is intentionally small;
 # the assembly worker that produces the real mapping lives in the acquisition-system packages, not in slsa.
 COLUMN_DESCRIPTIONS: dict[str, str] = {
     "time_us": "Microsecond-precision sample timestamps from the acquisition reference clock.",

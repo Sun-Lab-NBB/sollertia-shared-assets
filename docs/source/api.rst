@@ -17,6 +17,12 @@ Configuration Assets
    :undoc-members:
    :show-inheritance:
 
+.. The package re-exports these constants, so autodoc only renders them when they are named at their defining module.
+
+.. autodata:: sollertia_shared_assets.configuration.configuration_utilities.CONFIGURATION_DIRECTORY
+
+.. autodata:: sollertia_shared_assets.configuration.configuration_utilities.CREDENTIALS_DIRECTORY
+
 Data Contract Assets
 ====================
 
@@ -32,6 +38,16 @@ Data Hierarchy Assets
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. The package re-exports these constants, so autodoc only renders them when they are named at their defining module.
+
+.. autodata:: sollertia_shared_assets.data_hierarchy.session_data.RAW_DATA_DIRECTORY
+
+.. autodata:: sollertia_shared_assets.data_hierarchy.session_data.PROCESSED_DATA_DIRECTORY
+
+.. autodata:: sollertia_shared_assets.data_hierarchy.project_hierarchy.PERSISTENT_DATA_DIRECTORY
+
+.. autodata:: sollertia_shared_assets.data_hierarchy.project_hierarchy.DATASET_MARKER_FILENAME
 
 Mesoscope-VR Assets
 ===================

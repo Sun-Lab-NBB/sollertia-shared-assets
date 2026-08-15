@@ -34,7 +34,7 @@ appropriate skill results in style violations that block release.
 
 This library depends on `ataraxis-base-utilities`, `ataraxis-time`, and `ataraxis-data-structures`, and is itself
 consumed by `sollertia-experiment`, `sollertia-forgery`, and the `sollertia-virtual-reality` McpBridge. Local
-clones of all of these typically live alongside this repository under `/home/cyberaxolotl/Desktop/GitHubRepos/`.
+clones of all of these typically live alongside this repository, in its parent directory.
 
 **Before writing code that interacts with a cross-referenced library, you MUST:**
 
@@ -96,6 +96,11 @@ repositories.
 | `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
 | `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
+The `unity` plugin's ten skills (`gimbl-framework`, `mqtt-contract`, `play-mode`, `scene-setup`, `task-generator`,
+`task-parameters`, `task-prefabs`, `task-scenes`, `unity-mcp-environment-setup`, `zone-prefabs`) are authored and
+invoked on the Unity side, so they are intentionally absent from the table above. Reach for them when changing
+`interfaces/unity_tools.py`, since they document the bridge contract the relay must match.
+
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
 member, `SessionTypes` member, runtime trial class (a sibling of `MesoscopeWaterRewardTrial` / `MesoscopeGasPuffTrial`),
 or `TriggerType` member. The skill owns the touch list and the import-time parity check.
@@ -118,8 +123,10 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 Project conventions for MCP tools:
 - MCP tool functions are excluded from unit tests by project convention. Do NOT write tests for `@mcp.tool()` functions.
   Coverage configuration in `pyproject.toml` already omits `*/sollertia_shared_assets/interfaces/*`.
-- Every MCP tool returns a `dict[str, Any]` response constructed via `ok_response(...)` or `error_response(...)` from
-  `mcp_instance`. Return shapes documented in each tool's `Returns` docstring section are part of the public contract.
+- Every MCP tool in `configuration_tools.py` and `data_tools.py` returns a `dict[str, Any]` response constructed via
+  `ok_response(...)` or `error_response(...)` from `mcp_instance`. The `unity_tools.py` relay tools instead return the
+  McpBridge response payload verbatim on success, and `error_response(...)` only on relay failure. Return shapes
+  documented in each tool's `Returns` docstring section are part of the public contract.
 - Tools that take a session path use file-path-based access, so the caller passes the path explicitly, not a session ID.
 - Tool responses chain: `get_data_root_overview_tool` produces `sessions` entries, `filter_sessions_tool` consumes
   them and returns a `session_paths` list that downstream `sollertia-*` MCP servers (forgery, etc.) accept directly.
@@ -137,10 +144,11 @@ contracts, or canonical filenames ripple through three downstream libraries:
   `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials file resolved through
   `get_credentials`. Owns the system-level `MesoscopeSystemConfiguration`, which extends but does not live in this
   library.
-- **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `filter_sessions`, the working
-  directory itself (per-project artifacts like `<working_dir>/<project>/manifest.feather`) and its `configuration/`
-  subdirectory (where the forgery server configuration is persisted), the `ProcessingTrackers` enum,
-  `MesoscopeHardwareState`, and `MesoscopeExperimentConfiguration`.
+- **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `iterate_sessions`, `DatasetData`,
+  the working directory's `configuration/` subdirectory (where the forgery server configuration is persisted) and its
+  remote-state subdirectory, the `ProcessingTrackers` enum, `MesoscopeHardwareState`, and
+  `MesoscopeExperimentConfiguration`. Its per-project manifest is written at the project root under the data root as
+  `<project>/<project>_manifest.feather`, not under the working directory.
 - **sollertia-virtual-reality** (Unity Editor McpBridge plugin). Consumed by `interfaces/unity_tools.py` over HTTP
   localhost, and the plugin itself is authored on the Unity side.
 
@@ -248,6 +256,10 @@ parity check that fails if any registry is incomplete.
 | `READ_ASSET_REGISTRY`               | `ReadAssets`         | Contract (maintainer-only) |
 | `CREDENTIALS_FILE_REGISTRY`         | `CredentialsTypes`   | Contract (maintainer-only) |
 
+`SESSION_TYPES_USING_VR_TASK` is the seventh system-tier touch point and has no row above, because it is a
+`frozenset[SessionTypes]` gate rather than a keyed registry. Extend it whenever a new session type runs the corridor
+task, since it decides whether `SessionData.required_raw_assets` demands the `vr_configuration.yaml` snapshot.
+
 `DESCRIPTOR_REGISTRY` is deliberately flat: a session type maps to exactly one descriptor platform-wide, so an
 acquisition system that needs a different descriptor must mint a new `SessionTypes` member.
 `_assert_registry_coverage()` in `registries.py` runs on a bare `import sollertia_shared_assets` (the hub loads
@@ -256,7 +268,9 @@ raises the same error if `SYSTEM_SESSION_TYPES` leaves an acquisition system wit
 unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()` (every registered descriptor must
 declare the `incomplete` field the inspection tooling reads) and `_assert_experiment_configuration_contract()` (every
 registered experiment configuration must declare the `experiment_states`, `trial_structures`, and `unity_scene_name`
-contract fields and provide a `from_task_template` classmethod). A half-wired acquisition system fails fast instead
+contract fields and provide a `from_task_template` classmethod that accepts `template`, `unity_scene_name`, and
+`state_count` by keyword and gives every other parameter a default, so `create_experiment_from_vr_template_tool` can
+call it generically). A half-wired acquisition system fails fast instead
 of having its template-creation tool refuse it at runtime.
 
 Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
@@ -280,9 +294,11 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
   association listed above are necessary because they cross enum boundaries. Do not add more without justification.
 - **No tests for MCP tools**: `@mcp.tool()` functions live behind the MCP server and are excluded from coverage.
   Test the helper functions they delegate to instead.
-- **Frozen acquisition snapshots**: Every per-session YAML in `raw_data/` (descriptor, hardware state, system
-  configuration, experiment configuration, VR configuration, surgery metadata) is an immutable record of the
-  session's acquisition context. MCP write tools repair corruption, and they do not edit live runtime state.
+- **Frozen acquisition snapshots**: The per-session acquisition snapshots in `raw_data/` (descriptor, hardware state,
+  system configuration, experiment configuration, VR configuration, surgery metadata) are immutable records of the
+  session's acquisition context. MCP write tools repair corruption, and they do not edit live runtime state. The
+  `session_data.yaml` marker and the `checksum_processing_tracker.yaml` tracker also live in `raw_data/` and are not
+  snapshots: the marker is rewritten by `SessionData.save()`, and the tracker by the checksum pipeline.
 
 ### Workflow guidance
 
@@ -323,7 +339,7 @@ Invoke `/library-extension`. It enumerates every registry and sibling-skill upda
 **Running tests, linting, the docs build, and the release tasks:**
 
 ```bash
-tox -e lint                # ruff format, ruff check over ./src and ./tests, mypy over ./src
+tox -e lint                # purge stubs, ruff format, ruff check over ./src and ./tests, mypy over ./src
 tox -e stubs               # generate .pyi stubs after lint passes
 tox -e py314-test          # run pytest with coverage
 tox -e coverage            # combine coverage data, render the reports, apply the 100% gate
