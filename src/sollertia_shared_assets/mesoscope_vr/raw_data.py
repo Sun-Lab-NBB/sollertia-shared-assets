@@ -36,14 +36,12 @@ class MesoscopeDirectories(StrEnum):
     metadata written by sollertia-experiment's preprocessing."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class MesoscopeRawData:
     """Stores the absolute paths to the Mesoscope-VR-specific raw assets of a single data acquisition session.
 
     Notes:
-        Instances are constructed by ``SessionData._build_sub_dataclasses`` when the session's acquisition_system is
-        AcquisitionSystems.MESOSCOPE_VR. The ``build`` classmethod is the single source of truth for the
-        enum-to-field mapping.
+        The ``build`` classmethod is the single source of truth for the enum-to-field mapping.
     """
 
     zaber_positions_path: Path
@@ -53,12 +51,10 @@ class MesoscopeRawData:
     """Records the 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window
     during the session, allowing the same imaging field of view to be recovered in follow-up sessions."""
     window_screenshot_path: Path
-    """Provides a visual reference of the cranial imaging window taken at the start of the session, used for
-    downstream registration and quality assessment."""
+    """Provides a visual reference of the cranial imaging window taken at the start of the session."""
     mesoscope_data_path: Path
     """Holds the compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata
-    produced by sollertia-experiment's preprocessing, which serves as the input to cindra's neural imaging analysis
-    pipelines."""
+    produced by sollertia-experiment's preprocessing."""
 
     @classmethod
     def build(cls, root: Path) -> MesoscopeRawData:

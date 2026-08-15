@@ -25,9 +25,8 @@ shared assets both depend on.
 The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, subjects, hardware
 state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
 configuration and an MCP server with tools for agentic configuration management, session operations, and Unity Editor
-integration. A subset of the MCP tools relay commands to a running Unity Editor instance via the McpBridge plugin
-from [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality). This subset enables agents
-to generate task prefabs, manage scenes, and control Play Mode.
+integration, with a subset relaying commands to a running Editor via the McpBridge plugin from
+[sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality).
 
 ___
 
@@ -35,16 +34,23 @@ ___
 
 - [Dependencies](#dependencies)
 - [Installation](#installation)
+  - [Source](#source)
+  - [pip](#pip)
 - [Usage](#usage)
   - [CLI Commands](#cli-commands)
   - [MCP Server](#mcp-server)
 - [API Documentation](#api-documentation)
 - [Developers](#developers)
+  - [Installing the Project](#installing-the-project)
+  - [Additional Dependencies](#additional-dependencies)
+  - [Development Automation](#development-automation)
   - [Adding New Session Types](#adding-new-session-types)
   - [Adding New Acquisition Systems](#adding-new-acquisition-systems)
   - [Adding a New Trial Class](#adding-a-new-trial-class)
   - [Adding a New Trigger Type](#adding-a-new-trigger-type)
   - [Adding a New Read Asset](#adding-a-new-read-asset)
+  - [AI-Assisted Development](#ai-assisted-development)
+  - [Automation Troubleshooting](#automation-troubleshooting)
 - [Versioning](#versioning)
 - [Authors](#authors)
 - [License](#license)
@@ -55,10 +61,9 @@ ___
 ## Dependencies
 
 - [Python](https://www.python.org/downloads/) **3.14** (the only currently supported interpreter version).
-- An optional
-  [Google service account credentials JSON file](https://cloud.google.com/iam/docs/service-account-overview),
-  required only when downstream Sollertia libraries read subject metadata from, or write water-restriction logs to,
-  Google Sheets.
+- An optional [Google service account credentials JSON
+  file](https://cloud.google.com/iam/docs/service-account-overview), required only when downstream Sollertia libraries
+  read subject metadata from, or write water-restriction logs to, Google Sheets.
 - An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
   [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality), required only by the MCP
   tools that generate task prefabs, manage scenes, and control Play Mode.
@@ -125,9 +130,8 @@ Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND 
 
 ### MCP Server
 
-This library provides an MCP server that exposes configuration management, session operations, and Unity
-Editor relay tools for AI agent integration. The server enables agents to query and configure shared Sollertia platform
-workflow components.
+This library provides an MCP server that exposes configuration management, session operations, and Unity Editor relay
+tools for AI agent integration.
 
 #### Starting the Server
 
@@ -224,9 +228,6 @@ ___
 
 See the [API documentation](https://sollertia-shared-assets-api-docs.netlify.app/) for the detailed description of the
 methods and classes exposed by components of this library.
-
-***Note,*** the API documentation includes additional details about the `slsa` CLI commands and their parameters
-beyond what is covered in the [CLI Commands](#cli-commands) section above.
 
 ___
 
@@ -375,12 +376,12 @@ split and the contents:
    `_assert_descriptor_contract` check. Use `mesoscope_vr/runtime_data.py` as reference.
 2. `<system>/experiment_configuration.py` defines a `<System>ExperimentConfiguration` dataclass inheriting from
    `YamlConfig` that captures the runtime experiment parameters for the new system. Every
-   `<System>ExperimentConfiguration` shares one contract: an `experiment_states` field (a mapping of
-   `ExperimentState`, the experiment state machine that every experiment runs as), a `trial_structures` field (the
-   trials the experiment runs, whose concrete trial classes vary per system), a `unity_scene_name` field (the linear
-   infinite corridor task the experiment runs), and a `from_task_template` classmethod that builds the configuration
-   from a task template. Fields beyond that contract are system-specific. Use `mesoscope_vr/experiment_configuration.py`
-   as reference.
+   `<System>ExperimentConfiguration` shares one contract of three fields and one classmethod. The `experiment_states`
+   field holds a mapping of `ExperimentState`, the experiment state machine that every experiment runs as, and the
+   `trial_structures` field holds the trials the experiment runs, whose concrete trial classes vary per system. The
+   `unity_scene_name` field names the linear infinite corridor task the experiment runs, and the `from_task_template`
+   classmethod builds the configuration from a task template. Fields beyond that contract are system-specific. Use
+   `mesoscope_vr/experiment_configuration.py` as reference.
 3. `<system>/raw_data.py` defines a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all
    system-specific raw assets and exposes a `build(cls, root: Path) -> <System>RawData` classmethod that resolves
    every field against the session's `raw_data` directory. Optionally add `<System>RawDataFiles` and/or
@@ -414,8 +415,7 @@ system's `<System>ExperimentConfiguration` dataclass that maps the template's tr
 trials and seeds the default runtime states. The tool dispatches through `EXPERIMENT_CONFIGURATION_REGISTRY` to the
 registered class's `from_task_template`, and the import-time `_assert_experiment_configuration_contract` check fails
 fast if the builder or any contract field is missing. Use `MesoscopeExperimentConfiguration.from_task_template` as
-reference. The generic `write_experiment_configuration_tool` remains available to author or repair a full payload
-directly.
+reference. The generic `write_experiment_configuration_tool` authors or repairs a full payload directly.
 
 **Step 5: Update downstream libraries**
 
@@ -555,13 +555,13 @@ representation, and the dataclass keeps every downstream consumer storage-agnost
 
 ### AI-Assisted Development
 
-Claude Code skills and AI development assets for this project are distributed through two marketplaces:
+Claude Code skills and other AI development assets for this project are distributed through two marketplaces:
 
 - [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace:
-  - **assets** plugin, which registers the `slsa mcp` server with compatible MCP clients and provides configuration
-    and data skills for working directory setup, session discovery, session data, descriptors, hardware state,
-    subject metadata, task templates, experiment configuration, library extension, and MCP environment setup. The
-    server also fronts the Unity Editor relay that the **unity** plugin's skills drive.
+  - **assets** plugin, which registers the `slsa mcp` server with compatible MCP clients. It also provides
+    configuration and data skills for working directory setup, session discovery, session data, descriptors, hardware
+    state, subject metadata, task templates, experiment configuration, library extension, and MCP environment setup.
+    The server also fronts the Unity Editor relay that the **unity** plugin's skills drive.
   - **unity** plugin, which provides Unity Editor skills that drive the `McpBridge` relay tools served by the
     `slsa mcp` server, document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger
     zone prefabs.

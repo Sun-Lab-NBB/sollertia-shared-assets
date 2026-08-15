@@ -31,16 +31,16 @@ from sollertia_shared_assets.data_hierarchy import (
 )
 
 _DEFAULT_PYTHON_VERSION: str = "3.14.6"
-"""Canonical Python version string for SessionData fixtures; matches SessionData.python_version default."""
+"""Canonical Python version string for SessionData fixtures. Matches SessionData.python_version default."""
 
 _DEFAULT_EXPERIMENT_VERSION: str = "5.0.0"
-"""Canonical sollertia-experiment version string for SessionData fixtures; matches the dataclass default."""
+"""Canonical sollertia-experiment version string for SessionData fixtures. Matches the dataclass default."""
 
 _SENTINEL_RAW_PATH: Path = Path("/sentinel/raw")
-"""Placeholder raw_data root used by path-resolution tests; never touched on disk."""
+"""Placeholder raw_data root used by path-resolution tests. Never touched on disk."""
 
 _SENTINEL_PROCESSED_PATH: Path = Path("/sentinel/processed")
-"""Placeholder processed_data root used by path-resolution tests; never touched on disk."""
+"""Placeholder processed_data root used by path-resolution tests. Never touched on disk."""
 
 
 @pytest.fixture
@@ -405,7 +405,7 @@ def test_session_data_create_raises_error_if_project_does_not_exist(clean_workin
 
     # Intentionally omits project-directory creation to trigger the FileNotFoundError path.
 
-    with pytest.raises(FileNotFoundError) as exc_info:
+    with pytest.raises(FileNotFoundError) as exception_info:
         SessionData.create(
             animal=AnimalData(
                 root=clean_working_directory, project_name="nonexistent_project", animal_id="test_animal"
@@ -416,8 +416,8 @@ def test_session_data_create_raises_error_if_project_does_not_exist(clean_workin
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
         )
 
-    assert "nonexistent_project" in str(exc_info.value)
-    assert "slsa configure project" in str(exc_info.value)
+    assert "nonexistent_project" in str(exception_info.value)
+    assert "slsa configure project" in str(exception_info.value)
 
 
 def test_session_data_create_copies_experiment_configuration(
@@ -432,8 +432,8 @@ def test_session_data_create_copies_experiment_configuration(
     configuration_path = project_path / "configuration"
     configuration_path.mkdir()
 
-    experiment_config_path = configuration_path / "test_experiment.yaml"
-    sample_experiment_config.to_yaml(file_path=experiment_config_path)
+    experiment_configuration_path = configuration_path / "test_experiment.yaml"
+    sample_experiment_config.to_yaml(file_path=experiment_configuration_path)
 
     templates_directory = clean_working_directory / "task_templates"
     templates_directory.mkdir()
@@ -451,10 +451,10 @@ def test_session_data_create_copies_experiment_configuration(
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
     )
 
-    session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
-    assert session_experiment_config.exists()
+    session_experiment_configuration = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
+    assert session_experiment_configuration.exists()
 
-    content = session_experiment_config.read_text()
+    content = session_experiment_configuration.read_text()
     assert "TestScene" in content
 
 
@@ -470,8 +470,8 @@ def test_session_data_create_caches_vr_configuration(
     configuration_path = project_path / "configuration"
     configuration_path.mkdir()
 
-    experiment_config_path = configuration_path / "test_experiment.yaml"
-    sample_experiment_config.to_yaml(file_path=experiment_config_path)
+    experiment_configuration_path = configuration_path / "test_experiment.yaml"
+    sample_experiment_config.to_yaml(file_path=experiment_configuration_path)
 
     templates_directory = clean_working_directory / "task_templates"
     templates_directory.mkdir()
@@ -490,12 +490,12 @@ def test_session_data_create_caches_vr_configuration(
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
     )
 
-    session_vr_config = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
-    assert session_vr_config.exists()
-    assert session_vr_config == session_data.raw_data.vr_configuration_path
+    session_vr_configuration = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
+    assert session_vr_configuration.exists()
+    assert session_vr_configuration == session_data.raw_data.vr_configuration_path
 
     # Round-trips the cached file through TaskTemplate to confirm it parses as a valid VR template.
-    cached_template = TaskTemplate.from_yaml(file_path=session_vr_config)
+    cached_template = TaskTemplate.from_yaml(file_path=session_vr_configuration)
     assert "trial1" in cached_template.trial_structures
     assert [cue.name for cue in cached_template.cues] == ["A", "B"]
 
@@ -513,10 +513,10 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(cle
         acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
     )
 
-    session_experiment_config = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
-    session_vr_config = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
-    assert not session_experiment_config.exists()
-    assert not session_vr_config.exists()
+    session_experiment_configuration = session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION
+    session_vr_configuration = session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION
+    assert not session_experiment_configuration.exists()
+    assert not session_vr_configuration.exists()
 
 
 def test_session_data_post_init_coerces_string_session_type() -> None:
@@ -637,8 +637,8 @@ def test_session_data_build_sub_dataclasses_unsupported_system_raises_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that _build_sub_dataclasses raises ValueError when the acquisition system is not registered."""
-    # Empties the registry so the lookup falls into the defensive error branch even though the
-    # acquisition_system value is a valid AcquisitionSystems member.
+    # Empties the registry so the lookup falls into the defensive error branch even though the acquisition_system value
+    # is a valid AcquisitionSystems member.
     monkeypatch.setattr(
         "sollertia_shared_assets.data_hierarchy.session_data.SYSTEM_RAW_DATA_REGISTRY",
         {},

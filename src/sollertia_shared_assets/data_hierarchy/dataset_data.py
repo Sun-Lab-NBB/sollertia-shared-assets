@@ -1,10 +1,4 @@
-"""Provides the system-agnostic forged-dataset data hierarchy shared across all Sollertia platform machines.
-
-A forged dataset aggregates multiple data acquisition sessions of the same type, recorded across different animals
-by the same acquisition system, into a single system-agnostic self-contained hierarchy. The dataset is system-agnostic
-at the data layer: every session's assembled ``data.feather`` can be loaded by polars regardless of which columns it
-contains.
-"""
+"""Provides the system-agnostic forged-dataset data hierarchy shared across all Sollertia platform machines."""
 
 from __future__ import annotations
 
@@ -42,7 +36,8 @@ class DatasetFiles(StrEnum):
     """
 
     DATA = "data.feather"
-    """The assembled per-session data feather written by the forging pipeline."""
+    """The assembled per-session data feather written by the forging pipeline. The file is loadable by polars
+    regardless of which columns it contains, which keeps the dataset system-agnostic at the data layer."""
     DESCRIPTIONS = "data_descriptions.feather"
     """The per-dataset companion feather mapping each column name in ``data.feather`` to its description. Written once
     at the dataset root, since every session in a dataset shares the same data format."""
@@ -78,17 +73,15 @@ class DatasetSession:
 
     @property
     def vr_configuration_path(self) -> Path:
-        """Returns the path to the session's ``vr_configuration.yaml`` file within the dataset hierarchy.
-
-        Only sessions that use VR carry this asset, so callers should check ``.is_file()`` before reading.
+        """Returns the path to the session's ``vr_configuration.yaml`` file within the dataset hierarchy, which only
+        sessions that use VR carry, so callers should check ``.is_file()`` before reading.
         """
         return self.session_path.joinpath(RawDataFiles.VR_CONFIGURATION)
 
     @property
     def experiment_configuration_path(self) -> Path:
-        """Returns the path to the session's ``experiment_configuration.yaml`` file within the dataset hierarchy.
-
-        Only experiment session types carry this asset, so callers should check ``.is_file()`` before reading.
+        """Returns the path to the session's ``experiment_configuration.yaml`` file within the dataset hierarchy,
+        which only experiment session types carry, so callers should check ``.is_file()`` before reading.
         """
         return self.session_path.joinpath(RawDataFiles.EXPERIMENT_CONFIGURATION)
 
@@ -128,8 +121,8 @@ class DatasetData(YamlConfig):
         Datasets are created using a pre-filtered set of session + animal pairs, typically obtained through the
         session filtering functionality in sollertia-forgery. The dataset stores only the assembled data, not raw or
         processed data. Each created dataset carries a per-dataset ``data_descriptions.feather`` describing the
-        meaning of every column its acquisition system can emit; use column_descriptions() and
-        get_column_description() to read it.
+        meaning of every column its acquisition system can emit. Use column_descriptions() and get_column_description()
+        to read it.
     """
 
     name: str
@@ -194,7 +187,6 @@ class DatasetData(YamlConfig):
                 in the provided collection.
             FileExistsError: If a dataset with the same name already exists.
         """
-        # Converts sessions to tuple if provided as set.
         if isinstance(sessions, set):
             sessions = tuple(sessions)
 
@@ -213,7 +205,6 @@ class DatasetData(YamlConfig):
             action=f"create the '{name}' forged dataset",
         )
 
-        # Constructs the dataset root directory path.
         dataset_path = datasets_root.joinpath(name)
 
         # Prevents overwriting existing datasets.
@@ -229,7 +220,6 @@ class DatasetData(YamlConfig):
         # path and only its parent would be created.
         ensure_directory_exists(path=dataset_path, is_file=False)
 
-        # Creates animal/session subdirectories and rebuilds each session with its resolved path.
         resolved_sessions: list[DatasetSession] = []
         for session in sessions:
             session_path = dataset_path.joinpath(session.animal, session.session)
@@ -238,7 +228,6 @@ class DatasetData(YamlConfig):
                 DatasetSession(session=session.session, animal=session.animal, session_path=session_path)
             )
 
-        # Generates the DatasetData instance.
         instance = cls(
             name=name,
             project=project,
@@ -298,7 +287,6 @@ class DatasetData(YamlConfig):
                 console.error(message=message, error=FileNotFoundError)
             dataset_data_path = candidates[0]
 
-        # Loads the dataset's data from the .yaml file.
         instance: DatasetData = cls.from_yaml(file_path=dataset_data_path)
 
         # Re-resolves the dataset_data_path and each session's session_path against the YAML file's filesystem
@@ -342,7 +330,6 @@ class DatasetData(YamlConfig):
             ValueError: If no sessions are provided, or if any provided session is already part of the dataset or is
                 repeated within the provided collection.
         """
-        # Converts sessions to tuple if provided as set.
         if isinstance(sessions, set):
             sessions = tuple(sessions)
 
@@ -359,7 +346,6 @@ class DatasetData(YamlConfig):
             action=f"add sessions to the '{self.name}' forged dataset",
         )
 
-        # Creates each added session's subdirectory and rebuilds the session with its resolved path.
         dataset_path = self.dataset_data_path.parent
         added: list[DatasetSession] = []
         for session in sessions:
@@ -391,7 +377,7 @@ class DatasetData(YamlConfig):
         Raises:
             ValueError: If the specified animal is not part of the dataset.
         """
-        removed = self.get_sessions_for_animal(animal)
+        removed = self.get_sessions_for_animal(animal=animal)
         if not removed:
             message = (
                 f"Unable to remove the animal '{animal}' from the '{self.name}' forged dataset. The animal must be "
@@ -401,7 +387,7 @@ class DatasetData(YamlConfig):
 
         # Clears the animal's directory before rewriting the marker, so an interrupted removal leaves a marker that
         # still describes the data present on disk.
-        animal_path = self.get_animal(animal).animal_path
+        animal_path = self.get_animal(animal=animal).animal_path
         if animal_path.is_dir():
             delete_directory(directory_path=animal_path)
 
@@ -412,23 +398,10 @@ class DatasetData(YamlConfig):
 
     @property
     def descriptions_path(self) -> Path:
-        """Returns the path to this dataset's ``data_descriptions.feather`` file at the dataset root.
-
-        Resolved against the ``dataset.yaml`` file's filesystem location so the path remains portable across
-        processing machines.
+        """Returns the path to this dataset's ``data_descriptions.feather`` file at the dataset root, resolved against
+        the ``dataset.yaml`` file's filesystem location so the path remains portable across processing machines.
         """
         return self.dataset_data_path.parent.joinpath(DatasetFiles.DESCRIPTIONS)
-
-    def _write_column_descriptions(self, column_descriptions: dict[str, str]) -> None:
-        """Writes the per-dataset ``data_descriptions.feather`` mapping column names to descriptions.
-
-        Args:
-            column_descriptions: The mapping from each column name to its human-readable description.
-        """
-        pl.DataFrame(
-            {"column": list(column_descriptions), "description": list(column_descriptions.values())},
-            schema={"column": pl.String, "description": pl.String},
-        ).write_ipc(file=self.descriptions_path)
 
     def column_descriptions(self) -> dict[str, str]:
         """Returns the mapping from each column name in the dataset's ``data.feather`` to its description.
@@ -452,7 +425,7 @@ class DatasetData(YamlConfig):
             )
             console.error(message=message, error=FileNotFoundError)
 
-        descriptions = pl.read_ipc(descriptions_path)
+        descriptions = pl.read_ipc(source=descriptions_path)
         return dict(zip(descriptions["column"], descriptions["description"], strict=True))
 
     def get_column_description(self, column: str) -> str:
@@ -491,9 +464,9 @@ class DatasetData(YamlConfig):
         violation.
 
         Notes:
-            Intended to run once the dataset is fully composed (every session's ``data.feather`` written). The
-            forging pipeline invokes it after assembly so an acquisition system that emits an undescribed column
-            fails the run rather than producing a dataset whose assembled data cannot be fully interpreted.
+            Intended to run once the dataset is fully composed (every session's ``data.feather`` written), so an
+            acquisition system that emits an undescribed column fails rather than producing a dataset whose assembled
+            data cannot be fully interpreted.
 
         Raises:
             FileNotFoundError: If the dataset's ``data_descriptions.feather`` companion file does not exist, or if
@@ -518,7 +491,7 @@ class DatasetData(YamlConfig):
 
             # ``read_ipc_schema`` reads only the Arrow IPC schema from the file footer, so the column names are
             # resolved without materializing any of the session's data.
-            for column in pl.read_ipc_schema(data_path):
+            for column in pl.read_ipc_schema(source=data_path):
                 if column not in described_columns:
                     undescribed.setdefault(column, []).append(session.session)
 
@@ -537,11 +510,9 @@ class DatasetData(YamlConfig):
 
     @property
     def animals(self) -> tuple[DatasetAnimal, ...]:
-        """Returns a tuple of DatasetAnimal instances, one per unique animal in the dataset.
-
-        Each instance carries the animal identifier and the resolved path to the animal's directory under
-        the dataset root, anchored on the ``dataset.yaml`` file's filesystem location so the result remains
-        portable across processing machines.
+        """Returns a tuple of DatasetAnimal instances, one per unique animal in the dataset, each carrying the animal
+        identifier and the resolved path to the animal's directory under the dataset root, anchored on the
+        ``dataset.yaml`` file's filesystem location so the result remains portable across processing machines.
         """
         dataset_root = self.dataset_data_path.parent
         unique_animals = sorted({session.animal for session in self.sessions})
@@ -613,6 +584,17 @@ class DatasetData(YamlConfig):
         # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
         raise ValueError(message)  # pragma: no cover
 
+    def _write_column_descriptions(self, column_descriptions: dict[str, str]) -> None:
+        """Writes the per-dataset ``data_descriptions.feather`` mapping column names to descriptions.
+
+        Args:
+            column_descriptions: The mapping from each column name to its human-readable description.
+        """
+        pl.DataFrame(
+            data={"column": list(column_descriptions), "description": list(column_descriptions.values())},
+            schema={"column": pl.String, "description": pl.String},
+        ).write_ipc(file=self.descriptions_path)
+
 
 def _screen_duplicate_sessions(
     sessions: tuple[DatasetSession, ...],
@@ -622,9 +604,8 @@ def _screen_duplicate_sessions(
     """Rejects a request that names a session the dataset already holds or that repeats a session within itself.
 
     Notes:
-        Both the dataset-creation and the dataset-append paths screen their whole request through this function before
-        creating any directory, so the two paths enforce one membership invariant and a rejected request leaves the
-        filesystem untouched.
+        Screens the whole request before any directory is created, so a rejected request leaves the filesystem
+        untouched.
 
     Args:
         sessions: The DatasetSession instances the request adds to the dataset.

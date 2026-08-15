@@ -347,11 +347,7 @@ def test_task_template_trial_references_unknown_cue_raises_error() -> None:
 
 
 def test_task_template_invalid_trial_name_raises_error() -> None:
-    """Verifies that a trial name with characters outside [A-Za-z0-9_] raises ValueError.
-
-    Trial names are embedded verbatim in Unity-side ``<template>-<trial>.prefab`` segment filenames,
-    so any character that is unsafe in a filesystem path must be rejected at template load.
-    """
+    """Verifies that a trial name with characters outside [A-Za-z0-9_] raises ValueError."""
     trial_structures = {
         "bad name!": TrialStructure(
             cue_sequence=["A", "B"],

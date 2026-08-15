@@ -3,8 +3,6 @@
 Exposes the canonical MCP tool surface that all sibling Sollertia libraries (sollertia-experiment,
 sollertia-virtual-reality, sollertia-forgery, and downstream agents) use to discover, read, write, validate, and
 introspect the configuration and runtime data files defined in this library.
-
-Importing this module auto-discovers every ``*_tools`` submodule and imports it, triggering its tool registration.
 """
 
 from __future__ import annotations

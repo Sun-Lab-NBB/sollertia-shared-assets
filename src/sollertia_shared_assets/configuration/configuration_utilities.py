@@ -15,7 +15,7 @@ configuration YAML files)."""
 
 CREDENTIALS_DIRECTORY: str = "credentials"
 """The name of the working-directory subdirectory that stores all platform credentials files. The constant lives with
-the working-directory layout (``set_working_directory`` pre-creates the subdirectory); the credentials toolset that
+the working-directory layout (``set_working_directory`` pre-creates the subdirectory). The credentials toolset that
 fills the subdirectory lives in the top-level ``credentials`` module."""
 
 

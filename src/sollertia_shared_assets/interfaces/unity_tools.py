@@ -1,10 +1,10 @@
 """Provides MCP tools for interacting with the Unity Editor via the McpBridge HTTP relay.
 
-All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be
-running with the plugin active. On success each tool returns the McpBridge response payload verbatim; when the
-bridge is unreachable, leaves the request unanswered within the timeout, or returns a payload that is not a JSON
-object, the tool returns a ``{"success": False, "error": <message>}`` dict instead. A bridge-side tool rejection is
-forwarded verbatim as the bridge's own ``{"success": False, "error": ...}`` payload.
+All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be running with the
+plugin active. On success each tool returns the McpBridge response payload verbatim. When the bridge is unreachable,
+leaves the request unanswered within the timeout, or returns a payload that is not a JSON object, the tool returns a
+``{"success": False, "error": <message>}`` dict instead. A bridge-side tool rejection is forwarded verbatim as the
+bridge's own ``{"success": False, "error": ...}`` payload.
 """
 
 from __future__ import annotations
@@ -30,41 +30,37 @@ _UNITY_BRIDGE_TIMEOUT: int = 30
 def create_task_tool(template_name: str, unsaved_changes: Literal["save", "discard"] | None = None) -> dict[str, Any]:
     """Creates a Unity task end-to-end from a YAML task template.
 
-    Generates the task prefab and the matching scene in one call. Mirrors the ``CreateTask/New Task`` Editor
-    menu so the agentic and manual paths produce
-    byte-equivalent assets. The prefab is built at
+    Generates the task prefab and the matching scene in one call. Mirrors the ``CreateTask/New Task`` Editor menu so the
+    agentic and manual paths produce byte-equivalent assets. The prefab is built at
     ``Assets/InfiniteCorridorTask/Tasks/<template_name>.prefab`` and the scene at
-    ``Assets/Scenes/<template_name>.unity``; both paths are auto-resolved from the template basename so
-    every task artifact shares one name end to end. Refuses to overwrite an existing scene at the
-    resolved path. Regeneration is therefore always an explicit two-step action: call
-    ``delete_task_tool`` first to remove the existing task bundle (scene, prefab, segments), then call
-    ``create_task_tool`` again to rebuild from scratch. The prefab itself is always regenerated because
-    the template is authoritative.
+    ``Assets/Scenes/<template_name>.unity``. Both paths are auto-resolved from the template basename so every task
+    artifact shares one name end to end. Refuses to overwrite an existing scene at the resolved path. Regeneration is
+    therefore always an explicit two-step action: call ``delete_task_tool`` first to remove the existing task bundle
+    (scene, prefab, segments), then call ``create_task_tool`` again to rebuild from scratch. The prefab itself is always
+    regenerated because the template is authoritative.
 
-    Before any mutation, the Unity-side ``CreateFromTemplate`` runs a cross-template cue-texture
-    preflight that scans every YAML under ``Assets/InfiniteCorridorTask/Configurations/`` and aborts the
-    call when two templates declare a cue with the same ``(name, length_cm)`` identity but different
-    textures. The shared-cue keying scheme makes such conflicts silently corrupt downstream prefabs, so
-    the preflight failure surfaces as an ``error:`` response with the offending template pair(s) listed
-    before any cue or segment is touched. Templates outside ``Configurations/`` are not visible to the
-    MCP surface and are rejected by the Editor menu as well.
+    Before any mutation, the Unity-side ``CreateFromTemplate`` runs a cross-template cue-texture preflight that scans
+    every YAML under ``Assets/InfiniteCorridorTask/Configurations/`` and aborts the call when two templates declare a
+    cue with the same ``(name, length_cm)`` identity but different textures. The shared-cue keying scheme makes such
+    conflicts silently corrupt downstream prefabs, so the preflight failure surfaces as an ``error:`` response with the
+    offending template pair(s) listed before any cue or segment is touched. Templates outside ``Configurations/`` are
+    not visible to the MCP surface and are rejected by the Editor menu as well.
 
-    Scene generation opens the new scene, which discards unsaved edits in the active one. When the active
-    scene has unsaved edits and ``unsaved_changes`` is omitted, the bridge returns an error before any asset
-    is written, matching the policy :func:`open_scene_tool` applies.
+    Scene generation opens the new scene, which discards unsaved edits in the active one. When the active scene has
+    unsaved edits and ``unsaved_changes`` is omitted, the bridge returns an error before any asset is written, matching
+    the policy :func:`open_scene_tool` applies.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
-        template_name: The template filename without extension (e.g., ``SSO_Merging``). Must exist in the
-            Unity project's ``Assets/InfiniteCorridorTask/Configurations/`` directory.
-        unsaved_changes: The policy applied when the active scene has unsaved edits. ``save`` persists the
-            active scene first, ``discard`` abandons the edits, and ``None`` returns an error so the caller
-            can prompt the user.
+        template_name: The template filename without extension (e.g., ``SSO_Merging``). Must exist in the Unity
+            project's ``Assets/InfiniteCorridorTask/Configurations/`` directory.
+        unsaved_changes: The policy applied when the active scene has unsaved edits. ``save`` persists the active scene
+            first, ``discard`` abandons the edits, and ``None`` returns an error so the caller can prompt the user.
 
     Returns:
-        A response dict with ``template_name``, ``prefab_path``, ``scene_path``,
-        ``simulated_controller_added``, and ``message`` on success.
+        A response dict with ``template_name``, ``prefab_path``, ``scene_path``, ``simulated_controller_added``, and
+        ``message`` on success.
     """
     relay_arguments: dict[str, Any] = {"template_name": template_name}
     if unsaved_changes is not None:
@@ -76,30 +72,28 @@ def create_task_tool(template_name: str, unsaved_changes: Literal["save", "disca
 def delete_task_tool(template_name: str) -> dict[str, Any]:
     """Removes every Unity artifact that ``create_task_tool`` produces for a given template in a single call.
 
-    Removes the scene plus its ``savedFullScreenViews`` companion, the task prefab, and every segment prefab
-    the template owns. A segment is named ``TemplateName-TrialName`` and neither half may contain a hyphen, so
-    the prefix resolves to exactly one owning template even where one template basename nests another. A
-    template name matching a protected hand-authored asset, such as the base scene template, is refused before
-    anything is deleted. Mirrors ``create_task_tool`` — the two tools cover the
-    full lifecycle of a task's generated artifacts. Cue prefabs and cue materials are intentionally not removed
-    because they are shared
-    across every template that declares a matching ``(name, length_cm)`` identity; deleting them
-    would corrupt sibling tasks. Use ``delete_asset_tool`` for individual cue cleanup. The
-    template YAML is also preserved as the source of truth — to remove the template itself, edit the
+    Removes the scene plus its ``savedFullScreenViews`` companion, the task prefab, and every segment prefab the
+    template owns. A segment is named ``TemplateName-TrialName`` and neither half may contain a hyphen, so the prefix
+    resolves to exactly one owning template even where one template basename nests another. A template name matching a
+    protected hand-authored asset, such as the base scene template, is refused before anything is deleted. Mirrors
+    ``create_task_tool``. The two tools cover the full lifecycle of a task's generated artifacts. Cue prefabs and cue
+    materials are intentionally not removed because they are shared across every template that declares a matching
+    ``(name, length_cm)`` identity. Deleting them would corrupt sibling tasks. Use ``delete_asset_tool`` for individual
+    cue cleanup. The template YAML is also preserved as the source of truth. To remove the template itself, edit the
     file system directly or use a templates-side tool.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
-        template_name: The template filename without extension (e.g., ``SSO_Merging``). The same name
-            used with ``create_task_tool``.
+        template_name: The template filename without extension (e.g., ``SSO_Merging``). The same name used with
+            ``create_task_tool``.
 
     Returns:
-        A response dict with ``template_name``, ``deleted_paths`` (the scene, the task prefab, and every
-        segment prefab removed; the per-scene companion is reported separately),
-        ``deleted`` (boolean), and ``message`` on success. When a per-scene companion asset existed,
-        the response also carries ``companion_deleted`` with the project-relative path of the removed
-        companion. The call returns an error when no artifacts existed for the template.
+        A response dict with ``template_name``, ``deleted_paths`` (the scene, the task prefab, and every segment prefab
+        removed. The per-scene companion is reported separately), ``deleted`` (boolean), and ``message`` on success.
+        When a per-scene companion asset existed, the response also carries ``companion_deleted`` with the
+        project-relative path of the removed companion. The call returns an error when no artifacts existed for the
+        template.
     """
     return _unity_relay(tool="delete_task", arguments={"template_name": template_name})
 
@@ -115,8 +109,8 @@ def inspect_prefab_tool(prefab_path: str) -> dict[str, Any]:
             ``Assets/InfiniteCorridorTask/Prefabs/SSO_Merging-ABC.prefab``).
 
     Returns:
-        A response dict with ``prefab_path`` and ``hierarchy`` (recursive GameObject tree with transforms,
-        components, and collider geometry).
+        A response dict with ``prefab_path`` and ``hierarchy`` (recursive GameObject tree with transforms, components,
+        and collider geometry).
     """
     return _unity_relay(tool="inspect_prefab", arguments={"prefab_path": prefab_path})
 
@@ -132,19 +126,18 @@ def clone_zone_prefab_tool(
 ) -> dict[str, Any]:
     """Clones a canonical base zone prefab into a new trigger-zone prefab.
 
-    Performs the prefab-authoring step of adding a new trigger zone through Unity's serialization layer, so
-    fileIDs, script references, and parent-child wiring are assigned by Unity and stay consistent. The clone copies
-    one of the two protected base zone prefabs, optionally swaps the root and named region modifier scripts for new
-    compiled ``MonoBehaviour`` types, and applies serialized field overrides. Every requested script name is
-    resolved before any asset is written, and the created asset is rolled back if a later edit fails, so a failed
-    call leaves a clean working tree. Unity names the new prefab's root after the destination filename.
+    Performs the prefab-authoring step of adding a new trigger zone through Unity's serialization layer, so fileIDs,
+    script references, and parent-child wiring are assigned by Unity and stay consistent. The clone copies one of the
+    two protected base zone prefabs, optionally swaps the root and named region modifier scripts for new compiled
+    ``MonoBehaviour`` types, and applies serialized field overrides. Every requested script name is resolved before any
+    asset is written, and the created asset is rolled back if a later edit fails, so a failed call leaves a clean
+    working tree. Unity names the new prefab's root after the destination filename.
 
-    This tool only produces the prefab. Wiring it into the runtime (the ``ConfigLoader`` trigger_type
-    literal, the ``CreateTask`` placement branch, the ``McpBridge`` protected-path set, and the Python
-    ``TriggerType`` registry) remains the documented zone-extension recipe. A new region behavior should
-    follow the zone-modifier architecture: subclass an existing zone, or add a standalone ``IResettable``
-    registered in ``Task.FindResettableZones``, on a root that subclasses ``StimulusTriggerZone`` and
-    publishes the standard ``Stimulus`` event.
+    This tool only produces the prefab. Wiring it into the runtime (the ``ConfigLoader`` trigger_type literal, the
+    ``CreateTask`` placement branch, the ``McpBridge`` protected-path set, and the Python ``TriggerType`` registry)
+    remains the documented zone-extension recipe. A new region behavior should follow the zone-modifier architecture:
+    subclass an existing zone, or add a standalone ``IResettable`` registered in ``Task.FindResettableZones``, on a root
+    that subclasses ``StimulusTriggerZone`` and publishes the standard ``Stimulus`` event.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
@@ -152,22 +145,20 @@ def clone_zone_prefab_tool(
         source_prefab: The project-relative path to a canonical base zone prefab, either
             ``Assets/InfiniteCorridorTask/Prefabs/StimulusTriggerZone.prefab`` or
             ``Assets/InfiniteCorridorTask/Prefabs/OccupancyTriggerZone.prefab``.
-        destination_prefab: The project-relative path for the new prefab under
-            ``Assets/InfiniteCorridorTask/Prefabs/``. Must end with ``.prefab`` and must not name a
-            protected base prefab.
-        root_script: Optional name of a compiled ``MonoBehaviour`` deriving from ``StimulusTriggerZone``
-            to replace the root modifier script. When omitted, the root script is kept.
-        regions: Optional list of per-region edits. Each entry requires ``match`` (the name of the region
-            to modify) and may carry ``rename`` (str), ``script`` (the name of a compiled ``MonoBehaviour``
-            replacing that region's modifier), and ``fields`` (a name-to-value map of serialized field
-            overrides applied to the region's modifier).
-        overwrite: When true, replaces an existing prefab at ``destination_prefab``. Defaults to false,
-            which makes an existing destination an error.
+        destination_prefab: The project-relative path for the new prefab under ``Assets/InfiniteCorridorTask/Prefabs/``.
+            Must end with ``.prefab`` and must not name a protected base prefab.
+        root_script: Optional name of a compiled ``MonoBehaviour`` deriving from ``StimulusTriggerZone`` to replace the
+            root modifier script. When omitted, the root script is kept.
+        regions: Optional list of per-region edits. Each entry requires ``match`` (the name of the region to modify) and
+            may carry ``rename`` (str), ``script`` (the name of a compiled ``MonoBehaviour`` replacing that region's
+            modifier), and ``fields`` (a name-to-value map of serialized field overrides applied to the region's
+            modifier).
+        overwrite: Determines whether to replace an existing prefab at ``destination_prefab``. Defaults to false, which
+            makes an existing destination an error.
 
     Returns:
-        A response dict with ``destination_prefab``, ``hierarchy`` (the new prefab's recursive GameObject
-        tree, in the same shape as :func:`inspect_prefab_tool`), and a ``warning`` listing the remaining
-        recipe steps on success.
+        A response dict with ``destination_prefab``, ``hierarchy`` (the new prefab's recursive GameObject tree, in the
+        same shape as :func:`inspect_prefab_tool`), and a ``warning`` listing the remaining recipe steps on success.
     """
     relay_arguments: dict[str, Any] = {
         "source_prefab": source_prefab,
@@ -185,10 +176,9 @@ def clone_zone_prefab_tool(
 def delete_asset_tool(asset_path: str) -> dict[str, Any]:
     """Deletes a non-scene Unity asset and refreshes the AssetDatabase.
 
-    The bridge rejects deletion of hand-authored protected assets and paths outside the allowed
-    directories with a descriptive error. Scene paths under ``Assets/Scenes/`` are also rejected —
-    use ``delete_task_tool`` for end-to-end scene+prefab+segment cleanup. Requires the Unity Editor
-    to be running with the McpBridge plugin active.
+    The bridge rejects deletion of hand-authored protected assets and paths outside the allowed directories with a
+    descriptive error. Scene paths under ``Assets/Scenes/`` are also rejected. Use ``delete_task_tool`` for end-to-end
+    scene+prefab+segment cleanup. Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
         asset_path: The project-relative path to the asset to delete (e.g.,
@@ -207,13 +197,12 @@ def list_assets_tool(asset_type: str = "Prefab", search_path: str = "Assets/Infi
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
-        asset_type: The Unity asset type filter (e.g., ``Prefab``, ``Scene``, ``Material``, ``Texture2D``).
-            Defaults to ``Prefab``.
+        asset_type: The Unity asset type filter (e.g., ``Prefab``, ``Scene``, ``Material``, ``Texture2D``). Defaults to
+            ``Prefab``.
         search_path: The project-relative directory to search. Defaults to ``Assets/InfiniteCorridorTask``.
 
     Returns:
-        A response dict with ``asset_type``, ``search_path``, and ``assets`` (list of project-relative
-        paths).
+        A response dict with ``asset_type``, ``search_path``, and ``assets`` (list of project-relative paths).
     """
     return _unity_relay(
         tool="list_assets",
@@ -238,17 +227,16 @@ def list_scenes_tool() -> dict[str, Any]:
 def open_scene_tool(scene_path: str, unsaved_changes: Literal["save", "discard"] | None = None) -> dict[str, Any]:
     """Opens a Unity scene in the Editor after applying the unsaved-changes policy.
 
-    When the active scene has unsaved edits and ``unsaved_changes`` is omitted, the bridge returns an error
-    instead of switching scenes. Agentic callers should ask the user whether to save or discard the edits,
-    then retry with the chosen value. ``save`` persists the active scene before switching; ``discard``
-    abandons the edits silently. When the active scene is clean, the value is ignored.
-    Requires the Unity Editor to be running with the McpBridge plugin active.
+    When the active scene has unsaved edits and ``unsaved_changes`` is omitted, the bridge returns an error instead of
+    switching scenes. Agentic callers should ask the user whether to save or discard the edits, then retry with the
+    chosen value. ``save`` persists the active scene before switching. ``discard`` abandons the edits silently. When the
+    active scene is clean, the value is ignored. Requires the Unity Editor to be running with the McpBridge plugin
+    active.
 
     Args:
         scene_path: The project-relative path to the scene (e.g., ``Assets/Scenes/SSO_Merging.unity``).
-        unsaved_changes: The policy applied when the active scene has unsaved edits. ``save`` persists the
-            active scene first, ``discard`` abandons the edits, and ``None`` returns an error so the caller
-            can prompt the user.
+        unsaved_changes: The policy applied when the active scene has unsaved edits. ``save`` persists the active scene
+            first, ``discard`` abandons the edits, and ``None`` returns an error so the caller can prompt the user.
 
     Returns:
         A response dict with ``scene_path`` and ``message`` on success.
@@ -263,15 +251,14 @@ def open_scene_tool(scene_path: str, unsaved_changes: Literal["save", "discard"]
 def inspect_scene_tool() -> dict[str, Any]:
     """Returns the active scene's metadata and the recursive hierarchy of every root GameObject.
 
-    Used for pre-flight verification of agent-prepared scenes — confirms that expected components such as
-    ``ActorObject``, ``MQTTClient``, ``Display`` rigs, and the Task prefab are present before entering Play
-    Mode. The returned ``is_dirty`` flag also exposes whether the scene has unsaved changes that would
-    affect a subsequent ``open_scene_tool`` call. Requires the Unity Editor to be running with the
-    McpBridge plugin active.
+    Used for pre-flight verification of agent-prepared scenes. Confirms that expected components such as
+    ``ActorObject``, ``MQTTClient``, ``Display`` rigs, and the Task prefab are present before entering Play Mode. The
+    returned ``is_dirty`` flag also exposes whether the scene has unsaved changes that would affect a subsequent
+    ``open_scene_tool`` call. Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with ``scene_path``, ``scene_name``, ``is_dirty``, and ``root_objects``
-        (list of recursive GameObject hierarchies with transforms, components, and collider geometry).
+        A response dict with ``scene_path``, ``scene_name``, ``is_dirty``, and ``root_objects`` (list of recursive
+        GameObject hierarchies with transforms, components, and collider geometry).
     """
     return _unity_relay(tool="inspect_scene")
 
@@ -283,8 +270,8 @@ def enter_play_mode_tool() -> dict[str, Any]:
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with ``state`` (``playing`` when already in Play Mode, ``entering_play_mode`` while
-        the transition is in progress) and ``message``.
+        A response dict with ``state`` (``playing`` when already in Play Mode, ``entering_play_mode`` while the
+        transition is in progress) and ``message``.
     """
     return _unity_relay(tool="enter_play_mode")
 
@@ -296,8 +283,8 @@ def exit_play_mode_tool() -> dict[str, Any]:
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with ``state`` (``edit`` when not in Play Mode, ``exiting_play_mode`` while the
-        transition is in progress) and ``message``.
+        A response dict with ``state`` (``edit`` when not in Play Mode, ``exiting_play_mode`` while the transition is in
+        progress) and ``message``.
     """
     return _unity_relay(tool="exit_play_mode")
 
@@ -318,30 +305,26 @@ def get_play_state_tool() -> dict[str, Any]:
 def read_task_parameters_tool() -> dict[str, Any]:
     """Reads every field exposed by the Task Parameters Unity Editor window.
 
-    Returns a single-scan snapshot of the active scene's current state plus the enumerated options
-    available for each settable enum-like field and the visibility of conditionally-rendered controls.
-    State, options, and visibility are all derived from the same scene walk so an agent that reads,
-    modifies, and writes back values does not race against a separate enumeration pass.
+    Returns a single-scan snapshot of the active scene's current state plus the enumerated options available for each
+    settable enum-like field and the visibility of conditionally-rendered controls. State, options, and visibility are
+    all derived from the same scene walk so an agent that reads, modifies, and writes back values does not race against
+    a separate enumeration pass.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with three top-level keys: ``state``, ``options``, and ``visibility``.
-        The ``state`` key holds per-section current values. ``actor`` carries ``model`` and
-        ``controller``. ``mqtt`` carries ``ip`` and ``port``. ``display`` carries
-        ``current_brightness``, ``brightness``, and ``height_in_vr``. ``camera_mapping`` carries
-        a list of per-monitor dicts with ``monitor``, ``left``, ``top``, and ``camera``. ``task``
-        carries ``require_interaction``, ``require_wait``, ``track_length``, and ``track_seed``.
-        The ``options`` key lists enumerated alternatives for fields with a finite valid set.
-        ``actor.model`` lists every Resources actor prefab plus the literal ``"None"``.
-        ``actor.controller`` lists every scene ControllerOutput plus the literal ``"None"``.
-        ``camera_mapping.camera`` lists every scene Camera not tagged MainCamera or named
-        ``Main Camera``, also plus ``"None"``.
-        The ``visibility`` key holds per-control flags indicating whether the matching control is
-        currently rendered in the Parameters window. ``task.require_interaction`` is true only when the
-        scene contains a ``GuidanceZone``. ``task.require_wait`` is true only when the scene
-        contains an ``OccupancyZone``. Writes against fields whose visibility is false are
-        rejected by :func:`write_task_parameters_tool`.
+        A response dict with three top-level keys: ``state``, ``options``, and ``visibility``. The ``state`` key holds
+        per-section current values. ``actor`` carries ``model`` and ``controller``. ``mqtt`` carries ``ip`` and
+        ``port``. ``display`` carries ``current_brightness``, ``brightness``, and ``height_in_vr``. ``camera_mapping``
+        carries a list of per-monitor dicts with ``monitor``, ``left``, ``top``, and ``camera``. ``task`` carries
+        ``require_interaction``, ``require_wait``, ``track_length``, and ``track_seed``. The ``options`` key lists
+        enumerated alternatives for fields with a finite valid set. ``actor.model`` lists every Resources actor prefab
+        plus the literal ``"None"``. ``actor.controller`` lists every scene ControllerOutput plus the literal
+        ``"None"``. ``camera_mapping.camera`` lists every scene Camera not tagged MainCamera or named ``Main Camera``,
+        also plus ``"None"``. The ``visibility`` key holds per-control flags indicating whether the matching control is
+        currently rendered in the Parameters window. ``task.require_interaction`` is true only when the scene contains a
+        ``GuidanceZone``. ``task.require_wait`` is true only when the scene contains an ``OccupancyZone``. Writes
+        against fields whose visibility is false are rejected by :func:`write_task_parameters_tool`.
     """
     return _unity_relay(tool="read_task_parameters")
 
@@ -356,37 +339,35 @@ def write_task_parameters_tool(
 ) -> dict[str, Any]:
     """Writes a subset of the Task Parameters fields in a single atomic relay call.
 
-    Each top-level argument corresponds to one section of the Task Parameters window. Passing ``None``
-    (the default) leaves the section untouched; fields within a supplied section are also individually
-    optional so callers can update one value at a time. Writes flow through the same code paths the
-    GUI uses, so the scene is marked dirty and modified asset files (``DisplaySettings``,
-    ``savedFullScreenViews``) are flagged for save.
+    Each top-level argument corresponds to one section of the Task Parameters window. Passing ``None`` (the default)
+    leaves the section untouched. Fields within a supplied section are also individually optional so callers can update
+    one value at a time. Writes flow through the same code paths the GUI uses, so the scene is marked dirty and modified
+    asset files (``DisplaySettings``, ``savedFullScreenViews``) are flagged for save.
 
-    Validation rejects values that fall outside the enumeration reported by
-    :func:`read_task_parameters_tool`, mismatched monitor indices, and writes targeting
-    ``task.require_interaction`` / ``task.require_wait`` when the corresponding zone is absent from the scene
-    (mirroring the GUI's conditional rendering). The tightened require-toggle contract guarantees that
-    a successful write means the flag will actually take effect at runtime.
+    Validation rejects values that fall outside the enumeration reported by :func:`read_task_parameters_tool`,
+    mismatched monitor indices, and writes targeting ``task.require_interaction`` / ``task.require_wait`` when the
+    corresponding zone is absent from the scene (mirroring the GUI's conditional rendering). The tightened
+    require-toggle contract guarantees that a successful write means the flag will actually take effect at runtime.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
-        actor: Optional dict with ``model`` (str matching ``options.actor.model``) and/or
-            ``controller`` (str matching ``options.actor.controller``).
+        actor: Optional dict with ``model`` (str matching ``options.actor.model``) and/or ``controller`` (str matching
+            ``options.actor.controller``).
         mqtt: Optional dict with ``ip`` (str) and/or ``port`` (int).
-        display: Optional dict with ``current_brightness`` (0-100 float), ``brightness``
-            (0-100 float), and/or ``height_in_vr`` (float, Unity units).
-        camera_mapping: Optional list of per-monitor dicts. Each entry requires ``monitor`` (1-based
-            index, matching the GUI row index) and ``camera`` (str matching
-            ``options.camera_mapping.camera``). Omitted monitors keep their current assignment.
-        task: Optional dict with ``require_interaction`` (bool), ``require_wait`` (bool), ``track_length``
-            (float), and/or ``track_seed`` (int). ``require_interaction`` is rejected when the scene has no
-            ``GuidanceZone``; ``require_wait`` is rejected when the scene has no ``OccupancyZone``.
-            ``track_length`` must be a positive, finite number of Unity units long enough to fill one corridor.
+        display: Optional dict with ``current_brightness`` (0-100 float), ``brightness`` (0-100 float), and/or
+            ``height_in_vr`` (float, Unity units).
+        camera_mapping: Optional list of per-monitor dicts. Each entry requires ``monitor`` (1-based index, matching the
+            GUI row index) and ``camera`` (str matching ``options.camera_mapping.camera``). Omitted monitors keep their
+            current assignment.
+        task: Optional dict with ``require_interaction`` (bool), ``require_wait`` (bool), ``track_length`` (float),
+            and/or ``track_seed`` (int). ``require_interaction`` is rejected when the scene has no ``GuidanceZone``.
+            ``require_wait`` is rejected when the scene has no ``OccupancyZone``. ``track_length`` must be a positive,
+            finite number of Unity units long enough to fill one corridor.
 
     Returns:
-        A post-write snapshot in the same shape as :func:`read_task_parameters_tool`, so callers get
-        immediate confirmation of the new state without a separate read.
+        A post-write snapshot in the same shape as :func:`read_task_parameters_tool`, so callers get immediate
+        confirmation of the new state without a separate read.
     """
     relay_arguments: dict[str, Any] = {}
     if actor is not None:
@@ -406,21 +387,20 @@ def write_task_parameters_tool(
 def refresh_monitors_tool() -> dict[str, Any]:
     """Re-detects the system monitors attached to the Unity Editor host and returns a fresh snapshot.
 
-    The agentic counterpart of the Camera Mapping section's Refresh Monitor Positions button, sharing the
-    same Unity-side code path so both re-detect identically. Existing camera assignments carry across by
-    monitor index, so removing a monitor from the middle of the arrangement shifts every later assignment
-    up by one slot. The refreshed list is not persisted to the scene's companion asset until a camera
-    assignment is written via :func:`write_task_parameters_tool`.
+    The agentic counterpart of the Camera Mapping section's Refresh Monitor Positions button, sharing the same
+    Unity-side code path so both re-detect identically. Existing camera assignments carry across by monitor index, so
+    removing a monitor from the middle of the arrangement shifts every later assignment up by one slot. The refreshed
+    list is not persisted to the scene's companion asset until a camera assignment is written via
+    :func:`write_task_parameters_tool`.
 
-    The bridge builds its monitor enumeration once per scene and reuses it across requests, so call this
-    after physically changing the monitor arrangement. A snapshot that already matches the hardware needs
-    no refresh.
+    The bridge builds its monitor enumeration once per scene and reuses it across requests, so call this after
+    physically changing the monitor arrangement. A snapshot that already matches the hardware needs no refresh.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A post-refresh snapshot in the same shape as :func:`read_task_parameters_tool`, whose
-        ``state.camera_mapping`` list reflects the re-detected monitor geometry.
+        A post-refresh snapshot in the same shape as :func:`read_task_parameters_tool`, whose ``state.camera_mapping``
+        list reflects the re-detected monitor geometry.
     """
     return _unity_relay(tool="refresh_monitors")
 

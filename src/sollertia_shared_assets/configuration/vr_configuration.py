@@ -22,13 +22,12 @@ _PROBABILITY_SUM_TOLERANCE: float = 0.001
 _NAME_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
 """Matches the trial and cue names that are safe to embed in Unity asset filenames.
 
-Restricts both names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName``
-segment naming scheme and the ``Cue_Name_LengthCm`` cue naming scheme used by
-``sollertia-virtual-reality`` cannot be corrupted by path separators, whitespace, or punctuation
-introduced in a template. Excluding the hyphen from both halves of a segment name is what lets a
-segment filename split back to exactly one owning template. Barring whitespace from a cue name also
-keeps the space-joined cue sequence signature that Unity compares trials on unambiguous. Mirrors the
-equivalent check on the Unity side in ``ConfigLoader.cs``.
+Restricts both names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName`` segment naming scheme
+and the ``Cue_Name_LengthCm`` cue naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path
+separators, whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves of a segment name
+is what lets a segment filename split back to exactly one owning template. Barring whitespace from a cue name also keeps
+the space-joined cue sequence signature that Unity compares trials on unambiguous. Mirrors the equivalent check on the
+Unity side in ``ConfigLoader.cs``.
 """
 
 
@@ -36,10 +35,10 @@ class TriggerType(StrEnum):
     """Defines the supported stimulus trigger zone activators for experiment trials.
 
     Notes:
-        These are the platform-wide trigger mechanisms; each acquisition system supports the subset it can resolve
+        These are the platform-wide trigger mechanisms. Each acquisition system supports the subset it can resolve
         to its own stimuli (Mesoscope-VR supports INTERACTION and OCCUPANCY_DISARM, and leaves the rest unmapped).
         INTERACTION maps to the StimulusTriggerZone prefab (GuidanceZone child) and the three occupancy types to the
-        OccupancyTriggerZone prefab (OccupancyZone + OccupancyGuidanceZone children) in Unity; COLLISION reuses the
+        OccupancyTriggerZone prefab (OccupancyZone + OccupancyGuidanceZone children) in Unity. COLLISION reuses the
         StimulusTriggerZone prefab as a bare boundary wall.
     """
 
@@ -50,10 +49,10 @@ class TriggerType(StrEnum):
     """Indicates a collision-triggered trial where crossing the invisible boundary wall elicits stimulus delivery
     unconditionally, with no sensor or occupancy requirement."""
     OCCUPANCY_DISARM = "occupancy_disarm"
-    """Indicates an occupancy-disarm trial where occupying the zone disarms the boundary; colliding with the still-armed
+    """Indicates an occupancy-disarm trial where occupying the zone disarms the boundary. Colliding with the still-armed
     boundary (occupancy not met) elicits stimulus delivery."""
     OCCUPANCY_ARM = "occupancy_arm"
-    """Indicates an occupancy-arm trial where occupying the zone arms the boundary; colliding with the now-armed
+    """Indicates an occupancy-arm trial where occupying the zone arms the boundary. Colliding with the now-armed
     boundary (occupancy met) elicits stimulus delivery."""
     OCCUPANCY_TRIGGER = "occupancy_trigger"
     """Indicates an occupancy-trigger trial where occupying the zone for the required duration elicits stimulus
@@ -66,7 +65,7 @@ class Cue:
 
     Notes:
         Each cue has a unique name (used in trial cue sequences) and a unique uint8 code (used during MQTT
-        communication and analysis). Cues are not loaded as individual prefabs - they are baked into segment prefabs.
+        communication and analysis). Cues are baked into segment prefabs.
     """
 
     name: str
@@ -78,7 +77,7 @@ class Cue:
     texture: str = ""
     """The texture filename (e.g., ``Cue 016 - 4x1.png``) located in the Unity project's
     ``Assets/InfiniteCorridorTask/Textures/`` directory. Applied 1:1 to the cue wall panels during prefab generation.
-    Defaults to an empty string for backwards compatibility with templates that predate this field."""
+    Defaults to an empty string when the template omits the field."""
 
     def __post_init__(self) -> None:
         """Validates cue definition parameters."""
@@ -113,11 +112,9 @@ class VREnvironment:
     """Defines the Unity Virtual Reality (VR) corridor system configuration.
 
     Notes:
-        This class is primarily used by Unity to configure the task environment. Python parses these values
-        from the YAML configuration file but does not use them during acquisition; the template inspection tools
-        surface ``cue_offset_cm`` in their responses. Every field divides or sizes downstream
-        corridor geometry, so the validation below rejects a value that would leave Unity with an infinite segment
-        length, a zero-depth corridor, or a maze generation loop that never terminates.
+        Every field divides or sizes downstream corridor geometry, so the validation below rejects a value that would
+        leave Unity with an infinite segment length, a zero-depth corridor, or a maze generation loop that never
+        terminates.
     """
 
     corridor_spacing_cm: float
@@ -191,10 +188,9 @@ class TrialStructure:
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
     occupancy_duration_ms: float | None = None
     """The duration in milliseconds the animal must occupy the zone for occupancy trigger modes. Unity enforces this
-    value, and the template is its single source of truth: no experiment configuration carries a copy. Set it to None
-    on a non-occupancy trial, because None is how a
-    template communicates that the field is unused, while 0 is a real duration and is rejected on every trial whatever
-    its trigger type."""
+    value, and the template is its single source of truth: no experiment configuration carries a copy. Set it to None on
+    a non-occupancy trial, because None is how a template communicates that the field is unused, while 0 is a real
+    duration and is rejected on every trial whatever its trigger type."""
     transitions: dict[str, float] | None = None
     """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
     other trial names defined on the same TaskTemplate. If provided and non-empty, values must sum to 1.0. Set to
@@ -256,8 +252,8 @@ class TaskTemplate(YamlConfig):
 
     Notes:
         Task templates contain only the data Unity needs for prefab generation and runtime. Experiment-specific
-        parameters (rewards, guidance, experiment states) are not included here — those live on the matching
-        runtime trial classes defined by each acquisition system and are joined by trial name.
+        parameters (rewards, guidance, experiment states) live on the matching runtime trial classes defined by each
+        acquisition system. Those classes are joined back to the template by trial name.
 
         This dataclass can parse any valid task configuration (template) .yaml file from the sollertia-virtual-reality
         project.
@@ -273,9 +269,9 @@ class TaskTemplate(YamlConfig):
     def __post_init__(self) -> None:
         """Validates task template configuration.
 
-        Runs the full cascade of integrity checks against the loaded template, in this order: cue catalog
-        uniqueness (codes and names), trial name pattern, per-trial cue references, transition targets, trigger
-        types, zone positions within trial segment bounds, and cue-sequence uniqueness across trials.
+        Runs the full cascade of integrity checks against the loaded template. The checks run in this order: cue catalog
+        uniqueness (codes and names), trial name pattern, per-trial cue references, transition targets, trigger types,
+        zone positions within trial segment bounds, and cue-sequence uniqueness across trials.
 
         Raises:
             ValueError: If any of the validations above fails. The message identifies the offending field and
@@ -385,8 +381,8 @@ class TaskTemplate(YamlConfig):
     def _validate_zone_positions(trial_name: str, trial_structure: TrialStructure, trial_length_cm: float) -> None:
         """Validates the trial's zone positions within its segment bounds, per trigger type.
 
-        Collision trials validate only the boundary location; occupancy_trigger trials validate only the trigger
-        zone; the other trigger types validate the zone, the boundary, and their relative ordering.
+        Collision trials validate only the boundary location. The occupancy_trigger trials validate only the trigger
+        zone. The other trigger types validate the zone, the boundary, and their relative ordering.
 
         Args:
             trial_name: The name of the trial structure being validated.

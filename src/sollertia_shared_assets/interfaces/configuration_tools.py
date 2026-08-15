@@ -58,19 +58,18 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
     """Returns a health report for the Sollertia platform configuration components owned by this package.
 
     Combines working directory, data root, templates directory, and per-category credentials status into a single
-    report. Only the working directory is required for ``slsa mcp`` to function. The task templates directory is
-    needed when authoring task templates or experiment configurations, and by ``SessionData.create()`` when it caches
-    the ``vr_configuration.yaml`` snapshot for an experiment session. Credentials are needed only by hosts
-    that integrate with the corresponding external service (for example, Google credentials are used to read
-    subject metadata from and write water-restriction logs to Google Sheets). ``overall_ok`` reflects the required
-    components only — optional components contribute ``configured`` and ``ok`` per-component but do not gate the
-    aggregate. System configuration mount checks live with the acquisition runtime package,
-    sollertia-experiment.
+    report. Only the working directory is required for ``slsa mcp`` to function. The task templates directory is needed
+    when authoring task templates or experiment configurations, and by ``SessionData.create()`` when it caches the
+    ``vr_configuration.yaml`` snapshot for an experiment session. Credentials are needed only by hosts that integrate
+    with the corresponding external service (for example, Google credentials are used to read subject metadata from and
+    write water-restriction logs to Google Sheets). ``overall_ok`` reflects the required components only. Optional
+    components contribute ``configured`` and ``ok`` per-component but do not gate the aggregate. System configuration
+    mount checks live with the acquisition runtime package, sollertia-experiment.
 
     Returns:
-        A response dict with ``overall_ok`` (the aggregate health flag, computed from required components only)
-        and ``components`` mapping each environment component name to a dict carrying ``required``,
-        ``configured``, ``ok``, and either ``path`` (when configured) or ``error`` (when not).
+        A response dict with ``overall_ok`` (the aggregate health flag, computed from required components only) and
+        ``components`` mapping each environment component name to a dict carrying ``required``, ``configured``, ``ok``,
+        and either ``path`` (when configured) or ``error`` (when not).
     """
     report: dict[str, Any] = {}
 
@@ -215,7 +214,8 @@ def create_project_tool(project_name: str, root_directory: str | None = None) ->
     if error is not None:
         return error
     if root is None:
-        return error_response(message=f"Unable to resolve the data root from {root_directory}.")
+        message = f"Unable to resolve the data root from {root_directory}."
+        return error_response(message=message)
 
     project = ProjectData(root=root, project_name=project_name).create()
     return ok_response(
@@ -346,11 +346,11 @@ def read_template_tool(file_path: str) -> dict[str, Any]:
     Notes:
         TaskTemplates live in two places. The **live** template at ``<templates-directory>/<name>.yaml`` is the
         authoring surface managed via ``write_template_tool`` under the directory configured by
-        ``set_task_templates_directory_tool``, and is shared across projects; ``discover_templates_tool`` returns
-        the absolute paths of every live template. The per-session **frozen snapshot** at
+        ``set_task_templates_directory_tool``, and is shared across projects. ``discover_templates_tool`` returns the
+        absolute paths of every live template. The per-session **frozen snapshot** at
         ``<session>/raw_data/vr_configuration.yaml`` is the immutable copy cached by ``SessionData.create()`` at
-        acquisition time and records the exact template active when the session was acquired. This tool reads either
-        — the caller chooses by passing the corresponding absolute path.
+        acquisition time and records the exact template active when the session was acquired. This tool reads either.
+        The caller chooses by passing the corresponding absolute path.
 
     Args:
         file_path: Absolute path to the template YAML file. Pass a path under the configured templates directory
@@ -358,8 +358,7 @@ def read_template_tool(file_path: str) -> dict[str, Any]:
             session snapshot.
 
     Returns:
-        A response dict with ``data`` containing the full TaskTemplate payload and the resolved
-        ``file_path``.
+        A response dict with ``data`` containing the full TaskTemplate payload and the resolved ``file_path``.
     """
     return read_yaml(file_path=Path(file_path), validator_cls=TaskTemplate)
 
@@ -378,11 +377,11 @@ def write_template_tool(
     being persisted.
 
     Notes:
-        This tool targets the **live** authoring surface — TaskTemplate YAMLs under the configured templates
-        directory. Per-session frozen snapshots at ``<session>/raw_data/vr_configuration.yaml`` are immutable
-        records of the template active at acquisition time and are produced exclusively by ``SessionData.create()``.
-        Do not point this tool at a session's ``vr_configuration.yaml``; if a snapshot is corrupted or out of sync,
-        repair the live template and re-acquire, or restore the snapshot from a backup.
+        This tool targets the **live** authoring surface, TaskTemplate YAMLs under the configured templates directory.
+        Per-session frozen snapshots at ``<session>/raw_data/vr_configuration.yaml`` are immutable records of the
+        template active at acquisition time and are produced exclusively by ``SessionData.create()``. Do not point this
+        tool at a session's ``vr_configuration.yaml``. If a snapshot is corrupted or out of sync, repair the live
+        template and re-acquire, or restore the snapshot from a backup.
 
     Args:
         file_path: Absolute path to the destination template YAML file under the directory configured via
@@ -407,8 +406,8 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
 
     Notes:
         Accepts both live templates under the configured templates directory and per-session frozen snapshots at
-        ``<session>/raw_data/vr_configuration.yaml``. The validation logic is identical in either case — the schema
-        and cross-reference constraints belong to ``TaskTemplate``, not to a particular storage location.
+        ``<session>/raw_data/vr_configuration.yaml``. The validation logic is identical in either case. The schema and
+        cross-reference constraints belong to ``TaskTemplate``, not to a particular storage location.
 
     Args:
         file_path: Absolute path to the template YAML file (live template or session snapshot).
@@ -470,10 +469,9 @@ def discover_experiments_tool(
         project: When provided, restricts the search to a single project.
 
     Returns:
-        A response dict with ``experiments`` (a list of per-experiment summary dicts) and
-        ``total_experiments``. Each summary dict carries ``project`` (the project directory name),
-        ``experiment`` (the experiment configuration filename stem), and ``path`` (the absolute YAML
-        path).
+        A response dict with ``experiments`` (a list of per-experiment summary dicts) and ``total_experiments``. Each
+        summary dict carries ``project`` (the project directory name), ``experiment`` (the experiment configuration
+        filename stem), and ``path`` (the absolute YAML path).
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -524,9 +522,9 @@ def read_experiment_configuration_tool(file_path: str, acquisition_system: str) 
             to parse the file with.
 
     Returns:
-        On success, a response dict with ``data`` (the full experiment configuration payload),
-        ``acquisition_system``, and ``file_path``. On failure, a dict with ``success`` false and ``error`` (the
-        ``acquisition_system`` key is present only on success).
+        On success, a response dict with ``data`` (the full experiment configuration payload), ``acquisition_system``,
+        and ``file_path``. On failure, a dict with ``success`` false and ``error`` (the ``acquisition_system`` key is
+        present only on success).
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
@@ -628,7 +626,7 @@ def create_experiment_from_vr_template_tool(
         )
         return error_response(message=message)
 
-    config_class = EXPERIMENT_CONFIGURATION_REGISTRY[acquisition_enum]
+    experiment_configuration_class = EXPERIMENT_CONFIGURATION_REGISTRY[acquisition_enum]
 
     destination = Path(file_path)
     if destination.exists() and not overwrite:
@@ -648,7 +646,7 @@ def create_experiment_from_vr_template_tool(
     try:
         task_template = TaskTemplate.from_yaml(file_path=template_file)
         # The import-time contract check guarantees every registered configuration provides this builder.
-        build_from_template: Any = getattr(config_class, "from_task_template", None)
+        build_from_template: Any = getattr(experiment_configuration_class, "from_task_template", None)
         experiment_configuration = build_from_template(
             template=task_template,
             unity_scene_name=resolved_scene_name,
@@ -657,7 +655,11 @@ def create_experiment_from_vr_template_tool(
         destination.parent.mkdir(parents=True, exist_ok=True)
         experiment_configuration.to_yaml(file_path=destination)
     except Exception as exception:
-        return error_response(message=f"Failed to create experiment configuration: {exception}")
+        message = (
+            f"Unable to create the experiment configuration for '{acquisition_system}' from the task template at "
+            f"{template_file}: {exception}"
+        )
+        return error_response(message=message)
 
     return ok_response(
         file_path=str(destination),
@@ -750,9 +752,9 @@ def list_supported_session_types_tool(acquisition_system: str | None = None) -> 
     """Enumerates the SessionTypes supported by the platform, optionally scoped to one acquisition system.
 
     When ``acquisition_system`` is provided, only the session types that system can run are returned (per
-    ``SYSTEM_SESSION_TYPES``); when omitted, every platform session type is returned. Agents operating within a
-    configured acquisition system should pass that system so the result reflects what the local host can actually
-    run. Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values, and
+    ``SYSTEM_SESSION_TYPES``). When omitted, every platform session type is returned. Agents operating within a
+    configured acquisition system should pass that system so the result reflects what the local host can actually run.
+    Use ``list_supported_acquisition_systems_tool`` to enumerate valid ``acquisition_system`` values, and
     ``list_session_type_support_tool`` to retrieve the full system-to-session-type mapping at once.
 
     Args:
@@ -792,9 +794,9 @@ def list_supported_session_types_tool(acquisition_system: str | None = None) -> 
 def list_session_type_support_tool() -> dict[str, Any]:
     """Returns the full mapping of acquisition systems to the session types each one can run.
 
-    Use this to retrieve the entire system-to-session-type landscape in a single call; use
-    ``list_supported_session_types_tool`` with an ``acquisition_system`` argument when only one system's session
-    types are needed.
+    Use this to retrieve the entire system-to-session-type landscape in a single call. Use
+    ``list_supported_session_types_tool`` with an ``acquisition_system`` argument when only one system's session types
+    are needed.
 
     Returns:
         A response dict with ``session_type_support`` (a dict mapping each acquisition system value to the list of
@@ -825,13 +827,13 @@ def list_supported_acquisition_systems_tool() -> dict[str, Any]:
 def list_supported_data_assets_tool() -> dict[str, Any]:
     """Enumerates the read-asset data formats supported by the Sollertia platform.
 
-    Read assets are external records the platform reads and caches on disk as typed dataclasses. Use the
-    returned ``value`` as the ``data_asset`` argument to ``read_data_asset_tool``,
-    ``write_data_asset_tool``, and ``describe_data_asset_schema_tool``.
+    Read assets are external records the platform reads and caches on disk as typed dataclasses. Use the returned
+    ``value`` as the ``data_asset`` argument to ``read_data_asset_tool``, ``write_data_asset_tool``, and
+    ``describe_data_asset_schema_tool``.
 
     Returns:
-        A response dict with ``data_assets`` (a list of dicts containing ``value``, ``name``, and
-        ``data_asset_class`` for each supported read asset).
+        A response dict with ``data_assets`` (a list of dicts containing ``value``, ``name``, and ``data_asset_class``
+        for each supported read asset).
     """
     entries: list[dict[str, Any]] = [
         {
@@ -872,8 +874,8 @@ def list_supported_trial_types_tool(acquisition_system: str) -> dict[str, Any]:
     """Enumerates the trial classes supported by the ``acquisition_system``'s experiment configuration.
 
     Trial classes are derived from the system's experiment-configuration ``trial_structures`` field, so each system
-    reports its own trial vocabulary. ``trial_structures`` is part of the shared experiment-configuration contract;
-    the concrete trial classes vary per system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid
+    reports its own trial vocabulary. ``trial_structures`` is part of the shared experiment-configuration contract. The
+    concrete trial classes vary per system. Use ``list_supported_acquisition_systems_tool`` to enumerate valid
     ``acquisition_system`` values.
 
     Args:
@@ -908,17 +910,16 @@ def list_supported_trigger_types_tool() -> dict[str, Any]:
 def _resolve_experiment_configuration_class(acquisition_system: str) -> type[YamlConfig] | dict[str, Any]:
     """Resolves an ``acquisition_system`` string to its registered experiment configuration dataclass.
 
-    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding
-    class in ``EXPERIMENT_CONFIGURATION_REGISTRY``. Returns an error response dict when the value is
-    not a valid acquisition system or when no experiment configuration class has been registered for
-    that system yet.
+    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding class in
+    ``EXPERIMENT_CONFIGURATION_REGISTRY``. Returns an error response dict when the value is not a valid acquisition
+    system or when no experiment configuration class has been registered for that system yet.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value supplied by the caller.
 
     Returns:
-        The resolved experiment configuration dataclass on success, or an error response dict on
-        failure. Callers discriminate via ``isinstance(result, dict)``.
+        The resolved experiment configuration dataclass on success, or an error response dict on failure. Callers
+        discriminate via ``isinstance(result, dict)``.
     """
     try:
         acquisition_enum = AcquisitionSystems(acquisition_system)

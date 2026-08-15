@@ -79,7 +79,7 @@ class Directories(StrEnum):
     VIDEO_DATA = "video_data"
     """Video data directory under ``processed_data``. Holds the per-frame camera timestamps extracted from the camera
     log archives and the video processing tracker, and is the destination for sollertia-forgery pose-estimation
-    outputs. Collapses the former separate ``camera_timestamps`` and processed ``camera_data`` directories."""
+    outputs."""
     MICROCONTROLLER_DATA = "microcontroller_data"
     """Microcontroller data directory under ``processed_data``. Holds the extracted and parsed microcontroller data and
     the microcontroller processing tracker produced by the sollertia-forgery microcontroller-processing pipeline.
@@ -111,7 +111,7 @@ class ProcessingTrackers(StrEnum):
     re-packaging). Lives under ``processed_data/video_data``."""
     TWO_PHOTON = "single_recording_tracker.yaml"
     """Tracker for the two-photon (calcium-imaging) processing stage. The filename is owned and written by cindra's
-    single-recording pipeline; sollertia-forgery only reads it. Lives under ``processed_data/cindra``."""
+    single-recording pipeline. Sollertia-forgery only reads it. Lives under ``processed_data/cindra``."""
     CINDRA_MULTI_RECORDING = "multi_recording_tracker.yaml"
     """Tracker for cindra's multi-recording pipeline. Written by cindra per dataset under
     ``processed_data/cindra/multi_recording`` and read by the project manifest."""
@@ -121,13 +121,12 @@ class ProcessingTrackers(StrEnum):
     """Tracker for the project manifest generation pipeline. Lives at the project root."""
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class RawData:
     """Stores the absolute paths to all generic raw assets of a single data acquisition session.
 
     Notes:
-        Instances are constructed by ``SessionData._build_sub_dataclasses`` after the session's raw data root has been
-        finalized. The ``build`` classmethod is the single source of truth for the enum-to-field mapping.
+        The ``build`` classmethod is the single source of truth for the enum-to-field mapping.
     """
 
     session_data_path: Path
@@ -147,7 +146,7 @@ class RawData:
     parsing class is determined by the session's acquisition_system and is owned by sollertia-experiment."""
     experiment_configuration_path: Path
     """Stores the experiment configuration in effect when the session was acquired. Only populated for experiment
-    sessions; callers should check ``.exists()`` before reading. The concrete parsing class is determined by the
+    sessions. Callers should check ``.exists()`` before reading. The concrete parsing class is determined by the
     session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
     """Stores the linear infinite corridor task template (cues, VR environment, trial structures) active when the
@@ -193,7 +192,7 @@ class RawData:
         )
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ProcessedData:
     """Stores the absolute paths to all generic processed assets of a single data acquisition session.
 
@@ -270,9 +269,9 @@ class SessionData(YamlConfig):
         Do not initialize this class directly. Instead, use the ``create()`` method when starting new data acquisition
         sessions or the ``load()`` method when accessing data for an existing session. Both methods build the
         runtime-only ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes from the
-        currently configured root paths. ``create()`` finalizes only ``raw_data_path``; the ``processed_data`` root is
+        currently configured root paths. ``create()`` finalizes only ``raw_data_path``. The ``processed_data`` root is
         resolved later, on the processing host, by ``load()``, which finalizes both. Instances constructed via
-        ``from_yaml`` directly (without going through ``load()``) do not have these attributes populated; access raises
+        ``from_yaml`` directly (without going through ``load()``) do not have these attributes populated. Access raises
         AttributeError.
 
         When this class is used to create a new session, it generates the new session's name using the current UTC
@@ -319,24 +318,6 @@ class SessionData(YamlConfig):
         if isinstance(self.acquisition_system, str):
             self.acquisition_system = AcquisitionSystems(self.acquisition_system)
 
-    def _build_sub_dataclasses(self) -> None:
-        """Builds the runtime-only ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes
-        from the session's currently configured root paths and acquisition system.
-
-        Raises:
-            ValueError: If the session's ``acquisition_system`` is not supported by the platform.
-        """
-        self.raw_data = RawData.build(root=self.raw_data_path)
-        self.processed_data = ProcessedData.build(root=self.processed_data_path)
-        builder_cls = SYSTEM_RAW_DATA_REGISTRY.get(AcquisitionSystems(self.acquisition_system))
-        if builder_cls is None:
-            message = (
-                f"Unable to build the system-specific raw data sub-dataclass for the SessionData instance. The "
-                f"acquisition system '{self.acquisition_system}' is not supported by the Sollertia platform."
-            )
-            console.error(message=message, error=ValueError)
-        self.system_raw_data = builder_cls.build(root=self.raw_data_path)
-
     @classmethod
     def create(
         cls,
@@ -370,9 +351,10 @@ class SessionData(YamlConfig):
             ValueError: If the specified session_type or acquisition_system is not a valid enumeration member, if
                 the acquisition system does not support the requested session type (per ``SYSTEM_SESSION_TYPES``), or
                 if a session type listed in ``SESSION_TYPES_USING_VR_TASK`` is created without an experiment_name.
-            FileNotFoundError: If the project does not exist on the local machine (PC), if the named experiment's
-                configuration YAML is absent from the project's configuration directory, if the task templates
-                directory has not been configured, or if the experiment's task template YAML is absent from it.
+            FileNotFoundError: If the project does not exist on the local machine (PC), or if the named experiment's
+                configuration YAML is absent from the project's configuration directory. Also raised if the task
+                templates directory has not been configured, or if the experiment's task template YAML is absent from
+                it.
         """
         if session_type not in SessionTypes:
             message = (
@@ -426,8 +408,8 @@ class SessionData(YamlConfig):
             )
             console.error(message=message, error=FileNotFoundError)
 
-        # Only the raw_data directory is created here; processed_data is owned by the processing machine and
-        # is created later, on a different host, when the session is loaded for processing.
+        # Only the raw_data directory is created here. The processed_data directory is owned by the processing machine
+        # and is created later, on a different host, when the session is loaded for processing.
         raw_data_path = animal.session_path(session_name).joinpath(RAW_DATA_DIRECTORY)
         ensure_directory_exists(path=raw_data_path, is_file=False)
 
@@ -544,11 +526,9 @@ class SessionData(YamlConfig):
     def required_raw_assets(self) -> list[tuple[str, Path]]:
         """Returns the canonical filename and absolute path of every raw asset this session is required to contain.
 
-        Every session requires the session descriptor and the system configuration snapshot. Experiment sessions
-        (those with an ``experiment_name``) additionally require the experiment configuration snapshot, and sessions
-        whose type uses VR (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR
-        configuration snapshot. The session-inspection tooling pairs each returned path with its on-disk presence to
-        report missing required assets, so this method is the single source of truth for the required-asset policy.
+        Every session requires the session descriptor and the system configuration snapshot. Experiment sessions (those
+        with an ``experiment_name``) additionally require the experiment configuration snapshot, and sessions whose type
+        uses VR (those in ``SESSION_TYPES_USING_VR_TASK``) additionally require the VR configuration snapshot.
 
         Returns:
             A list of ``(canonical_filename, absolute_path)`` tuples, one per raw asset the session must contain.
@@ -567,10 +547,9 @@ class SessionData(YamlConfig):
         """Removes the 'nk.bin' uninitialized-session marker after acquisition-runtime initialization completes.
 
         Notes:
-            This service method is used by the sollertia-experiment library when it acquires a session's data. Do not
-            call it manually. Removal of the marker only changes the ``uninitialized`` signal; the separate descriptor
-            ``incomplete`` field is updated independently by the runtime at session end to report whether acquisition
-            completed without issues.
+            Do not call this method manually. Removal of the marker only changes the ``uninitialized`` signal. The
+            separate descriptor ``incomplete`` field is updated independently by the runtime at session end to report
+            whether acquisition completed without issues.
 
             Resolves the marker path directly from ``raw_data_path`` so the method works on instances that have not
             yet been routed through ``_build_sub_dataclasses``.
@@ -588,3 +567,21 @@ class SessionData(YamlConfig):
             written marker intact.
         """
         self.to_yaml(file_path=self.raw_data_path.joinpath(RawDataFiles.SESSION_DATA))
+
+    def _build_sub_dataclasses(self) -> None:
+        """Builds the runtime-only ``raw_data``, ``processed_data``, and ``system_raw_data`` sub-dataclass attributes
+        from the session's currently configured root paths and acquisition system.
+
+        Raises:
+            ValueError: If the session's ``acquisition_system`` is not supported by the platform.
+        """
+        self.raw_data = RawData.build(root=self.raw_data_path)
+        self.processed_data = ProcessedData.build(root=self.processed_data_path)
+        builder_class = SYSTEM_RAW_DATA_REGISTRY.get(AcquisitionSystems(self.acquisition_system))
+        if builder_class is None:
+            message = (
+                f"Unable to build the system-specific raw data sub-dataclass for the SessionData instance. The "
+                f"acquisition system '{self.acquisition_system}' is not supported by the Sollertia platform."
+            )
+            console.error(message=message, error=ValueError)
+        self.system_raw_data = builder_class.build(root=self.raw_data_path)

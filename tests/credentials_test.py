@@ -81,7 +81,7 @@ def test_set_credentials_replaces_existing_file_byte_for_byte(clean_working_dire
 
 
 def test_set_credentials_raises_error_file_not_exists(clean_working_directory: Path) -> None:
-    """Verifies that set_credentials raises error for non-existent source files."""
+    """Verifies that set_credentials raises an error for non-existent source files."""
     set_working_directory(path=clean_working_directory)
 
     non_existent_file = clean_working_directory.parent / "missing.json"
@@ -91,7 +91,7 @@ def test_set_credentials_raises_error_file_not_exists(clean_working_directory: P
 
 
 def test_set_credentials_raises_error_wrong_extension(clean_working_directory: Path) -> None:
-    """Verifies that set_credentials raises error when the source file's extension does not match the canonical
+    """Verifies that set_credentials raises an error when the source file's extension does not match the canonical
     credentials filename's extension."""
     set_working_directory(path=clean_working_directory)
 
@@ -118,8 +118,8 @@ def test_set_credentials_raises_error_working_directory_not_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that set_credentials raises an error when the working directory is not configured."""
-    app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -165,8 +165,8 @@ def test_get_credentials_raises_error_working_directory_not_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that get_credentials raises an error when the working directory is not configured."""
-    app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     with pytest.raises(FileNotFoundError, match=r"working directory"):
         get_credentials(credentials=CredentialsTypes.GOOGLE)

@@ -28,7 +28,7 @@ class SubjectData:
     location_housed: str
     """The location (room) used to house the subject after the surgery."""
     status: str
-    """The current subject's status (alive / deceased)."""
+    """The subject's current status (alive / deceased)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,8 +40,8 @@ class ProcedureData:
     surgery_end_us: int
     """The surgery's stop date and time as microseconds elapsed since UTC epoch onset."""
     surgeon: str
-    """The surgeon's name or ID. If the intervention was carried out by multiple surgeons, the data
-    for all surgeons is stored as part of the same string."""
+    """The surgeon's name or ID. If the intervention was carried out by multiple surgeons, the data for all surgeons is
+    stored as part of the same string."""
     protocol: str
     """The number (ID) of the experiment protocol used during the surgery."""
     surgery_notes: str
@@ -58,8 +58,6 @@ class ProcedureData:
 class DrugData:
     """Stores information about a single medical substance (drug) administered to the subject before, during, or
     immediately after the surgical intervention.
-
-    Multiple DrugData instances can be used at the same time if the surgery involved administering multiple drugs.
     """
 
     drug: str
@@ -72,11 +70,7 @@ class DrugData:
 
 @dataclass(frozen=True, slots=True)
 class ImplantData:
-    """Stores information about a single implantation procedure performed during the surgical intervention.
-
-    Multiple ImplantData instances can be used at the same time if the surgery involved multiple implantation
-    procedures.
-    """
+    """Stores information about a single implantation procedure performed during the surgical intervention."""
 
     implant: str
     """The descriptive name of the implant."""
@@ -94,10 +88,7 @@ class ImplantData:
 
 @dataclass(frozen=True, slots=True)
 class InjectionData:
-    """Stores information about a single injection performed during the surgical intervention.
-
-    Multiple InjectionData instances can be used at the same time if the surgery involved multiple injections.
-    """
+    """Stores information about a single injection performed during the surgical intervention."""
 
     injection: str
     """The descriptive name of the injection."""
@@ -120,9 +111,9 @@ class SurgeryData(YamlConfig):
     """Stores information about a surgical intervention performed on an animal before data acquisition session(s)."""
 
     subject: SubjectData
-    """Stores information about the subject of the surgical intervention."""
+    """The animal that underwent the surgical intervention."""
     procedure: ProcedureData
-    """Stores general information about the surgical intervention."""
+    """The general parameters of the surgical intervention."""
     drugs: list[DrugData]
     """Stores information about all medical substances (drugs) administered to the subject before, during, and
     immediately after the surgical intervention."""

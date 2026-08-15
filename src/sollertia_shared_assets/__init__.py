@@ -89,7 +89,7 @@ from .data_hierarchy import (
     parse_session_timestamp,
 )
 
-# Ensures console is enabled when this library is imported.
+# This library drives its own pipeline, so it owns the console state for the runtimes that import it.
 if not console.enabled:
     console.enable()
 

@@ -40,11 +40,11 @@ def sample_experiment_config() -> MesoscopeExperimentConfiguration:
 def clean_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Provides an isolated temporary working directory for testing."""
     # Isolates platformdirs from the host machine to avoid polluting real user state.
-    app_dir = tmp_path / "app_data"
-    app_dir.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "app_data"
+    application_directory.mkdir()
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    working_dir = tmp_path / "working_directory"
-    working_dir.mkdir()
+    working_directory = tmp_path / "working_directory"
+    working_directory.mkdir()
 
-    return working_dir
+    return working_directory

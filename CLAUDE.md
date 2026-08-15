@@ -2,13 +2,9 @@
 
 ## Session start behavior
 
-At the beginning of each coding session, before making any code changes, you should build a comprehensive understanding
-of the codebase by invoking the `/explore-codebase` skill.
-
-This ensures you:
-- Understand the project architecture before modifying code
-- Follow existing patterns and conventions
-- Do not introduce inconsistencies or break integrations with the downstream libraries that consume this library
+You MUST build a comprehensive understanding of the codebase by invoking the `/explore-codebase` skill at the beginning
+of each coding session, before making any code changes, since changes made without it introduce inconsistencies and
+break integrations with the downstream libraries that consume this library.
 
 ## Style guide compliance
 
@@ -62,22 +58,22 @@ state to prevent integration errors.
 
 The sollertia marketplace ships an `assets` plugin with skills that target this library directly, and a `unity` plugin
 whose Unity Editor skills drive the `McpBridge` relay tools that this library's `slsa mcp` server exposes through
-`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sollertia Platform
+`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sollertia platform
 repositories.
 
 | Skill                           | Description                                                                      |
 |---------------------------------|----------------------------------------------------------------------------------|
 | `/explore-codebase`             | Perform in-depth codebase exploration at session start                           |
 | `/explore-dependencies`         | Build a live API snapshot of the installed Ataraxis dependencies                 |
-| `/python-style`                 | Apply Sollertia Platform Python coding conventions (REQUIRED for Python changes) |
-| `/readme-style`                 | Apply Sollertia Platform README conventions (REQUIRED for README changes)        |
-| `/commit`                       | Stage changes and create a Sollertia Platform style-compliant git commit         |
-| `/pr`                           | Draft Sollertia Platform style-compliant pull request summaries                  |
-| `/release`                      | Draft Sollertia Platform style-compliant release notes                           |
-| `/pyproject-style`              | Apply Sollertia Platform pyproject.toml conventions                              |
-| `/tox-config`                   | Apply Sollertia Platform tox.ini conventions                                     |
-| `/api-docs`                     | Apply Sollertia Platform Sphinx documentation conventions                        |
-| `/project-layout`               | Apply Sollertia Platform project directory structure conventions                 |
+| `/python-style`                 | Apply Sollertia platform Python coding conventions (REQUIRED for Python changes) |
+| `/readme-style`                 | Apply Sollertia platform README conventions (REQUIRED for README changes)        |
+| `/commit`                       | Stage changes and create a Sollertia platform style-compliant git commit         |
+| `/pr`                           | Draft Sollertia platform style-compliant pull request summaries                  |
+| `/release`                      | Draft Sollertia platform style-compliant release notes                           |
+| `/pyproject-style`              | Apply Sollertia platform pyproject.toml conventions                              |
+| `/tox-config`                   | Apply Sollertia platform tox.ini conventions                                     |
+| `/api-docs`                     | Apply Sollertia platform Sphinx documentation conventions                        |
+| `/project-layout`               | Apply Sollertia platform project directory structure conventions                 |
 | `/skill-design`                 | Generate, update, and verify skill files and this CLAUDE.md                      |
 | `/audit-facts`                  | Audit documentation files against source code for factual accuracy               |
 | `/audit-style`                  | Audit files against applicable style skill checklists for compliance             |
@@ -103,7 +99,9 @@ invoked on the Unity side, so they are intentionally absent from the table above
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
 member, `SessionTypes` member, runtime trial class (a sibling of `MesoscopeWaterRewardTrial` / `MesoscopeGasPuffTrial`),
-or `TriggerType` member. The skill owns the touch list and the import-time parity check.
+or `TriggerType` member. The skill owns the touch list and the import-time parity check. Its touch list enumerates
+every registry and sibling-skill update required, including the README's "Adding New Session Types" and "Adding New
+Acquisition Systems" sections.
 
 ## MCP server
 
@@ -122,7 +120,8 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 
 Project conventions for MCP tools:
 - MCP tool functions are excluded from unit tests by project convention. Do NOT write tests for `@mcp.tool()` functions.
-  Coverage configuration in `pyproject.toml` already omits `*/sollertia_shared_assets/interfaces/*`.
+  Test the helper functions they delegate to instead. Coverage configuration in `pyproject.toml` already omits
+  `*/sollertia_shared_assets/interfaces/*`.
 - Every MCP tool in `configuration_tools.py` and `data_tools.py` returns a `dict[str, Any]` response constructed via
   `ok_response(...)` or `error_response(...)` from `mcp_instance`. The `unity_tools.py` relay tools instead return the
   McpBridge response payload verbatim on success, and `error_response(...)` only on relay failure. Return shapes
@@ -180,22 +179,21 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Architecture
 
-- **Vocabulary and wiring**: The keying enums live in the leaf `enums.py` module, and every dispatch registry is
-  defined, fully populated, in the top-level `registries.py` module, which imports each system subpackage and the
-  contract dataclasses. The import graph is a strict DAG. `enums`, `data_classes`, and `configuration` are leaves,
-  `mesoscope_vr` imports `configuration`, and `registries` imports the leaves and the system subpackages.
-  `credentials` and `data_hierarchy` sit above `registries`, and `interfaces` sits on top. Shared modules never
-  import from a system subpackage. Only `registries.py` and the package `__init__.py` re-exports do.
+- **Vocabulary and wiring**: The keying enums live in the leaf `enums.py` module, and the dispatch registries live in
+  the top-level `registries.py` module. The import graph is a strict DAG. `enums`, `data_classes`, and `configuration`
+  are leaves, `mesoscope_vr` imports `configuration`, and `registries` imports the leaves and the system subpackages.
+  `credentials` and `data_hierarchy` sit above `registries`, and `interfaces` sits on top. Shared modules never import
+  from a system subpackage. Only `registries.py` and the package `__init__.py` re-exports do.
 - **Configuration layer**: `TaskTemplate` (the Unity corridor template, in `configuration/`) and
   `MesoscopeExperimentConfiguration` (Mesoscope-VR experiment config, in `mesoscope_vr/`) are independent siblings.
   Both inherit directly from `YamlConfig`, and neither inherits from the other. Every Sollertia acquisition system runs
-  a Unity VR task in the linear infinite corridor, so every `<System>ExperimentConfiguration` shares one contract: an
-  `experiment_states` field (the experiment state machine), a `trial_structures` field (the trials the experiment
-  runs, with concrete trial classes varying per system), a `unity_scene_name` field (the corridor task the experiment
-  runs), and a `from_task_template` classmethod. Fields beyond the contract are system-specific. `ExperimentState` is
-  the shared building block that stays in `configuration/`, while each acquisition system defines its own trial
-  classes in its subpackage (Mesoscope-VR's `MesoscopeWaterRewardTrial` and `MesoscopeGasPuffTrial` live in
-  `mesoscope_vr/experiment_configuration.py`).
+  a Unity VR task in the linear infinite corridor, so every `<System>ExperimentConfiguration` shares one contract. That
+  contract is an `experiment_states` field (the experiment state machine), a `trial_structures` field (the trials the
+  experiment runs, with concrete trial classes varying per system), a `unity_scene_name` field (the corridor task the
+  experiment runs), and a `from_task_template` classmethod. Fields beyond the contract are system-specific.
+  `ExperimentState` is the shared building block that stays in `configuration/`, while each acquisition system defines
+  its own trial classes in its subpackage (Mesoscope-VR's `MesoscopeWaterRewardTrial` and `MesoscopeGasPuffTrial` live
+  in `mesoscope_vr/experiment_configuration.py`).
   The platform `TriggerType` enum carries five members: `INTERACTION`, `COLLISION`, `OCCUPANCY_DISARM`,
   `OCCUPANCY_ARM`, and `OCCUPANCY_TRIGGER`. Each acquisition system maps only the subset it supports.
   `MesoscopeExperimentConfiguration.from_task_template` converts a `TaskTemplate` into a
@@ -215,16 +213,15 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   and never consume the registries.
   `DatasetData` (in `data_hierarchy/dataset_data.py`) is the sibling entry point for a forged dataset, the
   aggregate that `sollertia-forgery` assembles from many sessions of one session type and acquisition system. It
-  carries a full hierarchy lifecycle: `create()` mints the dataset and its per-animal and per-session directories,
+  carries a full hierarchy lifecycle. `create()` mints the dataset and its per-animal and per-session directories,
   `load()` rehydrates one and re-resolves every path against the marker's on-disk location, `add_sessions()` appends
   sessions to an existing dataset, and `remove_animal()` drops one animal with its directory tree. The mutators
   enforce structural invariants alone, so whether a given session belongs in a given dataset is decided by the
   consuming pipeline rather than here.
 - **Interface layer**: A single `MCPServer` instance lives in `interfaces/mcp_instance.py` with shared serialization,
-  validation, and dataclass-introspection helpers. The dispatch registries and their import-time checks live in the
-  top-level `registries.py` module, not here. Tool modules import the instance and register `@mcp.tool()` functions.
-  `run_server()` enables JSON responses when it starts the streamable-http transport. The CLI (`slsa`) starts the
-  server and exposes `configure {directory,data-root,credentials,templates,project}` and
+  validation, and dataclass-introspection helpers. Tool modules import the instance and register `@mcp.tool()`
+  functions. `run_server()` enables JSON responses when it starts the streamable-http transport. The CLI (`slsa`)
+  starts the server and exposes `configure {directory,data-root,credentials,templates,project}` and
   `get {directory,data-root,credentials,templates,projects,experiments}` command groups. The `mcp` command disables
   the console on the stdio transport, since the console writes to the stdout stream that carries JSON-RPC traffic.
 - **Persistent host settings**: `configuration/configuration_utilities.py` manages three independent
@@ -236,15 +233,14 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 ### Extension contracts
 
-Every dispatch registry is defined, fully populated, in the top-level `registries.py` module, keyed by the
-vocabulary enums in the leaf `enums.py` module. The registries form two governance tiers. The system registries
+Every dispatch registry is defined, fully populated, in the top-level `registries.py` module, keyed by the vocabulary
+enums in the leaf `enums.py` module. The registries form two governance tiers. The system registries
 (`DESCRIPTOR_REGISTRY`, `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, `SYSTEM_RAW_DATA_REGISTRY`,
-the `SYSTEM_SESSION_TYPES` association, and the `SESSION_TYPES_USING_VR_TASK` gate) form the designed extension
-point: they grow whenever a new acquisition system or session type is added. The contract registries
-(`READ_ASSET_REGISTRY`, `CREDENTIALS_FILE_REGISTRY`) are durable translation contracts curated by Sollertia platform
-maintainers. Adding an entry there is a platform-contract decision, not a routine extension. Use the
-`/library-extension` skill for system and session-type extensions, since it owns the touch list and the import-time
-parity check that fails if any registry is incomplete.
+the `SYSTEM_SESSION_TYPES` association, and `SESSION_TYPES_USING_VR_TASK`) form the designed extension point: they grow
+whenever a new acquisition system or session type is added. The contract registries (`READ_ASSET_REGISTRY`,
+`CREDENTIALS_FILE_REGISTRY`) are durable translation contracts curated by Sollertia platform maintainers. Adding an
+entry there is a platform-contract decision, not a routine extension. Use the `/library-extension` skill for system
+and session-type extensions.
 
 | Registry                            | Keyed by             | Tier                       |
 |-------------------------------------|----------------------|----------------------------|
@@ -265,13 +261,13 @@ acquisition system that needs a different descriptor must mint a new `SessionTyp
 `_assert_registry_coverage()` in `registries.py` runs on a bare `import sollertia_shared_assets` (the hub loads
 without the MCP server) and raises `RuntimeError` if any registry is missing entries for a known enum member. It
 raises the same error if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session types or a session type
-unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()` (every registered descriptor must
-declare the `incomplete` field the inspection tooling reads) and `_assert_experiment_configuration_contract()` (every
-registered experiment configuration must declare the `experiment_states`, `trial_structures`, and `unity_scene_name`
-contract fields and provide a `from_task_template` classmethod that accepts `template`, `unity_scene_name`, and
-`state_count` by keyword and gives every other parameter a default, so `create_experiment_from_vr_template_tool` can
-call it generically). A half-wired acquisition system fails fast instead
-of having its template-creation tool refuse it at runtime.
+unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()`, which requires every registered
+descriptor to declare the `incomplete` field the inspection tooling reads. It also runs
+`_assert_experiment_configuration_contract()`, which requires every registered experiment configuration to declare the
+`experiment_states`, `trial_structures`, and `unity_scene_name` contract fields and to provide a `from_task_template`
+classmethod. That classmethod must accept `template`, `unity_scene_name`, and `state_count` by keyword and give every
+other parameter a default, so `create_experiment_from_vr_template_tool` can call it generically. A half-wired
+acquisition system fails fast instead of having its template-creation tool refuse it at runtime.
 
 Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
 introspection from that system's `<System>ExperimentConfiguration` dataclass.
@@ -292,8 +288,6 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
 - **Minimal machinery**: Prefer concrete classes, explicit `Path` fields, and `if`/`elif` dispatch over ABCs,
   `@property`-derived state, back-references, or unnecessary registries. The registries and the `SYSTEM_SESSION_TYPES`
   association listed above are necessary because they cross enum boundaries. Do not add more without justification.
-- **No tests for MCP tools**: `@mcp.tool()` functions live behind the MCP server and are excluded from coverage.
-  Test the helper functions they delegate to instead.
 - **Frozen acquisition snapshots**: The per-session acquisition snapshots in `raw_data/` (descriptor, hardware state,
   system configuration, experiment configuration, VR configuration, surgery metadata) are immutable records of the
   session's acquisition context. MCP write tools repair corruption, and they do not edit live runtime state. The
@@ -304,8 +298,7 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
 
 **Adding a new session type or acquisition system:**
 
-Invoke `/library-extension`. It enumerates every registry and sibling-skill update required, including the README's
-"Adding New Session Types" / "Adding New Acquisition Systems" sections.
+Invoke `/library-extension`.
 
 **Modifying configuration dataclasses:**
 
