@@ -257,6 +257,18 @@ def test_filter_sessions_include_sessions_bypass_date_range() -> None:
     assert result == {("2026-03-20-12-00-00-000000", "1")}
 
 
+def test_filter_sessions_include_sessions_without_date_range_drops_nothing() -> None:
+    """Verifies that include_sessions without a date bound keeps every session, including unparseable names."""
+    keys = {
+        ("2026-03-01-12-00-00-000000", "1"),
+        ("not-a-real-session-name", "1"),
+    }
+
+    result = filter_sessions(sessions=keys, include_sessions={"2026-03-01-12-00-00-000000"})
+
+    assert result == keys
+
+
 def test_filter_sessions_drops_malformed_session_names() -> None:
     """Verifies that sessions whose names cannot be parsed as dates are dropped under a date filter."""
     keys = {

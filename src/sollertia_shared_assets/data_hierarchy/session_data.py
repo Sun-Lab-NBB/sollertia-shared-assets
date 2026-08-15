@@ -430,6 +430,14 @@ class SessionData(YamlConfig):
 
         instance._build_sub_dataclasses()
 
+        # Marks the session as 'uninitialized' by writing the 'nk.bin' file into raw_data before the discoverable
+        # session marker is published, so a session whose creation fails partway is still recognized as holding no data
+        # of value. The acquisition runtime removes this marker once it has finished creating snapshots and initializing
+        # instruments (see mark_runtime_initialized). Sessions that still carry the marker are valid targets for
+        # purging. Distinct from the descriptor ``incomplete`` field, which marks initialized sessions that ran into
+        # runtime issues but still hold usable data.
+        instance.raw_data.nk_path.touch()
+
         # Persisting the marker file here lets future processing or preprocessing reuse this configuration
         # without re-resolving the source paths.
         instance.save()
@@ -458,13 +466,6 @@ class SessionData(YamlConfig):
                 src=vr_template_path,
                 dst=instance.raw_data.vr_configuration_path,
             )
-
-        # Marks the session as 'uninitialized' by writing the 'nk.bin' file into raw_data. The acquisition
-        # runtime removes this marker once it has finished creating snapshots and initializing instruments
-        # (see mark_runtime_initialized). Sessions that still carry the marker hold no data of value and
-        # are valid targets for purging. Distinct from the descriptor ``incomplete`` field, which marks
-        # initialized sessions that ran into runtime issues but still hold usable data.
-        instance.raw_data.nk_path.touch()
 
         return instance
 

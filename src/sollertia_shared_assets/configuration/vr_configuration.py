@@ -133,10 +133,13 @@ class VREnvironment:
 
     def __post_init__(self) -> None:
         """Validates corridor geometry parameters."""
-        if self.segments_per_corridor < 1:
+        # The YAML loader does not enforce the field annotation, so a float depth reaches this check. NaN and positive
+        # infinity compare False against the lower bound, a fractional depth has no meaning to the maze generator, and
+        # bool would pass an isinstance check as an int, which is why the depth must be exactly an integer.
+        if type(self.segments_per_corridor) is not int or self.segments_per_corridor < 1:
             message = (
-                "Unable to initialize VREnvironment. The segments_per_corridor must be at least 1, but got "
-                f"{self.segments_per_corridor}."
+                "Unable to initialize VREnvironment. The segments_per_corridor must be an integer of at least 1, but "
+                f"got {self.segments_per_corridor}."
             )
             console.error(message=message, error=ValueError)
         if not math.isfinite(self.cm_per_unity_unit) or self.cm_per_unity_unit <= 0:

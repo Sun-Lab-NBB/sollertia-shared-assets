@@ -108,6 +108,27 @@ def test_get_working_directory_raises_error_if_directory_missing(clean_working_d
         get_working_directory()
 
 
+def test_get_working_directory_preserves_trailing_whitespace(clean_working_directory: Path) -> None:
+    """Verifies that get_working_directory preserves a trailing space in a newline-terminated path record."""
+    spaced_directory = clean_working_directory.parent / "working directory "
+    spaced_directory.mkdir()
+    path_file = clean_working_directory.parent / "app_data" / "working_directory_path.txt"
+    path_file.write_text(f"{spaced_directory}\n")
+
+    assert get_working_directory() == spaced_directory
+
+
+def test_get_working_directory_raises_error_if_record_is_whitespace(clean_working_directory: Path) -> None:
+    """Verifies that get_working_directory raises FileNotFoundError for a whitespace-only path record."""
+    set_working_directory(path=clean_working_directory)
+
+    path_file = clean_working_directory.parent / "app_data" / "working_directory_path.txt"
+    path_file.write_text("\n")
+
+    with pytest.raises(FileNotFoundError, match=r"cached path record\s+is empty"):
+        get_working_directory()
+
+
 def test_set_data_root_creates_directory(clean_working_directory: Path) -> None:
     """Verifies that set_data_root creates the directory if it does not exist (working-directory model)."""
     new_dir = clean_working_directory.parent / "new_data_root"
@@ -152,6 +173,27 @@ def test_get_data_root_raises_error_if_directory_missing(clean_working_directory
     shutil.rmtree(clean_working_directory)
 
     with pytest.raises(FileNotFoundError, match=r"currently configured"):
+        get_data_root()
+
+
+def test_get_data_root_preserves_trailing_whitespace(clean_working_directory: Path) -> None:
+    """Verifies that get_data_root preserves a trailing space in a newline-terminated path record."""
+    spaced_directory = clean_working_directory.parent / "data root "
+    spaced_directory.mkdir()
+    path_file = clean_working_directory.parent / "app_data" / "data_root_path.txt"
+    path_file.write_text(f"{spaced_directory}\n")
+
+    assert get_data_root() == spaced_directory
+
+
+def test_get_data_root_raises_error_if_record_is_whitespace(clean_working_directory: Path) -> None:
+    """Verifies that get_data_root raises FileNotFoundError for a whitespace-only path record."""
+    set_data_root(path=clean_working_directory)
+
+    path_file = clean_working_directory.parent / "app_data" / "data_root_path.txt"
+    path_file.write_text("\n")
+
+    with pytest.raises(FileNotFoundError, match=r"cached path record\s+is empty"):
         get_data_root()
 
 
@@ -234,4 +276,35 @@ def test_get_task_templates_directory_raises_error_if_directory_missing(
     shutil.rmtree(templates_dir)
 
     with pytest.raises(FileNotFoundError, match=r"does not exist"):
+        get_task_templates_directory()
+
+
+def test_get_task_templates_directory_preserves_trailing_whitespace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that get_task_templates_directory preserves a trailing space in a newline-terminated path record."""
+    app_dir = tmp_path / "app_data"
+    app_dir.mkdir()
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+
+    templates_dir = tmp_path / "task templates "
+    templates_dir.mkdir()
+    (app_dir / "task_templates_directory_path.txt").write_text(f"{templates_dir}\n")
+
+    assert get_task_templates_directory() == templates_dir
+
+
+def test_get_task_templates_directory_raises_error_if_record_is_whitespace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that get_task_templates_directory raises FileNotFoundError for a whitespace-only path record."""
+    app_dir = tmp_path / "app_data"
+    app_dir.mkdir()
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+
+    (app_dir / "task_templates_directory_path.txt").write_text("\n")
+
+    with pytest.raises(FileNotFoundError, match=r"cached path record\s+is empty"):
         get_task_templates_directory()

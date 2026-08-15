@@ -13,6 +13,7 @@ from .runtime_data import (
     MesoscopeExperimentDescriptor,
 )
 from .experiment_configuration import (
+    TrialKind,
     MesoscopeGasPuffTrial,
     MesoscopeWaterRewardTrial,
     MesoscopeExperimentConfiguration,
@@ -29,5 +30,6 @@ __all__ = [
     "MesoscopeRawDataFiles",
     "MesoscopeWaterRewardTrial",
     "RunTrainingDescriptor",
+    "TrialKind",
     "WindowCheckingDescriptor",
 ]

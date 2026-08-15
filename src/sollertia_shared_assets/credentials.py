@@ -12,10 +12,10 @@ pre-creates the subdirectory) and is imported from there.
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
+from ataraxis_data_structures import atomic_write
 
 from .enums import CredentialsTypes
 from .registries import CREDENTIALS_FILE_REGISTRY
@@ -50,8 +50,8 @@ def resolve_credentials_file(credentials: str | CredentialsTypes) -> str:
 def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
     """Copies the specified credentials file into the working directory's credentials subdirectory.
 
-    The copy is stored under the canonical filename registered for the credentials category, replacing any
-    previously configured credentials file for that category.
+    The copy is stored under the canonical filename registered for the credentials category, atomically replacing any
+    previously configured credentials file for that category. The published file carries umask-derived permissions.
 
     Notes:
         The configured credentials file is used for all future interactions with the corresponding external
@@ -89,7 +89,11 @@ def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
     ensure_directory_exists(path=credentials_directory, is_file=False)
 
     destination = credentials_directory.joinpath(file_name)
-    shutil.copyfile(src=path, dst=destination)
+
+    # The source bytes are published atomically, so a process killed mid-copy leaves the previously configured
+    # credentials file intact instead of truncating the file every later service interaction authenticates with.
+    with atomic_write(file_path=destination, binary=True) as file:
+        file.write(path.read_bytes())
 
     console.echo(
         message=f"The '{CredentialsTypes(credentials)}' credentials file copied to: {destination}.",

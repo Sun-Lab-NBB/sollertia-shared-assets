@@ -203,7 +203,9 @@ def _assert_registry_coverage() -> None:
     # separately. Every acquisition system must declare at least one session type, and every session type must be
     # claimed by at least one system; either gap would let SessionData.create reject a legitimate session or admit an
     # unrunnable one.
-    systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(SYSTEM_SESSION_TYPES)
+    systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(
+        system for system, session_types in SYSTEM_SESSION_TYPES.items() if session_types
+    )
     if systems_missing_session_types:
         missing_names = ", ".join(sorted(member.name for member in systems_missing_session_types))
         message = (

@@ -63,6 +63,23 @@ def test_set_credentials_overwrites_existing_file(clean_working_directory: Path)
     assert stored_file.read_text() == '{"account": "second"}'
 
 
+def test_set_credentials_replaces_existing_file_byte_for_byte(clean_working_directory: Path) -> None:
+    """Verifies that set_credentials replaces an existing credentials file with a byte-exact copy of the source."""
+    set_working_directory(path=clean_working_directory)
+
+    stored_file = clean_working_directory / CREDENTIALS_DIRECTORY / "google_credentials.json"
+    stored_file.write_bytes(b'{"account": "stale", "padding": "long enough to outlive a shorter replacement"}')
+
+    source_file = clean_working_directory.parent / "service_account.json"
+    source_bytes = b'{"account": "caf\xc3\xa9", "key": "line\r\nbreak"}'
+    source_file.write_bytes(source_bytes)
+
+    set_credentials(credentials=CredentialsTypes.GOOGLE, path=source_file)
+
+    assert stored_file.read_bytes() == source_bytes
+    assert source_file.read_bytes() == source_bytes
+
+
 def test_set_credentials_raises_error_file_not_exists(clean_working_directory: Path) -> None:
     """Verifies that set_credentials raises error for non-existent source files."""
     set_working_directory(path=clean_working_directory)

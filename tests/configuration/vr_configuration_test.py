@@ -55,7 +55,7 @@ def _create_base_task_template(
 
 def _create_vr_environment(
     corridor_spacing_cm: float = 100.0,
-    segments_per_corridor: int = 3,
+    segments_per_corridor: float = 3,
     cm_per_unity_unit: float = 10.0,
     cue_offset_cm: float = 0.0,
 ) -> VREnvironment:
@@ -249,8 +249,26 @@ def test_vr_environment_initialization() -> None:
 
 def test_vr_environment_zero_segments_per_corridor_raises_error() -> None:
     """Verifies that a VREnvironment with fewer than one segment per corridor raises ValueError."""
-    with pytest.raises(ValueError, match=r"segments_per_corridor must be at least 1"):
+    with pytest.raises(ValueError, match=r"segments_per_corridor must be an integer of at least 1"):
         _create_vr_environment(segments_per_corridor=0)
+
+
+def test_vr_environment_nan_segments_per_corridor_raises_error() -> None:
+    """Verifies that a VREnvironment with a NaN segments_per_corridor raises ValueError."""
+    with pytest.raises(ValueError, match=r"segments_per_corridor must be an integer of at least 1"):
+        _create_vr_environment(segments_per_corridor=math.nan)
+
+
+def test_vr_environment_infinite_segments_per_corridor_raises_error() -> None:
+    """Verifies that a VREnvironment with an infinite segments_per_corridor raises ValueError."""
+    with pytest.raises(ValueError, match=r"segments_per_corridor must be an integer of at least 1"):
+        _create_vr_environment(segments_per_corridor=math.inf)
+
+
+def test_vr_environment_fractional_segments_per_corridor_raises_error() -> None:
+    """Verifies that a VREnvironment with a non-integral segments_per_corridor raises ValueError."""
+    with pytest.raises(ValueError, match=r"segments_per_corridor must be an integer of at least 1"):
+        _create_vr_environment(segments_per_corridor=1.5)
 
 
 def test_vr_environment_zero_cm_per_unity_unit_raises_error() -> None:

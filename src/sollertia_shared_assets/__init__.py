@@ -33,6 +33,7 @@ from .data_classes import (
     ProcedureData,
 )
 from .mesoscope_vr import (
+    TrialKind,
     MesoscopeRawData,
     MesoscopeDirectories,
     MesoscopeGasPuffTrial,
@@ -135,6 +136,7 @@ __all__ = [
     "SubjectData",
     "SurgeryData",
     "TaskTemplate",
+    "TrialKind",
     "TrialStructure",
     "TriggerType",
     "VREnvironment",
