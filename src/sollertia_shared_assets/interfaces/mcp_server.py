@@ -18,12 +18,21 @@ from .mcp_instance import mcp
 __all__ = ["run_server"]
 
 
-def run_server(transport: Literal["stdio", "sse", "streamable-http"] = "stdio") -> None:
+def run_server(transport: Literal["stdio", "streamable-http"] = "stdio") -> None:
     """Starts the MCP server with the specified transport.
 
     Args:
-        transport: The transport type to use ('stdio', 'sse', or 'streamable-http').
+        transport: The transport type to use ('stdio' or 'streamable-http').
     """
+    # Delegates to the MCPServer run loop, which blocks until the transport connection is closed. For 'stdio' this
+    # means the server runs until the parent process closes stdin. For 'streamable-http' it runs an HTTP server that
+    # accepts connections until explicitly terminated.
+    if transport == "streamable-http":
+        # Frames each response as a single JSON body instead of an event stream. Only the streamable-http transport
+        # accepts this flag, so it stays out of the call below.
+        mcp.run(transport=transport, json_response=True)
+        return
+
     mcp.run(transport=transport)
 
 

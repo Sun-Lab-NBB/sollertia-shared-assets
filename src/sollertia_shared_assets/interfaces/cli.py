@@ -34,13 +34,24 @@ def slsa_cli() -> None:  # pragma: no cover
 @click.option(
     "-t",
     "--transport",
-    type=click.Choice(["stdio", "sse", "streamable-http"], case_sensitive=False),
+    type=click.Choice(["stdio", "streamable-http"], case_sensitive=False),
     default="stdio",
     show_default=True,
     help="The MCP transport type to use.",
 )
-def run_mcp_server(transport: Literal["stdio", "sse", "streamable-http"]) -> None:  # pragma: no cover
+def run_mcp_server(transport: Literal["stdio", "streamable-http"]) -> None:  # pragma: no cover
     """Starts the MCP server for agentic configuration management."""
+    # The stdio transport carries the JSON-RPC message stream over stdout, which is also where the console writes
+    # every message up to the WARNING level. Silencing the console keeps library output out of that stream, as a
+    # single logged line renders the message it interleaves with unparsable for the connected client.
+    if transport == "stdio":
+        console.disable()
+    else:
+        console.echo(
+            message=f"Starting the sollertia-shared-assets MCP server with the {transport} transport.",
+            level=LogLevel.INFO,
+        )
+
     run_server(transport=transport)
 
 

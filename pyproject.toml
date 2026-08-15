@@ -65,10 +65,8 @@ dependencies = [
     # YAML serialization (used directly by MCP helpers to stage caller-supplied dicts for YamlConfig validation)
     "pyyaml>=6,<7",
 
-    # MCP and HTTP
-    "mcp>=1,<2",
-    # Constraint pin (not imported directly): blocks mcp from resolving a broken pre-release httpx.
-    "httpx>=0.28,<1",
+    # MCP Server
+    "mcp>=2,<3",
 ]
 
 # Project repository and hosted documentation URLs.
