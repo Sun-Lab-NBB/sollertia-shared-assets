@@ -9,7 +9,8 @@ developed in the `Sun (NeuroAI) lab <https://neuroai.github.io/sunlab/>`_ at Cor
 tools, dataclasses, and configuration assets used by the data acquisition
 (`sollertia-experiment <https://github.com/Sun-Lab-NBB/sollertia-experiment>`_) and data processing
 (`sollertia-forgery <https://github.com/Sun-Lab-NBB/sollertia-forgery>`_) libraries to keep them independent of one
-another.
+another. Its MCP server additionally drives the Unity Editor McpBridge plugin shipped by
+`sollertia-virtual-reality <https://github.com/Sun-Lab-NBB/sollertia-virtual-reality>`_.
 
 This website contains the API documentation for the classes and methods offered by this library, together with the
 reference for every command exposed by its command-line interface where the project declares one. See the project
@@ -20,5 +21,6 @@ GitHub repository for installation instructions and library usage examples:
 .. _`Ataraxis`: https://github.com/Sun-Lab-NBB/ataraxis
 .. _`sollertia-experiment`: https://github.com/Sun-Lab-NBB/sollertia-experiment
 .. _`sollertia-forgery`: https://github.com/Sun-Lab-NBB/sollertia-forgery
+.. _`sollertia-virtual-reality`: https://github.com/Sun-Lab-NBB/sollertia-virtual-reality
 .. _`sollertia-shared-assets GitHub repository`: https://github.com/Sun-Lab-NBB/sollertia-shared-assets
 .. _`Sun (NeuroAI) lab`: https://neuroai.github.io/sunlab/

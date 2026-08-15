@@ -17,7 +17,7 @@ def test_acquisition_systems_mesoscope_vr_value() -> None:
 
 
 def test_acquisition_systems_is_string_enum() -> None:
-    """Verifies that AcquisitionSystems inherits from StrEnum."""
+    """Verifies that every AcquisitionSystems member is usable as a plain string."""
     assert isinstance(AcquisitionSystems.MESOSCOPE_VR, str)
 
 
@@ -30,7 +30,7 @@ def test_session_types_values() -> None:
 
 
 def test_session_types_is_string_enum() -> None:
-    """Verifies that SessionTypes inherits from StrEnum."""
+    """Verifies that every SessionTypes member is usable as a plain string."""
     assert isinstance(SessionTypes.LICK_TRAINING, str)
     assert isinstance(SessionTypes.RUN_TRAINING, str)
     assert isinstance(SessionTypes.MESOSCOPE_EXPERIMENT, str)

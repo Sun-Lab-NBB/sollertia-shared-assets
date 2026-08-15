@@ -1,4 +1,4 @@
-"""Contains tests for the system-agnostic experiment configuration dataclasses provided by the
+"""Contains tests for the system-agnostic ``ExperimentState`` dataclass provided by the
 ``configuration.experiment_configuration`` module.
 """
 

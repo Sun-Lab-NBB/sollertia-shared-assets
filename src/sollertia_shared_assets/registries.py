@@ -159,7 +159,7 @@ def resolve_read_asset(read_asset: str | ReadAssets) -> type[YamlConfig]:
             f"members: {valid}."
         )
         console.error(message=message, error=ValueError)
-        # Unreachable: console.error() is NoReturn, but ruff cannot trace NoReturn through method calls (RET503).
+        # Unreachable: console.error() always raises. The explicit raise documents the terminating branch for readers.
         raise ValueError(message)  # pragma: no cover
 
     return READ_ASSET_REGISTRY[ReadAssets(read_asset)]
@@ -201,8 +201,8 @@ def _assert_registry_coverage() -> None:
 
     # SYSTEM_SESSION_TYPES is an association (system -> session-type set), not a dispatch registry, so it is checked
     # separately. Every acquisition system must declare at least one session type, and every session type must be
-    # claimed by at least one system; either gap would let SessionData.create reject a legitimate session or admit an
-    # unrunnable one.
+    # claimed by at least one system; either gap would make SessionData.create reject a legitimate session, since an
+    # empty session-type set rejects every type and an unclaimed session type is rejected by every system.
     systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(
         system for system, session_types in SYSTEM_SESSION_TYPES.items() if session_types
     )

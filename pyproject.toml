@@ -56,7 +56,8 @@ dependencies = [
     # Date parsing (used by session-discovery filter helpers)
     "python-dateutil>=2,<3",
 
-    # DataFrame I/O (used by DatasetData to read/write the per-dataset column-descriptions feather)
+    # DataFrame I/O (used by DatasetData to read/write the per-dataset column-descriptions feather and to read each
+    # session's data.feather schema)
     "polars>=1,<2",
 
     # Provides IANA timezone data for zoneinfo on Windows, which does not ship system tzdata.
@@ -205,7 +206,7 @@ extra_checks = true
 pretty = true
 
 exclude = [
-    "sollertia-shared-assets-\\d+",  # The temporary folder created when building the sdist
+    "sollertia_shared_assets-\\d+",  # The temporary folder created when building the sdist
     "venv.*/",
     "build/",
     "dist/",
@@ -220,8 +221,9 @@ exclude = [
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
 
-# Lists the source files excluded from coverage measurement in full. The interface modules define the Click commands
-# and the MCP server tools, each of which wraps a function the test suite already covers.
+# Excludes the interface package from coverage measurement in full. Its Click commands and MCP tools wrap functions
+# the test suite already covers, and the shared MCP helpers in 'mcp_instance.py' and the server bootstrap in
+# 'mcp_server.py' are excluded with them by project convention.
 [tool.coverage.run]
 omit = [
     "*/sollertia_shared_assets/interfaces/*",

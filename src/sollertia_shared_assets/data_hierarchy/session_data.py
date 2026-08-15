@@ -51,7 +51,7 @@ class RawDataFiles(StrEnum):
     """The experiment configuration YAML copied into the session for experiment sessions only."""
     VR_CONFIGURATION = "vr_configuration.yaml"
     """The linear infinite corridor task template YAML (cues, VR environment, trial structures) cached into the
-    session at acquisition time. Written only for sessions that use VR."""
+    session at acquisition time. Written only for session types listed in ``SESSION_TYPES_USING_VR_TASK``."""
     SYSTEM_CONFIGURATION = "system_configuration.yaml"
     """The system configuration YAML copied into the session by the acquisition runtime."""
     CHECKSUM = "ax_checksum.txt"
@@ -151,8 +151,8 @@ class RawData:
     session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
     """Stores the linear infinite corridor task template (cues, VR environment, trial structures) active when the
-    session was acquired. Written only for sessions that use VR, so callers should check ``.exists()``
-    before reading. Parsed via ``TaskTemplate``."""
+    session was acquired. Written only for session types listed in ``SESSION_TYPES_USING_VR_TASK``, so callers should
+    check ``.exists()`` before reading. Parsed via ``TaskTemplate``."""
     checksum_path: Path
     """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
     accidental modification of raw assets after acquisition."""
@@ -367,8 +367,12 @@ class SessionData(YamlConfig):
             An initialized SessionData instance that stores the structure and the metadata of the created session.
 
         Raises:
-            ValueError: If the specified session_type or acquisition_system is not a valid enumeration member.
-            FileNotFoundError: If the project does not exist on the local machine (PC).
+            ValueError: If the specified session_type or acquisition_system is not a valid enumeration member, if
+                the acquisition system does not support the requested session type (per ``SYSTEM_SESSION_TYPES``), or
+                if a session type listed in ``SESSION_TYPES_USING_VR_TASK`` is created without an experiment_name.
+            FileNotFoundError: If the project does not exist on the local machine (PC), if the named experiment's
+                configuration YAML is absent from the project's configuration directory, if the task templates
+                directory has not been configured, or if the experiment's task template YAML is absent from it.
         """
         if session_type not in SessionTypes:
             message = (
@@ -395,6 +399,17 @@ class SessionData(YamlConfig):
                 f"Unable to initialize a new data acquisition session. The session type '{session_type.value}' is not "
                 f"supported by the '{acquisition_system.value}' acquisition system. Supported session types: "
                 f"{supported}."
+            )
+            console.error(message=message, error=ValueError)
+
+        # Rejects a corridor-task session type created without an experiment, since the VR task template is resolved
+        # from the experiment configuration's unity_scene_name. Without one, create() cannot cache the
+        # vr_configuration.yaml snapshot that required_raw_assets() goes on to demand for this session type.
+        if session_type in SESSION_TYPES_USING_VR_TASK and experiment_name is None:
+            message = (
+                f"Unable to initialize a new data acquisition session. The session type '{session_type.value}' runs "
+                f"the linear infinite corridor task, so it requires an experiment_name to resolve the task template "
+                f"cached as the session's VR configuration snapshot."
             )
             console.error(message=message, error=ValueError)
 
@@ -458,14 +473,17 @@ class SessionData(YamlConfig):
             )
 
             # Caches the corridor task template the experiment runs against alongside the experiment configuration.
+            # Gated on SESSION_TYPES_USING_VR_TASK so the write matches the required_raw_assets() policy exactly: an
+            # experiment session whose type does not run the corridor task gets no VR snapshot it is never asked for.
             # unity_scene_name is a contract field, so every experiment names a task and its template is always cached.
-            unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
-            templates_directory = get_task_templates_directory()
-            vr_template_path = templates_directory.joinpath(f"{unity_scene_name}.yaml")
-            shutil.copy2(
-                src=vr_template_path,
-                dst=instance.raw_data.vr_configuration_path,
-            )
+            if session_type in SESSION_TYPES_USING_VR_TASK:
+                unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
+                templates_directory = get_task_templates_directory()
+                vr_template_path = templates_directory.joinpath(f"{unity_scene_name}.yaml")
+                shutil.copy2(
+                    src=vr_template_path,
+                    dst=instance.raw_data.vr_configuration_path,
+                )
 
         return instance
 

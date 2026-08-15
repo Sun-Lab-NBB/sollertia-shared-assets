@@ -100,8 +100,13 @@ class ProjectData:
         return self
 
     def exists(self) -> bool:
-        """Determines whether the project directory exists on disk under the data root."""
-        return self.path.exists()
+        """Determines whether the project directory exists on disk under the data root.
+
+        Notes:
+            Tests for a directory specifically, so a regular file carrying the project's name reads as absent rather
+            than as an existing project.
+        """
+        return self.path.is_dir()
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,5 +163,10 @@ class AnimalData:
         return AnimalData(root=root, project_name=self.project_name, animal_id=self.animal_id)
 
     def exists(self) -> bool:
-        """Determines whether the animal directory exists on disk under the project."""
-        return self.path.exists()
+        """Determines whether the animal directory exists on disk under the project.
+
+        Notes:
+            Tests for a directory specifically, so a regular file carrying the animal's identifier reads as absent
+            rather than as an existing animal.
+        """
+        return self.path.is_dir()

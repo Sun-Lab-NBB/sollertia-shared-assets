@@ -216,7 +216,7 @@ def filter_sessions(
 
     Notes:
         The input is intentionally a plain iterable of ``(session_name, animal)`` tuples rather than a
-        richer type. Callers with domain-specific session types (e.g. forgery's ``DatasetSession``) map
+        richer type. Callers with domain-specific session types (e.g. the shared ``DatasetSession``) map
         their sets to tuples on the way in and rehydrate on the way out with a one-line comprehension.
 
     Args:
@@ -231,11 +231,12 @@ def filter_sessions(
             applied.
         include_sessions: Session names to include regardless of the date range. Sessions in this set
             are added even when they fall outside the ``start_date`` / ``end_date`` range, unless they
-            are also in ``exclude_sessions``.
+            are also in ``exclude_sessions``, or their animal is removed by ``exclude_animals``, or
+            absent from a non-empty ``include_animals``.
         exclude_sessions: Session names to exclude from the results. Takes precedence over every
             other inclusion criterion.
-        include_animals: Animal identifiers to include. When provided, only sessions from these
-            animals are considered. When ``None``, sessions from all animals are considered.
+        include_animals: Animal identifiers to include. When provided and non-empty, only sessions from
+            these animals are considered. When ``None`` or empty, sessions from all animals are considered.
         exclude_animals: Animal identifiers to exclude. Takes precedence over ``include_animals``.
         utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC
             (True) or the host machine's local time (False). Session names reflect UTC timestamps; when

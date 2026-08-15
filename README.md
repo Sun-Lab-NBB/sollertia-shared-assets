@@ -57,7 +57,8 @@ ___
 - [Python](https://www.python.org/downloads/) **3.14** (the only currently supported interpreter version).
 - An optional
   [Google service account credentials JSON file](https://cloud.google.com/iam/docs/service-account-overview),
-  required only when downstream Sollertia libraries fetch subject metadata or water-restriction logs from Google Sheets.
+  required only when downstream Sollertia libraries read subject metadata from, or write water-restriction logs to,
+  Google Sheets.
 - An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
   [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality), required only by the MCP
   tools that generate task prefabs, manage scenes, and control Play Mode.
@@ -124,7 +125,7 @@ Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND 
 
 ### MCP Server
 
-This library provides an MCP server that exposes configuration management, session and dataset operations, and Unity
+This library provides an MCP server that exposes configuration management, session operations, and Unity
 Editor relay tools for AI agent integration. The server enables agents to query and configure shared Sollertia platform
 workflow components.
 
@@ -316,7 +317,8 @@ module of its own subpackage, so add the descriptor to the subpackage of the sys
 Use `LickTrainingDescriptor` or `RunTrainingDescriptor` in `mesoscope_vr/runtime_data.py` as reference. The descriptor
 must declare an `incomplete: bool = True` field, which the session-inspection tooling reads to decide whether a
 session is complete. The import-time `_assert_descriptor_contract` check fails if it is missing. Export the new class
-from the subpackage's `__init__.py`.
+from the subpackage's `__init__.py`, and re-export it from the top-level `src/sollertia_shared_assets/__init__.py`
+(and its `__all__`).
 
 **Step 3: Register the descriptor**
 
@@ -431,29 +433,45 @@ matching `TrialStructure` in the paired Unity task template, not on the trial cl
 
 In the owning system's `<system>/experiment_configuration.py`, add a standalone `@dataclass(frozen=True, slots=True)`
 whose name is prefixed with the system name (mirror `MesoscopeWaterRewardTrial` and `MesoscopeGasPuffTrial`). The class
-carries only runtime parameters and declares no spatial fields.
+carries its runtime parameters plus the trial-kind discriminator, and declares no spatial fields.
 
-**Step 2: Export the trial class**
+**Step 2: Wire the trial-kind discriminator**
+
+Every trial class carries a discriminator drawn from its system's `TrialKind` enum, and that discriminator is what
+routes a stored trial back to the class that wrote it on deserialization. Four edits are required:
+
+1. Add a new member to the system's `TrialKind` enum (Mesoscope-VR's carries `WATER` and `PUFF`).
+2. Declare `trial_kind: TrialKind = TrialKind.<NEW>` on the new class, with the matching `__post_init__` rejection
+   that raises when the field holds any other member.
+3. Add the `(TrialKind.<NEW>, <NewTrial>)` pair to the module's `_TRIAL_CLASSES` tuple, which drives
+   `_restore_trial_kind` and `_unique_trial_fields`.
+4. Add the class to the `isinstance` acceptance tuple in `<System>ExperimentConfiguration.__post_init__`, which
+   rejects at load anything outside it.
+
+Skipping this step ships a trial class that serializes but cannot be deserialized: every configuration containing it
+raises at load.
+
+**Step 3: Export the trial class**
 
 Export the new class from the system subpackage's `__init__.py`, and re-export it from the top-level
 `src/sollertia_shared_assets/__init__.py` (and its `__all__`), mirroring the existing trial classes.
 
-**Step 3: Add the class to the experiment-configuration trial union**
+**Step 4: Add the class to the experiment-configuration trial union**
 
 Add the new class to the `trial_structures` type-union annotation of each `<System>ExperimentConfiguration` that uses
 it (for example, `dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial | <NewTrial>]`). The MCP
 trial-vocabulary introspection derives a system's trial types from this annotation, so a class absent from the union
 does not surface in the tooling.
 
-**Step 4: Map a trigger to the trial class**
+**Step 5: Map a trigger to the trial class**
 
 Update that configuration's `from_task_template` so the trial's `TriggerType` instantiates the new class (the trigger
 may itself be new, as covered by "Adding a New Trigger Type"). A trigger that no branch handles raises, so every
 trigger the template can carry on this system needs a branch.
 
 ***Note,*** the import-time `_assert_experiment_configuration_contract` check confirms the contract fields and the
-`from_task_template` builder, but it does not verify the trial union or the trigger mapping. Cover a new trial class
-in the experiment-configuration tests.
+`from_task_template` builder, but it does not verify the trial-kind discriminator, the trial union, or the trigger
+mapping. Cover a new trial class in the experiment-configuration tests.
 
 ### Adding a New Trigger Type
 
@@ -503,7 +521,8 @@ than a routine extension. The import-time parity check (`_assert_registry_covera
 
 In `data_classes/`, add a new module holding the concrete on-disk representation as a dataclass inheriting from
 `YamlConfig` (use `data_classes/surgery_data.py`'s `SurgeryData` as reference). Contract modules export plain
-dataclasses and never consume the dispatch registries. Export the new class from `data_classes/__init__.py`.
+dataclasses and never consume the dispatch registries. Export the new class from `data_classes/__init__.py`, and
+re-export it from the top-level `src/sollertia_shared_assets/__init__.py` (and its `__all__`).
 
 **Step 2: Extend the ReadAssets enum**
 

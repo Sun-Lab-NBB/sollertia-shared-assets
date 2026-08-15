@@ -188,7 +188,7 @@ def test_get_projects_for_animal_returns_sorted_membership(tmp_path: Path) -> No
 
 
 def test_filter_sessions_preserves_input_when_no_filters_applied() -> None:
-    """Verifies that filter_sessions is a no-op when every filter is None / empty."""
+    """Verifies that filter_sessions is a no-op when every filter is left at its None default."""
     keys = {
         ("2026-03-01-12-00-00-000000", "1"),
         ("2026-03-05-12-00-00-000000", "2"),

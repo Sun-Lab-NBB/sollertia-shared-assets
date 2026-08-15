@@ -91,8 +91,12 @@ def get_data_root_overview_tool(
         ``name``, ``path``, ``animals``, ``session_count``, ``counts``, ``sessions_by_type``,
         ``experiment_count``, and ``dataset_count``. Each animals entry carries ``id``, ``session_paths``,
         ``session_count``, and ``counts``. The ``sessions`` list holds flat per-session entries suitable
-        for chaining into ``filter_sessions_tool``. The top-level ``counts`` mapping holds the
-        cross-project status tally, including errors.
+        for chaining into ``filter_sessions_tool``. Each ``sessions`` entry carries ``session_name``,
+        ``project``, ``animal``, ``session_type``, ``acquisition_system``, ``experiment_name``,
+        ``session_path``, ``raw_data_path``, ``processed_data_path``, ``status``, ``uninitialized``,
+        ``incomplete``, and ``has_processed_data``; a marker that fails to load instead carries
+        ``session_path``, ``marker``, ``status``, and ``error_detail``. The top-level ``counts`` mapping
+        holds the cross-project status tally, including errors.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -185,7 +189,8 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
     """Produces a per-session health and inventory report for each supplied session path.
 
     Each report carries an ``identity`` block (project, animal, session name, session type, acquisition
-    system, experiment name), lifecycle status, an existence flag for every canonical ``raw_data`` file and
+    system, experiment name), lifecycle status, an existence flag for every canonical ``raw_data`` asset, generic
+    and acquisition-system-specific alike (each classified as a file or a directory), and for
     every ``processed_data`` subdirectory (with paired processing-tracker presence), a ``required_assets``
     check (descriptor and system configuration always required; experiment configuration required when the
     session declares an experiment name, and VR configuration required for session types that use VR), and an
@@ -198,7 +203,11 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
 
     Returns:
         A response dict with ``sessions`` (per-session report dicts), ``total_sessions``, and
-        ``counts`` (status tally across the batch).
+        ``counts`` (status tally across the batch). Each report carries ``session_path``, ``identity``,
+        ``status``, ``uninitialized``, ``incomplete``, ``has_processed_data``, ``raw_data_files``
+        (``{field, path, scope, kind, exists}`` entries), ``processed_data_subdirs`` (same shape),
+        ``required_assets`` (``{name, path, present, required_for_session_type}`` entries), ``issues``,
+        and ``error_detail`` when a read failed.
     """
     reports: list[dict[str, Any]] = []
     counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
@@ -270,8 +279,9 @@ def filter_sessions_tool(
             falls back to the host machine's local time when False.
 
     Returns:
-        A response dict with the filtered ``sessions`` list, a ``session_paths`` list of eligible
-        session roots from the filtered subset, ``total_sessions`` / ``total_eligible`` counts, and
+        A response dict with the filtered ``sessions`` list, a ``session_paths`` list of the filtered
+        subset's session roots, sorted by path and excluding entries whose ``status`` is ``"error"`` or
+        that carry no ``session_path`` key, ``total_sessions`` / ``total_eligible`` counts, and
         an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``, each
         annotated with a ``filter_error`` field.
     """
@@ -738,7 +748,8 @@ def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict
     """Groups flat session entries into the ``projects -> animals -> sessions`` hierarchy.
 
     Error-status entries (whose identity could not be trusted from SessionData) are excluded from
-    aggregation; they remain in the top-level flat ``sessions`` list only. The returned per-project
+    aggregation, as are entries whose ``project`` or ``animal`` value is not a non-empty string; all of
+    them remain in the top-level flat ``sessions`` list only. The returned per-project
     dicts do not include filesystem-derived counts such as ``experiment_count`` or ``dataset_count``;
     callers obtain those via ``_count_project_experiments`` and ``_count_datasets_by_project``.
 

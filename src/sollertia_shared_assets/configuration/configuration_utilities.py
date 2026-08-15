@@ -56,8 +56,8 @@ def get_working_directory() -> Path:
         The path to the local working directory.
 
     Raises:
-        FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
-            currently configured directory does not exist at the expected path.
+        FileNotFoundError: If the local working directory has not been configured for the host-machine, if the cached
+            path record is empty, or if the currently configured directory does not exist at the expected path.
     """
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = application_directory.joinpath("working_directory_path.txt")
@@ -131,8 +131,8 @@ def get_data_root() -> Path:
         The path to the local data root, the directory under which all project directories are stored.
 
     Raises:
-        FileNotFoundError: If the local data root has not been configured for the host-machine, or if the currently
-            configured directory does not exist at the expected path.
+        FileNotFoundError: If the local data root has not been configured for the host-machine, if the cached path
+            record is empty, or if the currently configured directory does not exist at the expected path.
     """
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = application_directory.joinpath("data_root_path.txt")
@@ -217,8 +217,8 @@ def get_task_templates_directory() -> Path:
         The path to the task templates directory.
 
     Raises:
-        FileNotFoundError: If the task templates directory path has not been configured for the host-machine, or if
-            the previously configured directory does not exist at the expected path.
+        FileNotFoundError: If the task templates directory path has not been configured for the host-machine, if the
+            cached path record is empty, or if the previously configured directory does not exist at the expected path.
     """
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
     path_file = application_directory.joinpath("task_templates_directory_path.txt")

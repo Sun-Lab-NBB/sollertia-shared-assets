@@ -79,7 +79,7 @@ def test_trigger_type_values() -> None:
 
 
 def test_trigger_type_is_string_enum() -> None:
-    """Verifies that TriggerType inherits from StrEnum."""
+    """Verifies that every TriggerType member is usable as a plain string."""
     assert isinstance(TriggerType.INTERACTION, str)
     assert isinstance(TriggerType.COLLISION, str)
     assert isinstance(TriggerType.OCCUPANCY_DISARM, str)
@@ -349,7 +349,7 @@ def test_task_template_trial_references_unknown_cue_raises_error() -> None:
 def test_task_template_invalid_trial_name_raises_error() -> None:
     """Verifies that a trial name with characters outside [A-Za-z0-9_] raises ValueError.
 
-    Trial names are embedded verbatim in Unity-side ``<template>_<trial>.prefab`` segment filenames,
+    Trial names are embedded verbatim in Unity-side ``<template>-<trial>.prefab`` segment filenames,
     so any character that is unsafe in a filesystem path must be rejected at template load.
     """
     trial_structures = {
@@ -568,7 +568,7 @@ def test_task_template_duplicate_cue_sequence_raises_error() -> None:
 
 
 def test_collision_trial_skips_trigger_zone_validation() -> None:
-    """Verifies that a collision trial ignores trigger-zone bounds but still validates the boundary location."""
+    """Verifies that a collision trial ignores the trigger-zone bounds and the zone/boundary ordering check."""
     # Reversed zone bounds (end < start) are accepted because collision validates only the boundary location.
     trial_structures = {
         "trial1": TrialStructure(
@@ -601,7 +601,7 @@ def test_collision_trial_validates_boundary_location() -> None:
 
 
 def test_occupancy_trigger_trial_skips_boundary_validation() -> None:
-    """Verifies that an occupancy_trigger trial ignores the boundary location but still validates the zone."""
+    """Verifies that an occupancy_trigger trial accepts a stimulus_location outside the trial bounds."""
     # An out-of-bounds stimulus_location is accepted because occupancy_trigger fires on occupancy, with no boundary.
     trial_structures = {
         "trial1": TrialStructure(
@@ -636,7 +636,8 @@ def test_occupancy_trigger_trial_validates_zone() -> None:
 
 
 def test_task_template_helpers() -> None:
-    """Verifies the internal helpers of TaskTemplate."""
+    """Verifies the ``_cue_by_name`` index and the ``_get_trial_length_cm`` segment-length computation of
+    TaskTemplate."""
     template = _create_base_task_template()
 
     # Asserts directly on private members to lock in the derived-data contract exercised by __post_init__.
@@ -650,7 +651,8 @@ def test_task_template_helpers() -> None:
 
 
 def test_task_template_yaml_round_trip(tmp_path: Path) -> None:
-    """Verifies that TaskTemplate round-trips through YAML with every field preserved."""
+    """Verifies that TaskTemplate round-trips through YAML, preserving the cue count, the trial names, and the
+    environment cue offset."""
     template = _create_base_task_template()
 
     yaml_path = tmp_path / "task_template.yaml"

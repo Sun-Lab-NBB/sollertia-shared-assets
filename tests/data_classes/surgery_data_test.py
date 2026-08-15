@@ -118,7 +118,7 @@ def test_drug_data_initialization() -> None:
 
 
 def test_implant_data_initialization() -> None:
-    """Verifies that ImplantData stores every supplied field verbatim."""
+    """Verifies that ImplantData stores its name, target, and stereotactic coordinate fields verbatim."""
     implant = _make_implant()
 
     assert implant.implant == "5mm cranial window"
@@ -129,7 +129,7 @@ def test_implant_data_initialization() -> None:
 
 
 def test_injection_data_initialization() -> None:
-    """Verifies that InjectionData stores every supplied field verbatim."""
+    """Verifies that InjectionData stores its name, volume, and code fields verbatim."""
     injection = _make_injection()
 
     assert injection.injection == "AAV9-GCaMP6s"

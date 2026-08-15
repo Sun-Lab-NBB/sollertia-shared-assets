@@ -134,8 +134,8 @@ def test_assert_experiment_configuration_contract_raises_on_missing_field(monkey
 
         @classmethod
         def from_task_template(cls) -> object:
-            """Returns a stub configuration so only the missing unity_scene_name field trips the contract check,
-            which verifies callability without invoking the builder."""
+            """Returns a stub configuration; the contract check resolves callability and signature without
+            invoking it."""
             return cls(experiment_states={}, trial_structures={})
 
     monkeypatch.setattr(

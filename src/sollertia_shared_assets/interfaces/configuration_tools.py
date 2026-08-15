@@ -59,7 +59,8 @@ def get_platform_environment_status_tool() -> dict[str, Any]:
 
     Combines working directory, data root, templates directory, and per-category credentials status into a single
     report. Only the working directory is required for ``slsa mcp`` to function. The task templates directory is
-    needed only when authoring task templates or experiment configurations. Credentials are needed only by hosts
+    needed when authoring task templates or experiment configurations, and by ``SessionData.create()`` when it caches
+    the ``vr_configuration.yaml`` snapshot for an experiment session. Credentials are needed only by hosts
     that integrate with the corresponding external service (for example, Google credentials are used to read
     subject metadata from and write water-restriction logs to Google Sheets). ``overall_ok`` reflects the required
     components only — optional components contribute ``configured`` and ``ok`` per-component but do not gate the
@@ -344,7 +345,8 @@ def read_template_tool(file_path: str) -> dict[str, Any]:
 
     Notes:
         TaskTemplates live in two places. The **live** template at ``<templates-directory>/<name>.yaml`` is the
-        authoring surface managed via this skill and is shared across projects; ``discover_templates_tool`` returns
+        authoring surface managed via ``write_template_tool`` under the directory configured by
+        ``set_task_templates_directory_tool``, and is shared across projects; ``discover_templates_tool`` returns
         the absolute paths of every live template. The per-session **frozen snapshot** at
         ``<session>/raw_data/vr_configuration.yaml`` is the immutable copy cached by ``SessionData.create()`` at
         acquisition time and records the exact template active when the session was acquired. This tool reads either
@@ -413,7 +415,9 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
 
     Returns:
         A response dict with ``file_path``, ``valid``, and either ``summary`` (carrying ``cue_count``,
-        ``trial_count``, and ``cue_offset_cm``) or ``issues`` (a list of validation error messages).
+        ``trial_count``, and ``cue_offset_cm``) or ``issues`` (a list of validation error messages). When the file
+        does not exist, the tool instead returns the error envelope (``success`` false and ``error``) rather than a
+        ``valid`` verdict.
     """
     template_path = Path(file_path)
     if not template_path.exists():
@@ -549,8 +553,9 @@ def write_experiment_configuration_tool(
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
-            location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
-            implicitly by the sollertia-experiment session-creation flow; this tool does not create them.
+            location is ``<root>/<project>/configuration/<experiment>.yaml``. Any missing parent directories,
+            including the project and its ``configuration`` subdirectory, are created as needed. Use
+            ``create_project_tool`` to mint a project explicitly.
         acquisition_system: The ``AcquisitionSystems`` value identifying which experiment-configuration dataclass
             to validate against.
         configuration_payload: The complete experiment configuration payload.
@@ -599,8 +604,9 @@ def create_experiment_from_vr_template_tool(
 
     Args:
         file_path: Absolute path to the destination experiment configuration YAML file. Canonical per-project
-            location is ``<root>/<project>/configuration/<experiment>.yaml``. Project directories are created
-            implicitly by the sollertia-experiment session-creation flow; this tool does not create them.
+            location is ``<root>/<project>/configuration/<experiment>.yaml``. Any missing parent directories,
+            including the project and its ``configuration`` subdirectory, are created as needed. Use
+            ``create_project_tool`` to mint a project explicitly.
         acquisition_system: The ``AcquisitionSystems`` value whose experiment configuration is built from the
             template.
         template_path: Absolute path to the Unity VR task template YAML to instantiate. The embedded Unity scene
@@ -675,6 +681,8 @@ def validate_experiment_configuration_tool(file_path: str, acquisition_system: s
     Returns:
         A response dict with ``file_path``, ``acquisition_system``, ``valid``, and either ``summary`` (carrying the
         configuration's trial, state, and scene fields when present) or ``issues`` (a list of validation errors).
+        When the file does not exist, the tool instead returns the error envelope (``success`` false and ``error``)
+        rather than a ``valid`` verdict.
     """
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):

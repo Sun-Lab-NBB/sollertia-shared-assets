@@ -1,4 +1,5 @@
-"""Contains tests for the project-data-hierarchy assets provided by the ``data_hierarchy.project_hierarchy`` module."""
+"""Contains tests for the project-data-hierarchy assets provided by the ``data_hierarchy.project_hierarchy`` module
+and for the project / animal discovery walkers in ``data_hierarchy.session_discovery``."""
 
 from __future__ import annotations
 
@@ -111,7 +112,8 @@ def test_project_data_create(tmp_path: Path) -> None:
 
 
 def test_animal_data_path_resolution() -> None:
-    """Verifies that AnimalData resolves the animal, persistent-data, and session paths under the root."""
+    """Verifies that AnimalData resolves the animal, persistent-data, and session paths under the root and exposes
+    the parent ProjectData view."""
     animal = AnimalData(root=_LOCAL_ROOT, project_name="alpha", animal_id="mouse1")
 
     assert animal.path == _LOCAL_ROOT / "alpha" / "mouse1"
@@ -151,7 +153,8 @@ def test_discover_projects_markers_strategy(tmp_path: Path) -> None:
 
 
 def test_discover_projects_directories_strategy(tmp_path: Path) -> None:
-    """Verifies that the directories strategy lists project directories, including those without sessions."""
+    """Verifies that the directories strategy lists project directories, including those without sessions, and skips
+    hidden ones."""
     tmp_path.joinpath("alpha").mkdir()
     tmp_path.joinpath("beta").mkdir()
     tmp_path.joinpath(".hidden").mkdir()

@@ -98,7 +98,9 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
 
     Returns:
         A schema dict of shape ``{"class": <name>, "fields": {<field_name>: {"type", "default"|"required",
-        "nested"?}}}``, where ``nested`` recursively describes nested dataclass types.
+        "nested"?}}}``, where ``nested`` recursively describes nested dataclass types. A ``nested`` entry for a type
+        the recursion guard has already visited is ``{"class": <name>, "recursive_reference": True}`` instead, and
+        carries no ``fields`` key.
     """
 
     def _describe_inner(target: type, seen: frozenset[type]) -> dict[str, Any]:
@@ -207,7 +209,7 @@ def write_yaml_validated(
         return error_response(message=message)
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    # Keeps the temp file ending in .yaml because YamlConfig.from_yaml() rejects non-.yaml paths.
+    # Keeps the temp file ending in .yaml because YamlConfig.from_yaml() rejects any suffix other than .yaml or .yml.
     temp_path = file_path.with_name(f".{file_path.stem}.{uuid.uuid4().hex[:8]}.tmp.yaml")
 
     try:
@@ -275,13 +277,14 @@ def resolve_root_directory(root_directory: str) -> tuple[Path | None, dict[str, 
 
 
 def safe_iterdir(directory: Path) -> list[Path]:
-    """Returns immediate non-hidden children of a directory, ignoring permission errors.
+    """Returns immediate non-hidden children of a directory, ignoring filesystem errors.
 
     Args:
         directory: The directory whose children to list.
 
     Returns:
-        A list of non-hidden child paths, or an empty list if a permission error occurs.
+        A list of non-hidden child paths, or an empty list if the directory cannot be listed because it does not
+        exist, is not a directory, or is not readable.
     """
     try:
         return [child for child in directory.iterdir() if not child.name.startswith(".")]
