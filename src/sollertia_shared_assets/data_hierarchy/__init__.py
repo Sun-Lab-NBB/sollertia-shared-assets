@@ -1,6 +1,4 @@
-"""Provides assets for creating, discovering, and accessing the Sollertia platform project data hierarchy across all
-data acquisition and processing machines.
-"""
+"""Provides assets for creating, discovering, and accessing the Sollertia platform project data hierarchy."""
 
 from .dataset_data import (
     DatasetData,

@@ -21,8 +21,7 @@ class ExperimentState:
     state_duration_s: float
     """The time, in seconds, to maintain the experiment state while executing the experiment."""
     supports_trials: bool = True
-    """Determines whether trials are executed during this experiment state. When False, no trial-related processing
-    occurs during this phase."""
+    """Determines whether trials are executed during this experiment state."""
     reinforcing_initial_guided_trials: int = 0
     """The number of reinforcing trials after the onset of the experiment state that use the guidance mode."""
     reinforcing_recovery_failed_threshold: int = 0

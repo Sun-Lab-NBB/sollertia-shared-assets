@@ -15,17 +15,13 @@ from ataraxis_data_structures import YAML_EXCLUDE_METADATA
 
 from ..enums import SessionTypes
 from ..registries import DESCRIPTOR_REGISTRY
-from ..data_hierarchy import SessionData, RawDataFiles
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from ataraxis_data_structures import YamlConfig
 
-UNINITIALIZED_SESSION_MARKER: str = RawDataFiles.NK_MARKER.value
-"""Marker file present in ``raw_data`` while a session is uninitialized and holds no data of value, making it a valid
-purge target. Distinct from the descriptor's ``incomplete`` field, which marks an initialized session that hit a
-runtime issue but still holds usable data."""
+    from ..data_hierarchy import SessionData
 
 mcp: MCPServer = MCPServer(name="sollertia-shared-assets")
 """The shared MCP server instance on which all tool modules register their tools via ``@mcp.tool()``."""
@@ -75,15 +71,6 @@ def serialize(value: Any) -> Any:
     if isinstance(value, (list, tuple, set, frozenset)):
         return [serialize(value=item) for item in value]
     return value
-
-
-def _describe_type(type_hint: Any) -> str:
-    """Returns a human-readable string for the given type hint."""
-    if type_hint is None:
-        return "None"
-    if isinstance(type_hint, type):
-        return type_hint.__name__
-    return str(type_hint).replace("typing.", "")
 
 
 def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
@@ -142,10 +129,9 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
 def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> dict[str, type]:
     """Returns the dataclass types referenced by a dataclass's fields, keyed by class name.
 
-    Walks each field's type hint one level deep, unwrapping container and union arguments (for example, the value
-    type of a ``dict`` or the members of an ``A | B`` union) to collect the dataclass types it references. When
-    ``field_name`` is provided, only that field is inspected, and an absent field yields no types. Schema
-    introspection tools use this to describe a configuration's actual nested structure instead of hardcoding it.
+    Walks each field's type hint one level deep, unwrapping container and union arguments (for example, the value type
+    of a ``dict`` or the members of an ``A | B`` union) to collect the dataclass types it references. When
+    ``field_name`` is provided, only that field is inspected, and an absent field yields no types.
 
     Args:
         cls: The dataclass type to inspect.
@@ -155,13 +141,13 @@ def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> di
         A mapping of class name to dataclass type for every dataclass referenced by the inspected field(s).
     """
 
-    def _iter(type_hint: Any) -> Iterator[type]:
+    def _iterate_types(type_hint: Any) -> Iterator[type]:
         if isinstance(type_hint, type):
             if is_dataclass(type_hint):
                 yield type_hint
             return
         for argument in get_args(type_hint):
-            yield from _iter(type_hint=argument)
+            yield from _iterate_types(type_hint=argument)
 
     try:
         hints = get_type_hints(cls)
@@ -171,7 +157,7 @@ def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> di
         hints = {field_name: hints[field_name]} if field_name in hints else {}
     collected: dict[str, type] = {}
     for hint in hints.values():
-        for candidate in _iter(type_hint=hint):
+        for candidate in _iterate_types(type_hint=hint):
             collected.setdefault(candidate.__name__, candidate)
     return collected
 
@@ -295,19 +281,18 @@ def safe_iterdir(directory: Path) -> list[Path]:
 def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str | None]:
     """Loads the session's descriptor YAML and returns its ``incomplete`` field.
 
-    Resolves the correct descriptor dataclass from the session's ``session_type`` via
-    ``DESCRIPTOR_REGISTRY`` and parses the descriptor at ``<session>/raw_data/session_descriptor.yaml``.
-    The descriptor's ``incomplete`` field is distinct from the ``nk.bin`` uninitialized marker: it
-    indicates that the session ran to completion but encountered issues that may have left data gaps,
-    while ``nk.bin`` indicates the session was never initialized at all.
+    Resolves the correct descriptor dataclass from the session's ``session_type`` via ``DESCRIPTOR_REGISTRY`` and
+    parses the descriptor at ``<session>/raw_data/session_descriptor.yaml``. The descriptor's ``incomplete`` field is
+    distinct from the ``nk.bin`` uninitialized marker: it indicates that the session ran to completion but encountered
+    issues that may have left data gaps, while ``nk.bin`` indicates the session was never initialized at all.
 
     Args:
         session: The SessionData instance whose descriptor to load.
 
     Returns:
-        A tuple of ``(incomplete, error_message)``. On success, ``incomplete`` is the boolean value
-        of the descriptor's ``incomplete`` field and ``error_message`` is None. On failure,
-        ``incomplete`` is None and ``error_message`` describes the failure.
+        A tuple of ``(incomplete, error_message)``. On success, ``incomplete`` is the boolean value of the descriptor's
+        ``incomplete`` field and ``error_message`` is None. On failure, ``incomplete`` is None and ``error_message``
+        describes the failure.
     """
     descriptor_class = DESCRIPTOR_REGISTRY[SessionTypes(session.session_type)]
     descriptor_path = session.raw_data.session_descriptor_path
@@ -318,3 +303,12 @@ def read_descriptor_incomplete(session: SessionData) -> tuple[bool | None, str |
     except Exception as exception:
         return None, str(exception)
     return bool(descriptor.incomplete), None  # type: ignore[attr-defined]
+
+
+def _describe_type(type_hint: Any) -> str:
+    """Returns a human-readable string for the given type hint."""
+    if type_hint is None:
+        return "None"
+    if isinstance(type_hint, type):
+        return type_hint.__name__
+    return str(type_hint).replace("typing.", "")

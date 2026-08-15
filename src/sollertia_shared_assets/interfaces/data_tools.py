@@ -51,14 +51,14 @@ class _SessionStatusInfo:
     """Carries the lifecycle-status signals computed from a loaded ``SessionData`` instance."""
 
     status: str
-    """The coarse lifecycle status; one of the values in ``_STATUS_KEYS``."""
+    """The coarse lifecycle status, one of the values in ``_STATUS_KEYS``."""
     uninitialized: bool
-    """Indicates whether the ``nk.bin`` uninitialized marker is present in the session's raw_data."""
+    """Determines whether the ``nk.bin`` uninitialized marker is present in the session's raw_data."""
     incomplete: bool | None
     """The descriptor's ``incomplete`` field, or None when the session is uninitialized or the descriptor
     read failed."""
     has_processed_data: bool
-    """Indicates whether the session's ``processed_data`` directory exists and is non-empty."""
+    """Determines whether the session's ``processed_data`` directory exists and is non-empty."""
     error_detail: str | None
     """Human-readable detail when the descriptor read failed, otherwise None."""
 
@@ -69,10 +69,9 @@ def get_data_root_overview_tool(
 ) -> dict[str, Any]:
     """Walks the data root and groups loadable ``session_data.yaml`` markers into a project / animal / session tree.
 
-    Sessions are bucketed by their SessionData identity fields, not by directory structure, so stray
-    directories cannot surface as phantom projects. Markers that fail to load appear in the flat
-    ``sessions`` list with ``status="error"`` and an ``error_detail`` field, but do not contribute to
-    project or animal aggregation.
+    Sessions are bucketed by their SessionData identity fields, not by directory structure, so stray directories cannot
+    surface as phantom projects. Markers that fail to load appear in the flat ``sessions`` list with ``status="error"``
+    and an ``error_detail`` field, but do not contribute to project or animal aggregation.
 
     The ``strategy`` argument controls whether empty hierarchies surface. The ``markers`` strategy reports only
     projects and animals that hold at least one loadable session. The ``directories`` strategy additionally walks
@@ -87,22 +86,22 @@ def get_data_root_overview_tool(
 
     Returns:
         A response dict with top-level keys ``projects``, ``sessions``, ``counts``, ``total_projects``,
-        ``total_animals``, ``total_sessions``, and ``root_directory``. Each ``projects`` entry carries
-        ``name``, ``path``, ``animals``, ``session_count``, ``counts``, ``sessions_by_type``,
-        ``experiment_count``, and ``dataset_count``. Each animals entry carries ``id``, ``session_paths``,
-        ``session_count``, and ``counts``. The ``sessions`` list holds flat per-session entries suitable
-        for chaining into ``filter_sessions_tool``. Each ``sessions`` entry carries ``session_name``,
-        ``project``, ``animal``, ``session_type``, ``acquisition_system``, ``experiment_name``,
-        ``session_path``, ``raw_data_path``, ``processed_data_path``, ``status``, ``uninitialized``,
-        ``incomplete``, and ``has_processed_data``; a marker that fails to load instead carries
-        ``session_path``, ``marker``, ``status``, and ``error_detail``. The top-level ``counts`` mapping
-        holds the cross-project status tally, including errors.
+        ``total_animals``, ``total_sessions``, and ``root_directory``. Each ``projects`` entry carries ``name``,
+        ``path``, ``animals``, ``session_count``, ``counts``, ``sessions_by_type``, ``experiment_count``, and
+        ``dataset_count``. Each ``animals`` entry carries ``id``, ``session_paths``, ``session_count``, and ``counts``.
+        The ``sessions`` list holds flat per-session entries suitable for chaining into ``filter_sessions_tool``. Each
+        ``sessions`` entry carries ``session_name``, ``project``, ``animal``, ``session_type``, ``acquisition_system``,
+        ``experiment_name``, ``session_path``, ``raw_data_path``, ``processed_data_path``, ``status``,
+        ``uninitialized``, ``incomplete``, and ``has_processed_data``. A marker that fails to load instead carries
+        ``session_path``, ``marker``, ``status``, and ``error_detail``. The top-level ``counts`` mapping holds the
+        cross-project status tally, including errors.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
         return error
     if root is None:
-        return error_response(message=f"Unable to resolve the data root from {root_directory}.")
+        message = f"Unable to resolve the data root from {root_directory}."
+        return error_response(message=message)
 
     flat_sessions: list[dict[str, Any]] = []
     top_counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
@@ -117,14 +116,13 @@ def get_data_root_overview_tool(
             marker_names=(RawDataFiles.SESSION_DATA, DATASET_MARKER_FILENAME),
         )
     except OSError as exception:
-        return error_response(
-            message=f"Unable to scan the data root {root} for session and dataset markers: {exception}"
-        )
+        message = f"Unable to scan the data root {root} for session and dataset markers: {exception}"
+        return error_response(message=message)
 
     dataset_counts = _count_datasets_by_project(root=root, markers=marker_index[DATASET_MARKER_FILENAME])
 
-    # Walks every session marker under the root. Broken markers produce error-status entries but do
-    # not corrupt the project / animal aggregation because their identity cannot be trusted.
+    # Walks every session marker under the root. Broken markers produce error-status entries but do not corrupt the
+    # project / animal aggregation because their identity cannot be trusted.
     for marker in marker_index[RawDataFiles.SESSION_DATA]:
         session_root = get_session_root_from_marker(marker=marker)
         try:
@@ -188,26 +186,27 @@ def get_data_root_overview_tool(
 def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
     """Produces a per-session health and inventory report for each supplied session path.
 
-    Each report carries an ``identity`` block (project, animal, session name, session type, acquisition
-    system, experiment name), lifecycle status, an existence flag for every canonical ``raw_data`` asset, generic
-    and acquisition-system-specific alike (each classified as a file or a directory), and for
-    every ``processed_data`` subdirectory (with paired processing-tracker presence), a ``required_assets``
-    check (descriptor and system configuration always required; experiment configuration required when the
-    session declares an experiment name, and VR configuration required for session types that use VR), and an
-    ``issues`` list summarizing any missing required assets. Paths that fail to
-    resolve or load surface with ``status="error"`` and an ``error_detail`` field without aborting the batch.
+    Each report carries an ``identity`` block (project, animal, session name, session type, acquisition system,
+    experiment name) and the session's lifecycle status. It also carries an existence flag for every canonical
+    ``raw_data`` asset, generic and acquisition-system-specific alike, each classified as a file or a directory. The
+    same existence flag is reported for every ``processed_data`` subdirectory, together with the presence of the
+    paired processing tracker. Finally, each report carries a ``required_assets`` check (descriptor and system
+    configuration always required, experiment configuration required when the session declares an experiment name,
+    and VR configuration required for session types that use VR) and an ``issues`` list summarizing any missing
+    required assets. Paths that fail to resolve or load surface with ``status="error"`` and an ``error_detail``
+    field without aborting the batch.
 
     Args:
-        session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a
-            single-element list to inspect one session.
+        session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a single-element list
+            to inspect one session.
 
     Returns:
-        A response dict with ``sessions`` (per-session report dicts), ``total_sessions``, and
-        ``counts`` (status tally across the batch). Each report carries ``session_path``, ``identity``,
-        ``status``, ``uninitialized``, ``incomplete``, ``has_processed_data``, ``raw_data_files``
-        (``{field, path, scope, kind, exists}`` entries), ``processed_data_subdirs`` (same shape),
-        ``required_assets`` (``{name, path, present, required_for_session_type}`` entries), ``issues``,
-        and ``error_detail`` when a read failed.
+        A response dict with ``sessions`` (per-session report dicts), ``total_sessions``, and ``counts`` (status tally
+        across the batch). Each report carries ``session_path``, ``identity``, ``status``, ``uninitialized``,
+        ``incomplete``, ``has_processed_data``, ``raw_data_files`` (``{field, path, scope, kind, exists}`` entries),
+        ``processed_data_subdirs`` (same shape), ``required_assets``
+        (``{name, path, present, required_for_session_type}`` entries), ``issues``, and ``error_detail`` when a read
+        failed.
     """
     reports: list[dict[str, Any]] = []
     counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
@@ -259,31 +258,30 @@ def filter_sessions_tool(
 ) -> dict[str, Any]:
     """Filters a list of session entries by date range and inclusion-exclusion criteria.
 
-    Designed to chain after ``get_data_root_overview_tool``: pass its ``sessions`` list and receive
-    a filtered subset with the same structure. Animal filters apply before session filters;
-    exclusions take precedence over inclusions.
+    Designed to chain after ``get_data_root_overview_tool``: pass its ``sessions`` list and receive a filtered
+    subset with the same structure. Animal filters apply before session filters. Exclusions take precedence over
+    inclusions.
 
     Args:
-        sessions: Session entry dictionaries, each containing at least ``session_name`` and
-            ``animal`` keys. Typically, the ``sessions`` list returned by ``get_data_root_overview_tool``.
-        start_date: Lower bound (inclusive). Accepts ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``.
-            None disables the lower bound.
-        end_date: Upper bound (inclusive). Date-only values include the entire day. None disables
-            the upper bound.
-        include_sessions: Session names to include regardless of the date range, unless overridden
-            by ``exclude_sessions``.
+        sessions: Session entry dictionaries, each containing at least ``session_name`` and ``animal`` keys. Typically,
+            the ``sessions`` list returned by ``get_data_root_overview_tool``.
+        start_date: Lower bound (inclusive). Accepts ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``. None disables the lower
+            bound.
+        end_date: Upper bound (inclusive). Date-only values include the entire day. None disables the upper bound.
+        include_sessions: Session names to include regardless of the date range, unless overridden by
+            ``exclude_sessions``.
         exclude_sessions: Session names to exclude. Takes precedence over all inclusion criteria.
         include_animals: When provided, only sessions from these animal IDs are considered.
         exclude_animals: Animal IDs to exclude. Takes precedence over ``include_animals``.
-        utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC;
-            falls back to the host machine's local time when False.
+        utc_timezone: Determines whether to interpret date boundaries and session timestamps in UTC. Falls back to
+            the host machine's local time when False.
 
     Returns:
-        A response dict with the filtered ``sessions`` list, a ``session_paths`` list of the filtered
-        subset's session roots, sorted by path and excluding entries whose ``status`` is ``"error"`` or
-        that carry no ``session_path`` key, ``total_sessions`` / ``total_eligible`` counts, and
-        an optional ``invalid_entries`` key listing entries missing ``session_name`` or ``animal``, each
-        annotated with a ``filter_error`` field.
+        A response dict with the filtered ``sessions`` list and a ``session_paths`` list of the filtered subset's
+        session roots. The ``session_paths`` list is sorted by path and excludes entries whose ``status`` is ``"error"``
+        and entries that carry no ``session_path`` key. The response also carries the ``total_sessions`` and
+        ``total_eligible`` counts, together with an optional ``invalid_entries`` key listing entries missing
+        ``session_name`` or ``animal``, each annotated with a ``filter_error`` field.
     """
     # Groups the input entries under their (session_name, animal) identity, which both keys the filter helper's plain
     # tuple input and rehydrates the results. A single structure cannot disagree with itself about which entries an
@@ -347,7 +345,7 @@ def read_session_data_tool(file_path: str) -> dict[str, Any]:
     """Parses a ``session_data.yaml`` file and returns its serialized ``SessionData`` payload.
 
     For session discovery or lifecycle-status decisions, prefer ``get_data_root_overview_tool`` or
-    ``inspect_sessions_tool`` instead — this tool only parses the marker file.
+    ``inspect_sessions_tool`` instead. This tool only parses the marker file.
 
     Args:
         file_path: Absolute path to the ``session_data.yaml`` file. Canonical location is
@@ -368,8 +366,8 @@ def write_session_data_tool(
 ) -> dict[str, Any]:
     """Validates ``session_data_payload`` against ``SessionData`` and writes it to ``file_path``.
 
-    Intended for agent-driven repair of a corrupted or missing session marker. The primary
-    on-disk copy is normally authored by the acquisition runtime via ``SessionData.create``.
+    Intended for agent-driven repair of a corrupted or missing session marker. The primary on-disk copy is normally
+    authored by the acquisition runtime via ``SessionData.create``.
 
     Args:
         file_path: Absolute path to the destination ``session_data.yaml``. Canonical location is
@@ -435,13 +433,13 @@ def list_processing_trackers_tool() -> dict[str, Any]:
 def read_session_descriptor_tool(file_path: str, session_type: str) -> dict[str, Any]:
     """Loads a session descriptor YAML, parsing it with the dataclass that matches ``session_type``.
 
-    The descriptor filename is always ``session_descriptor.yaml`` — only the parsing class varies, so
+    The descriptor filename is always ``session_descriptor.yaml``. Only the parsing class varies, so
     ``session_type`` must be supplied. Use ``list_supported_session_types_tool`` to enumerate valid values.
 
     Args:
         file_path: Absolute path to the descriptor YAML. Canonical location is
             ``<session>/raw_data/session_descriptor.yaml``.
-        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use; see
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to use. See
             ``list_supported_session_types_tool`` for the supported values.
 
     Returns:
@@ -473,14 +471,14 @@ def write_session_descriptor_tool(
     Args:
         file_path: Absolute path to the destination descriptor YAML. Canonical location is
             ``<session>/raw_data/session_descriptor.yaml``.
-        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate
-            against; see ``list_supported_session_types_tool`` for the supported values.
+        session_type: The ``SessionTypes`` value identifying which descriptor dataclass to validate against. See
+            ``list_supported_session_types_tool`` for the supported values.
         descriptor_payload: The complete descriptor payload matching the schema for ``session_type``.
         overwrite: Determines whether to overwrite an existing file.
 
     Returns:
-        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``,
-        and ``session_type``.
+        A response dict with ``file_path``, ``data`` (the validated payload), ``descriptor_class``, and
+        ``session_type``.
     """
     resolved = _resolve_descriptor_class(session_type=session_type)
     if isinstance(resolved, dict):
@@ -505,8 +503,8 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
         session_type: The ``SessionTypes`` value to describe.
 
     Returns:
-        A response dict with ``session_type`` (the validated enum value) and ``schema`` (the
-        descriptor dataclass field schema).
+        A response dict with ``session_type`` (the validated enum value) and ``schema`` (the descriptor dataclass field
+        schema).
     """
     resolved = _resolve_descriptor_class(session_type=session_type)
     if isinstance(resolved, dict):
@@ -521,19 +519,18 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
 def read_session_hardware_state_tool(file_path: str, acquisition_system: str) -> dict[str, Any]:
     """Loads a hardware-state YAML, parsing it with the dataclass that matches ``acquisition_system``.
 
-    The hardware-state filename is always ``hardware_state.yaml`` — only the parsing class varies, so
-    ``acquisition_system`` must be supplied. Use ``list_supported_acquisition_systems_tool`` to
-    enumerate valid values.
+    The hardware-state filename is always ``hardware_state.yaml``. Only the parsing class varies, so
+    ``acquisition_system`` must be supplied. Use ``list_supported_acquisition_systems_tool`` to enumerate valid
+    values.
 
     Args:
         file_path: Absolute path to the hardware-state YAML. Canonical location is
             ``<session>/raw_data/hardware_state.yaml``.
-        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state
-            dataclass to use.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state dataclass to use.
 
     Returns:
-        A response dict with ``data`` (the hardware-state payload), ``hardware_state_class``,
-        ``acquisition_system``, and ``file_path``.
+        A response dict with ``data`` (the hardware-state payload), ``hardware_state_class``, ``acquisition_system``,
+        and ``file_path``.
     """
     resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
@@ -560,8 +557,8 @@ def write_session_hardware_state_tool(
     Args:
         file_path: Absolute path to the destination hardware-state YAML. Canonical location is
             ``<session>/raw_data/hardware_state.yaml``.
-        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state
-            dataclass to validate against.
+        acquisition_system: The ``AcquisitionSystems`` value identifying which hardware-state dataclass to validate
+            against.
         hardware_state_payload: The complete hardware-state payload.
         overwrite: Determines whether to overwrite an existing file.
 
@@ -594,8 +591,8 @@ def describe_session_hardware_state_schema_tool(acquisition_system: str) -> dict
         acquisition_system: The ``AcquisitionSystems`` value to describe.
 
     Returns:
-        A response dict with ``acquisition_system`` (the validated enum value) and ``schema``
-        (the hardware-state dataclass field schema).
+        A response dict with ``acquisition_system`` (the validated enum value) and ``schema`` (the hardware-state
+        dataclass field schema).
     """
     resolved = _resolve_hardware_state_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
@@ -695,8 +692,8 @@ def describe_data_asset_schema_tool(data_asset: str) -> dict[str, Any]:
 def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
     """Derives lifecycle status for a loaded ``SessionData`` using the canonical two-signal model.
 
-    Combines the ``nk.bin`` uninitialized marker, the descriptor's ``incomplete`` flag, and the
-    processed_data directory population to project a coarse status. Status priority is
+    Combines the ``nk.bin`` uninitialized marker, the descriptor's ``incomplete`` flag, and the processed_data directory
+    population to project a coarse status. Status priority is
     ``uninitialized > error > incomplete > processed > acquired``.
 
     Args:
@@ -747,15 +744,14 @@ def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
 def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Groups flat session entries into the ``projects -> animals -> sessions`` hierarchy.
 
-    Error-status entries (whose identity could not be trusted from SessionData) are excluded from
-    aggregation, as are entries whose ``project`` or ``animal`` value is not a non-empty string; all of
-    them remain in the top-level flat ``sessions`` list only. The returned per-project
-    dicts do not include filesystem-derived counts such as ``experiment_count`` or ``dataset_count``;
-    callers obtain those via ``_count_project_experiments`` and ``_count_datasets_by_project``.
+    Error-status entries (whose identity could not be trusted from SessionData) are excluded from aggregation, as
+    are entries whose ``project`` or ``animal`` value is not a non-empty string. All of them remain in the
+    top-level flat ``sessions`` list only. The returned per-project dicts do not include filesystem-derived counts
+    such as ``experiment_count`` or ``dataset_count``.
 
     Args:
         root: The resolved data root path used to construct each project's reported ``path``.
-        sessions: Flat per-session entries produced by ``get_data_root_overview_tool``.
+        sessions: The flat per-session entries to group, each keyed by its ``project`` and ``animal`` identity.
 
     Returns:
         A list of per-project aggregate dicts sorted by project name.
@@ -906,22 +902,24 @@ def _count_datasets_by_project(root: Path, markers: tuple[Path, ...]) -> dict[st
 def _build_session_report(instance: SessionData, session_root: Path) -> dict[str, Any]:
     """Produces a per-session inspection report from a loaded ``SessionData`` instance.
 
-    Enumerates every canonical ``raw_data`` file and ``processed_data`` subdirectory exposed by
-    ``SessionData``, checks the required-asset set for the session's type, and attaches the same
-    lifecycle status that ``get_data_root_overview_tool`` computes.
+    Enumerates every canonical ``raw_data`` file and ``processed_data`` subdirectory exposed by ``SessionData``,
+    checks the required-asset set for the session's type, and attaches the same lifecycle status that
+    ``get_data_root_overview_tool`` computes.
 
     Args:
         instance: The loaded ``SessionData`` instance.
         session_root: The resolved session root directory.
 
     Returns:
-        A per-session report dict.
+        A report dict with ``session_path``, ``identity``, ``status``, ``uninitialized``, ``incomplete``,
+        ``has_processed_data``, ``raw_data_files``, ``processed_data_subdirs``, ``required_assets``, and ``issues``
+        keys, and an ``error_detail`` key when the descriptor read failed.
     """
     session_type = SessionTypes(instance.session_type)
     status_info = _compute_session_status(instance=instance)
 
     raw_data_files = _raw_data_inventory(instance=instance)
-    processed_data_subdirs = _processed_data_inventory(instance=instance)
+    processed_data_subdirectories = _processed_data_inventory(instance=instance)
     required_assets = _required_asset_inventory(instance=instance, session_type=session_type)
     issues = [
         f"Missing required {asset['name']} at {asset['path']}" for asset in required_assets if not asset["present"]
@@ -942,7 +940,7 @@ def _build_session_report(instance: SessionData, session_root: Path) -> dict[str
         "incomplete": status_info.incomplete,
         "has_processed_data": status_info.has_processed_data,
         "raw_data_files": raw_data_files,
-        "processed_data_subdirs": processed_data_subdirs,
+        "processed_data_subdirs": processed_data_subdirectories,
         "required_assets": required_assets,
         "issues": issues,
     }
@@ -954,27 +952,34 @@ def _build_session_report(instance: SessionData, session_root: Path) -> dict[str
 def _raw_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
     """Returns the existence and classification of every canonical asset under the session's ``raw_data`` directory.
 
-    Iterates ``dataclasses.fields()`` over ``instance.raw_data`` (generic raw assets) and
-    ``instance.system_raw_data`` (acquisition-system-specific raw assets) so that new fields and new system
-    extensions are picked up automatically without per-class hardcoding here.
+    Iterates ``dataclasses.fields()`` over ``instance.raw_data`` (generic raw assets) and ``instance.system_raw_data``
+    (acquisition-system-specific raw assets) so that new fields and new system extensions are picked up automatically
+    without per-class hardcoding here.
 
     Args:
-        instance: A loaded ``SessionData`` instance with sub-dataclass attributes populated by
-            ``_build_sub_dataclasses``.
+        instance: A loaded ``SessionData`` instance whose ``raw_data`` and ``system_raw_data`` sub-dataclasses hold the
+            canonical raw-data asset paths.
 
     Returns:
         A list of ``{field, path, scope, kind, exists}`` dicts. ``scope`` is ``"generic"`` for fields read off
-        ``raw_data`` and ``"system"`` for fields read off ``system_raw_data``. ``kind`` is ``"file"`` for paths
-        that carry a filename suffix and ``"directory"`` otherwise.
+        ``raw_data`` and ``"system"`` for fields read off ``system_raw_data``. ``kind`` is ``"file"`` for paths that
+        carry a filename suffix and ``"directory"`` otherwise.
     """
-    inventory: list[dict[str, Any]] = []
-    for field_definition in fields(instance.raw_data):
-        path = getattr(instance.raw_data, field_definition.name)
-        inventory.append(_inventory_entry(scope="generic", field_name=field_definition.name, path=path))
-    for field_definition in fields(instance.system_raw_data):
-        path = getattr(instance.system_raw_data, field_definition.name)
-        inventory.append(_inventory_entry(scope="system", field_name=field_definition.name, path=path))
-    return inventory
+    return [
+        _inventory_entry(
+            scope="generic",
+            field_name=field_definition.name,
+            path=getattr(instance.raw_data, field_definition.name),
+        )
+        for field_definition in fields(instance.raw_data)
+    ] + [
+        _inventory_entry(
+            scope="system",
+            field_name=field_definition.name,
+            path=getattr(instance.system_raw_data, field_definition.name),
+        )
+        for field_definition in fields(instance.system_raw_data)
+    ]
 
 
 def _processed_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
@@ -985,8 +990,8 @@ def _processed_data_inventory(instance: SessionData) -> list[dict[str, Any]]:
     picked up automatically without per-pipeline hardcoding here.
 
     Args:
-        instance: A loaded ``SessionData`` instance with sub-dataclass attributes populated by
-            ``_build_sub_dataclasses``.
+        instance: A loaded ``SessionData`` instance whose ``processed_data`` sub-dataclass holds the canonical
+            processed-data asset paths.
 
     Returns:
         A list of ``{field, path, scope, kind, exists}`` dicts. ``scope`` is always ``"generic"``. ``kind`` is
@@ -1051,16 +1056,15 @@ def _required_asset_inventory(instance: SessionData, session_type: SessionTypes)
 def _resolve_descriptor_class(session_type: str) -> type[YamlConfig] | dict[str, Any]:
     """Resolves a ``session_type`` string to its registered descriptor dataclass.
 
-    Validates the value against the ``SessionTypes`` enum and then looks up the corresponding class
-    in ``DESCRIPTOR_REGISTRY``. Returns an error response dict when the value is not a valid session
-    type.
+    Validates the value against the ``SessionTypes`` enum and then looks up the corresponding class in
+    ``DESCRIPTOR_REGISTRY``. Returns an error response dict when the value is not a valid session type.
 
     Args:
         session_type: The ``SessionTypes`` value supplied by the caller.
 
     Returns:
-        The resolved descriptor dataclass on success, or an error response dict on failure. Callers
-        discriminate via ``isinstance(result, dict)``.
+        The resolved descriptor dataclass on success, or an error response dict on failure. Callers discriminate via
+        ``isinstance(result, dict)``.
     """
     try:
         session_type_enum = SessionTypes(session_type)
@@ -1077,16 +1081,16 @@ def _resolve_descriptor_class(session_type: str) -> type[YamlConfig] | dict[str,
 def _resolve_hardware_state_class(acquisition_system: str) -> type[YamlConfig] | dict[str, Any]:
     """Resolves an ``acquisition_system`` string to its registered hardware-state dataclass.
 
-    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding
-    class in ``HARDWARE_STATE_REGISTRY``. Returns an error response dict when the value is not a
-    valid acquisition system or when no hardware-state class has been registered for that system yet.
+    Validates the value against the ``AcquisitionSystems`` enum and then looks up the corresponding class in
+    ``HARDWARE_STATE_REGISTRY``. Returns an error response dict when the value is not a valid acquisition system or when
+    no hardware-state class has been registered for that system yet.
 
     Args:
         acquisition_system: The ``AcquisitionSystems`` value supplied by the caller.
 
     Returns:
-        The resolved hardware-state dataclass on success, or an error response dict on failure.
-        Callers discriminate via ``isinstance(result, dict)``.
+        The resolved hardware-state dataclass on success, or an error response dict on failure. Callers discriminate via
+        ``isinstance(result, dict)``.
     """
     try:
         acquisition_enum = AcquisitionSystems(acquisition_system)
@@ -1119,8 +1123,8 @@ def _resolve_read_asset_class(data_asset: str) -> type[YamlConfig] | dict[str, A
         data_asset: The ``ReadAssets`` value supplied by the caller.
 
     Returns:
-        The resolved read-asset dataclass on success, or an error response dict on failure. Callers
-        discriminate via ``isinstance(result, dict)``.
+        The resolved read-asset dataclass on success, or an error response dict on failure. Callers discriminate via
+        ``isinstance(result, dict)``.
     """
     try:
         read_asset_enum = ReadAssets(data_asset)

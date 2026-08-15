@@ -15,9 +15,9 @@ from sollertia_shared_assets import (
     AcquisitionSystems,
 )
 
-# A representative column-description binding, passed to nearly every create() call; the empty-mapping test passes
-# {} instead. The mapping is intentionally small;
-# the assembly worker that produces the real mapping lives in the acquisition-system packages, not in slsa.
+# A representative column-description binding, passed to nearly every create() call. The empty-mapping test passes {}
+# instead. The mapping is intentionally small. The assembly worker that produces the real mapping lives in the
+# acquisition-system packages.
 COLUMN_DESCRIPTIONS: dict[str, str] = {
     "time_us": "Microsecond-precision sample timestamps from the acquisition reference clock.",
     "lick": "Lick sensor state at each sample.",
@@ -27,10 +27,7 @@ COLUMN_DESCRIPTIONS: dict[str, str] = {
 
 
 def test_dataset_session_default_initialization() -> None:
-    """Verifies default initialization of DatasetSession.
-
-    This test ensures session_path defaults to an empty Path() when not provided.
-    """
+    """Verifies that DatasetSession.session_path defaults to an empty Path()."""
     dataset_session = DatasetSession(session="2024-01-15-12-30-45-123456", animal="test_animal")
 
     assert dataset_session.session == "2024-01-15-12-30-45-123456"
@@ -39,10 +36,7 @@ def test_dataset_session_default_initialization() -> None:
 
 
 def test_dataset_session_is_frozen() -> None:
-    """Verifies that DatasetSession instances are immutable.
-
-    This test ensures attempting to modify a DatasetSession field raises an error.
-    """
+    """Verifies that DatasetSession instances are immutable."""
     dataset_session = DatasetSession(
         session="2024-01-15-12-30-45-123456",
         animal="test_animal",
@@ -718,7 +712,7 @@ def test_dataset_data_verify_data_descriptions_passes_when_all_columns_described
 def test_dataset_data_verify_data_descriptions_allows_unused_descriptions(tmp_path: Path) -> None:
     """Verifies the check is one-directional: a described column no session emits is permitted."""
     dataset_data = _make_dataset(tmp_path, COLUMN_DESCRIPTIONS)
-    # Emits only a subset of the described columns; the unused 'lick' description must not trigger a violation.
+    # Emits only a subset of the described columns. The unused 'lick' description must not trigger a violation.
     _write_session_data(dataset_data, ("time_us",))
 
     dataset_data.verify_data_descriptions()

@@ -26,7 +26,7 @@ _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 
 
 @click.group("slsa", context_settings=_CONTEXT_SETTINGS)
-def slsa_cli() -> None:  # pragma: no cover
+def slsa_cli() -> None:
     """Provides the entry point for all interactive sollertia-shared-assets library components."""
 
 
@@ -39,7 +39,7 @@ def slsa_cli() -> None:  # pragma: no cover
     show_default=True,
     help="The MCP transport type to use.",
 )
-def run_mcp_server(transport: Literal["stdio", "streamable-http"]) -> None:  # pragma: no cover
+def run_mcp_server(transport: Literal["stdio", "streamable-http"]) -> None:
     """Starts the MCP server for agentic configuration management."""
     # The stdio transport carries the JSON-RPC message stream over stdout, which is also where the console writes
     # every message up to the WARNING level. Silencing the console keeps library output out of that stream, as a
@@ -56,18 +56,18 @@ def run_mcp_server(transport: Literal["stdio", "streamable-http"]) -> None:  # p
 
 
 @slsa_cli.group("get", context_settings=_CONTEXT_SETTINGS)
-def get_group() -> None:  # pragma: no cover
+def get_group() -> None:
     """Reports the configured paths and the composition of the local Sollertia platform data hierarchy."""
 
 
 @get_group.command("directory", context_settings=_CONTEXT_SETTINGS)
-def get_directory() -> None:  # pragma: no cover
+def get_directory() -> None:
     """Reports the configured local Sollertia platform working directory."""
     console.echo(message=f"Working directory: {get_working_directory()}.")
 
 
 @get_group.command("data-root", context_settings=_CONTEXT_SETTINGS)
-def get_data_root_path() -> None:  # pragma: no cover
+def get_data_root_path() -> None:
     """Reports the configured local Sollertia platform data root."""
     console.echo(message=f"Data root: {get_data_root()}.")
 
@@ -80,19 +80,19 @@ def get_data_root_path() -> None:  # pragma: no cover
     required=True,
     help="The category of the credentials file to report.",
 )
-def get_credentials_path(category: str) -> None:  # pragma: no cover
+def get_credentials_path(category: str) -> None:
     """Reports the path to the requested credentials file stored in the platform credentials directory."""
     console.echo(message=f"The '{category}' credentials path: {get_credentials(credentials=category)}.")
 
 
 @get_group.command("templates", context_settings=_CONTEXT_SETTINGS)
-def get_templates_directory() -> None:  # pragma: no cover
+def get_templates_directory() -> None:
     """Reports the configured sollertia-virtual-reality task templates directory."""
     console.echo(message=f"Task templates directory: {get_task_templates_directory()}.")
 
 
 @get_group.command("projects", context_settings=_CONTEXT_SETTINGS)
-def get_projects() -> None:  # pragma: no cover
+def get_projects() -> None:
     """Lists the projects stored under the local Sollertia platform data root."""
     projects = [
         project.project_name for project in discover_projects(root_path=get_data_root(), strategy="directories")
@@ -111,7 +111,7 @@ def get_projects() -> None:  # pragma: no cover
     required=True,
     help="The name of the project for which to list the available experiment configurations.",
 )
-def get_experiments(project: str) -> None:  # pragma: no cover
+def get_experiments(project: str) -> None:
     """Lists the experiment configurations available for the target project."""
     experiments = [
         configuration.stem
@@ -129,7 +129,7 @@ def get_experiments(project: str) -> None:  # pragma: no cover
 
 
 @slsa_cli.group("configure", context_settings=_CONTEXT_SETTINGS)
-def configure_group() -> None:  # pragma: no cover
+def configure_group() -> None:
     """Configures major components of the Sollertia platform data workflow."""
 
 
@@ -141,7 +141,7 @@ def configure_group() -> None:  # pragma: no cover
     required=True,
     help="The absolute path to the directory where to cache Sollertia platform configuration and local runtime data.",
 )
-def configure_directory(directory: Path) -> None:  # pragma: no cover
+def configure_directory(directory: Path) -> None:
     """Sets the input directory as the local Sollertia platform working directory."""
     ensure_directory_exists(path=directory, is_file=False)
     set_working_directory(path=directory)
@@ -155,7 +155,7 @@ def configure_directory(directory: Path) -> None:  # pragma: no cover
     required=True,
     help="The absolute path to the directory under which all project directories are stored on this machine.",
 )
-def configure_data_root(directory: Path) -> None:  # pragma: no cover
+def configure_data_root(directory: Path) -> None:
     """Sets the input directory as the local Sollertia platform data root."""
     set_data_root(path=directory)
 
@@ -175,7 +175,7 @@ def configure_data_root(directory: Path) -> None:  # pragma: no cover
     required=True,
     help="The absolute path to the credentials file to copy into the platform credentials directory.",
 )
-def configure_credentials(category: str, file: Path) -> None:  # pragma: no cover
+def configure_credentials(category: str, file: Path) -> None:
     """Copies the input credentials file into the platform credentials directory under its canonical name."""
     set_credentials(credentials=category, path=file)
 
@@ -188,7 +188,7 @@ def configure_credentials(category: str, file: Path) -> None:  # pragma: no cove
     required=True,
     help="The absolute path to the sollertia-virtual-reality project's Configurations (Template) directory.",
 )
-def configure_task_templates_directory(directory: Path) -> None:  # pragma: no cover
+def configure_task_templates_directory(directory: Path) -> None:
     """Sets the path to the sollertia-virtual-reality task templates directory."""
     set_task_templates_directory(path=directory)
 
@@ -201,7 +201,7 @@ def configure_task_templates_directory(directory: Path) -> None:  # pragma: no c
     required=True,
     help="The name of the project to be created.",
 )
-def configure_project(project: str) -> None:  # pragma: no cover
+def configure_project(project: str) -> None:
     """Creates the data structure for a new project under the configured Sollertia platform data root."""
     ProjectData(root=get_data_root(), project_name=project).create()
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)

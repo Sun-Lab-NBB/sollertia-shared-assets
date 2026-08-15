@@ -41,11 +41,11 @@ class MesoscopeHardwareState(YamlConfig):
     """The conversion factor used to translate torque values reported by the sensor as 12-bit Analog to Digital
     Converter (ADC) units into Newton centimeters (N·cm)."""
     screens_initially_on: bool | None = None
-    """Stores the initial state of the Virtual Reality screens at the beginning of the session's runtime."""
+    """Determines whether the Virtual Reality screens were turned on at the beginning of the session's runtime."""
     recorded_mesoscope_ttl: bool | None = None
-    """Tracks whether the session recorded brain activity data with the mesoscope."""
+    """Determines whether the session recorded brain activity data with the mesoscope."""
     delivered_gas_puffs: bool | None = None
-    """Tracks whether the session delivered any gas puffs to the animal."""
+    """Determines whether the session delivered any gas puffs to the animal."""
     system_state_codes: dict[str, int] | None = None
     """Maps the human-readable state names of the Mesoscope-VR system to the integer state-codes the system uses to
     communicate those states (system states). Consumers that need a code-keyed lookup invert this mapping."""
@@ -85,7 +85,7 @@ class LickTrainingDescriptor(YamlConfig):
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
     session."""
     incomplete: bool = True
-    """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
+    """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
 
@@ -141,7 +141,7 @@ class RunTrainingDescriptor(YamlConfig):
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
     session."""
     incomplete: bool = True
-    """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
+    """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
 
@@ -167,7 +167,7 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     """The additional volume of water, in milliliters, administered by the experimenter to the animal after the
     session."""
     incomplete: bool = True
-    """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
+    """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""
 
@@ -182,6 +182,6 @@ class WindowCheckingDescriptor(YamlConfig):
     """The quality of the cranial window and surgical intervention on a scale from 0 (non-usable) to
     3 (high-tier publication grade) inclusive."""
     incomplete: bool = True
-    """Tracks whether the session's data is complete and eligible for unsupervised data processing."""
+    """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
     """Stores the experimenter's notes made during runtime."""

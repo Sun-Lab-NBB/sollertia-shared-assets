@@ -1,17 +1,9 @@
 """Collects every sollertia-shared-assets dispatch registry in one place and runs the import-time checks that guard
-them.
-
-This module is the single canonical surface for wiring new capabilities into the library, and it holds two governance
-tiers. The system registries — descriptor, hardware state, experiment configuration, system raw data, the
-system/session-type association, and the VR-task gate — form the designed extension point. They grow whenever a
-new acquisition system or session type is added, following the recipe owned by the /library-extension skill. The
-contract registries — read assets and credentials — are durable translation contracts curated by Sollertia platform
-maintainers; adding an entry there is a platform-contract decision, not a routine extension.
-
-The module imports each acquisition system's subpackage (``mesoscope_vr`` and its future siblings) and wires the
-system's classes into the registries, so the shared configuration and data modules never import from a system
-subpackage. The keying enumerations live in the leaf ``enums`` module, which keeps this module importable by every
-registry consumer without circular imports.
+them. The module holds two governance tiers, the system registries that grow whenever a new acquisition system or
+session type is added, and the contract registries that Sollertia platform maintainers curate. It imports each
+acquisition system's subpackage and wires that system's classes into the registries, so the shared configuration and
+data modules never import from a system subpackage. The keying enumerations live in the leaf ``enums`` module, which
+keeps this module importable by every registry consumer without circular imports.
 """
 
 from __future__ import annotations
@@ -58,25 +50,6 @@ __all__ = [
 ]
 
 
-class _SystemRawDataBuilder(Protocol):
-    """Structural type for system-specific raw data dataclasses registered in ``SYSTEM_RAW_DATA_REGISTRY``."""
-
-    @classmethod
-    def build(cls, root: Path) -> Any:
-        """Resolves all system-specific raw-asset paths under the session's ``raw_data`` directory.
-
-        Conforming implementations construct and return a dataclass instance whose fields hold absolute paths
-        anchored on ``root``. The concrete return type is the implementing class itself (e.g., ``MesoscopeRawData``).
-
-        Args:
-            root: The session's ``raw_data`` directory absolute path.
-
-        Returns:
-            An instance of the conforming dataclass with every system-specific raw-asset path resolved.
-        """
-        ...  # pragma: no cover
-
-
 DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
     SessionTypes.LICK_TRAINING: LickTrainingDescriptor,
     SessionTypes.RUN_TRAINING: RunTrainingDescriptor,
@@ -84,21 +57,21 @@ DESCRIPTOR_REGISTRY: dict[SessionTypes, type[YamlConfig]] = {
     SessionTypes.WINDOW_CHECKING: WindowCheckingDescriptor,
 }
 """Maps each session type to its descriptor dataclass. The canonical on-disk filename is always the flat
-``session_descriptor.yaml`` (``RawDataFiles.SESSION_DESCRIPTOR``) regardless of session type — the only thing that
-varies per type is the parsing class. The registry is deliberately flat: a session type maps to exactly one descriptor
+``session_descriptor.yaml`` (``RawDataFiles.SESSION_DESCRIPTOR``) regardless of session type, and the parsing class is
+the only thing that varies per type. The registry is deliberately flat: a session type maps to exactly one descriptor
 platform-wide, so an acquisition system that needs a different descriptor must mint a new ``SessionTypes`` member."""
 
 HARDWARE_STATE_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeHardwareState,
 }
 """Maps each acquisition system to its hardware-state dataclass. The canonical on-disk filename is always
-``hardware_state.yaml`` (``RawDataFiles.HARDWARE_STATE``) regardless of system — only the parsing class varies."""
+``hardware_state.yaml`` (``RawDataFiles.HARDWARE_STATE``) regardless of system, and only the parsing class varies."""
 
 EXPERIMENT_CONFIGURATION_REGISTRY: dict[AcquisitionSystems, type[YamlConfig]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeExperimentConfiguration,
 }
 """Maps each acquisition system to its experiment configuration dataclass. Every registered class satisfies the
-experiment-configuration contract; the configuration and template-creation tools dispatch through this registry."""
+experiment-configuration contract."""
 
 SYSTEM_RAW_DATA_REGISTRY: dict[AcquisitionSystems, type[_SystemRawDataBuilder]] = {
     AcquisitionSystems.MESOSCOPE_VR: MesoscopeRawData,
@@ -117,27 +90,23 @@ SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
         }
     ),
 }
-"""Maps each acquisition system to the set of session types it can run. ``SessionData.create()`` rejects a session
-type that is not paired with the session's acquisition system."""
+"""Maps each acquisition system to the set of session types it can run."""
 
 SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
-"""The session types that use VR and therefore write a ``vr_configuration.yaml`` task-template snapshot.
-``SessionData.required_raw_assets`` consults this set to decide whether a session of a given type requires the
-snapshot. Training and window-checking sessions run no VR task and are absent here."""
+"""The session types that use VR and therefore write a ``vr_configuration.yaml`` task-template snapshot."""
 
 READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
     ReadAssets.SURGERY_DATA: SurgeryData,
 }
 """Maps each read-asset format to the dataclass that represents it on disk. This contract registry is curated by
-Sollertia platform maintainers; each entry is a durable contract for translating an external data shape into the
+Sollertia platform maintainers. Each entry is a durable contract for translating an external data shape into the
 uniform on-disk format the downstream Sollertia libraries consume."""
 
 CREDENTIALS_FILE_REGISTRY: dict[CredentialsTypes, str] = {
     CredentialsTypes.GOOGLE: "google_credentials.json",
 }
 """Maps each credentials category to the canonical filename under which its credentials file is stored inside the
-working directory's credentials subdirectory. This contract registry is curated by Sollertia platform maintainers;
-the credentials toolset that consumes it lives in the top-level ``credentials`` module."""
+working directory's credentials subdirectory. This contract registry is curated by Sollertia platform maintainers."""
 
 
 def resolve_read_asset(read_asset: str | ReadAssets) -> type[YamlConfig]:
@@ -163,6 +132,27 @@ def resolve_read_asset(read_asset: str | ReadAssets) -> type[YamlConfig]:
         raise ValueError(message)  # pragma: no cover
 
     return READ_ASSET_REGISTRY[ReadAssets(read_asset)]
+
+
+class _SystemRawDataBuilder(Protocol):
+    """Defines the structural type for the system-specific raw data dataclasses registered in
+    ``SYSTEM_RAW_DATA_REGISTRY``.
+    """
+
+    @classmethod
+    def build(cls, root: Path) -> Any:
+        """Resolves all system-specific raw-asset paths under the session's ``raw_data`` directory.
+
+        Conforming implementations construct and return a dataclass instance whose fields hold absolute paths
+        anchored on ``root``. The concrete return type is the implementing class itself (e.g., ``MesoscopeRawData``).
+
+        Args:
+            root: The session's ``raw_data`` directory absolute path.
+
+        Returns:
+            An instance of the conforming dataclass with every system-specific raw-asset path resolved.
+        """
+        ...  # pragma: no cover
 
 
 def _assert_registry_coverage() -> None:
@@ -199,10 +189,10 @@ def _assert_registry_coverage() -> None:
             )
             console.error(message=message, error=RuntimeError)
 
-    # SYSTEM_SESSION_TYPES is an association (system -> session-type set), not a dispatch registry, so it is checked
-    # separately. Every acquisition system must declare at least one session type, and every session type must be
-    # claimed by at least one system; either gap would make SessionData.create reject a legitimate session, since an
-    # empty session-type set rejects every type and an unclaimed session type is rejected by every system.
+    # SYSTEM_SESSION_TYPES is an association (system -> session-type set) rather than a dispatch registry, so it is
+    # checked separately. Every acquisition system must declare at least one session type, and every session type
+    # must be claimed by at least one system. Either gap would make SessionData.create reject a legitimate session,
+    # since an empty session-type set rejects every type and an unclaimed session type is rejected by every system.
     systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(
         system for system, session_types in SYSTEM_SESSION_TYPES.items() if session_types
     )

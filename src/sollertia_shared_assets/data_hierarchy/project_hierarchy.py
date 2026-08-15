@@ -1,10 +1,4 @@
-"""Provides the system-agnostic project-data-hierarchy assets shared across all Sollertia platform machines.
-
-The assets in this module model the platform directory layout above the session level
-(``<root>/<project>/<animal>/<session>``) as derived runtime aggregates that hold no on-disk markers. They
-operate purely on resolved paths, so they remain agnostic to any particular acquisition or processing system,
-and they can rebind the same project / animal / session subtree onto any mounted root via ``for_root``.
-"""
+"""Provides the system-agnostic project-data-hierarchy assets shared across all Sollertia platform machines."""
 
 from __future__ import annotations
 
@@ -12,6 +6,7 @@ from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
 from natsort import natsorted
+from ataraxis_base_utilities import ensure_directory_exists
 
 from ..configuration import CONFIGURATION_DIRECTORY
 
@@ -96,16 +91,11 @@ class ProjectData:
         Returns:
             This instance, to support call chaining.
         """
-        self.configuration_directory.mkdir(parents=True, exist_ok=True)
+        ensure_directory_exists(path=self.configuration_directory, is_file=False)
         return self
 
     def exists(self) -> bool:
-        """Determines whether the project directory exists on disk under the data root.
-
-        Notes:
-            Tests for a directory specifically, so a regular file carrying the project's name reads as absent rather
-            than as an existing project.
-        """
+        """Determines whether the project directory exists on disk under the data root."""
         return self.path.is_dir()
 
 
@@ -163,10 +153,5 @@ class AnimalData:
         return AnimalData(root=root, project_name=self.project_name, animal_id=self.animal_id)
 
     def exists(self) -> bool:
-        """Determines whether the animal directory exists on disk under the project.
-
-        Notes:
-            Tests for a directory specifically, so a regular file carrying the animal's identifier reads as absent
-            rather than as an existing animal.
-        """
+        """Determines whether the animal directory exists on disk under the project."""
         return self.path.is_dir()

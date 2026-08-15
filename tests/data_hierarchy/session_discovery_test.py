@@ -284,11 +284,11 @@ def test_filter_sessions_drops_malformed_session_names() -> None:
 def test_filter_sessions_local_timezone_handling() -> None:
     """Verifies that utc_timezone=False compares session timestamps in the host machine's local time.
 
-    The host is pinned to America/New_York for determinism. A session name of
-    ``2026-03-02-03-30-00-000000`` is 03:30 UTC on March 2, which is 22:30 EST on March 1, so it falls
-    within the March 1 end-of-day boundary when ``utc_timezone=False`` but not when ``utc_timezone=True``.
+    The host is pinned to America/New_York for determinism. A session name of ``2026-03-02-03-30-00-000000`` is 03:30
+    UTC on March 2, which is 22:30 EST on March 1, so it falls within the March 1 end-of-day boundary when
+    ``utc_timezone=False`` but not when ``utc_timezone=True``.
     """
-    original_tz = os.environ.get("TZ")
+    original_timezone = os.environ.get("TZ")
     os.environ["TZ"] = "America/New_York"
     time.tzset()
     try:
@@ -296,10 +296,10 @@ def test_filter_sessions_local_timezone_handling() -> None:
         included = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=False)
         excluded = filter_sessions(sessions=keys, end_date="2026-03-01", utc_timezone=True)
     finally:
-        if original_tz is None:
+        if original_timezone is None:
             os.environ.pop("TZ", None)
         else:
-            os.environ["TZ"] = original_tz
+            os.environ["TZ"] = original_timezone
         time.tzset()
 
     assert included == keys

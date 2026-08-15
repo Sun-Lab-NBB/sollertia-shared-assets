@@ -19,13 +19,13 @@ from sollertia_shared_assets.data_hierarchy import (
 )
 
 _LOCAL_ROOT: Path = Path("/data/local")
-"""Sentinel local data root used by the path-resolution tests; never touched on disk."""
+"""Sentinel local data root used by the path-resolution tests. Never touched on disk."""
 
 _NAS_ROOT: Path = Path("/mnt/nas")
-"""Sentinel NAS storage root used by the multi-root resolution tests; never touched on disk."""
+"""Sentinel NAS storage root used by the multi-root resolution tests. Never touched on disk."""
 
 _SERVER_ROOT: Path = Path("/mnt/server")
-"""Sentinel server storage root used by the multi-root resolution tests; never touched on disk."""
+"""Sentinel server storage root used by the multi-root resolution tests. Never touched on disk."""
 
 
 def _write_session_marker(root: Path, project_name: str, animal_id: str, session_name: str) -> None:
@@ -82,7 +82,7 @@ def test_project_data_experiment_configs_natural_order(tmp_path: Path) -> None:
     for name in ("experiment_1", "experiment_2", "experiment_10"):
         (project.configuration_directory / f"{name}.yaml").write_text("a")
 
-    # Natural sort keeps experiment_10 last; a plain lexicographic sort would place it before experiment_2.
+    # Natural sort keeps experiment_10 last. A plain lexicographic sort would place it before experiment_2.
     assert [path.stem for path in project.experiment_configs()] == ["experiment_1", "experiment_2", "experiment_10"]
 
 
@@ -216,5 +216,5 @@ def test_iter_project_animals_orders_numeric_ids_naturally(tmp_path: Path) -> No
 
     animals = list(iter_project_animals(project=project))
 
-    # Natural sort keeps "10" last; a plain lexicographic sort would place it right after "1".
+    # Natural sort keeps "10" last. A plain lexicographic sort would place it right after "1".
     assert [animal.animal_id for animal in animals] == ["1", "2", "9", "10"]

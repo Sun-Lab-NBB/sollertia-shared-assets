@@ -82,7 +82,7 @@ class MesoscopeGasPuffTrial:
     """Defines a Mesoscope-VR trial that delivers a gas puff (an aversive stimulus) when the animal fails the trial's
     avoidance condition.
 
-    The animal avoids the puff by satisfying the task's occupancy condition; failing to do so delivers a puff of the
+    The animal avoids the puff by satisfying the task's occupancy condition. Failing to do so delivers a puff of the
     configured duration. The behavioral condition is defined by the task, not by this class.
     """
 
@@ -107,13 +107,12 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     Implements the full experiment-configuration contract shared by every Sollertia acquisition system: the
     ``experiment_states`` state machine, the ``trial_structures`` table, the ``unity_scene_name`` of the linear
-    infinite corridor task the experiment runs, and the ``from_task_template`` builder. The configuration is consumed
-    by the acquisition runtime (sollertia-experiment) and the analysis pipeline (sollertia-forgery).
+    infinite corridor task the experiment runs, and the ``from_task_template`` builder.
     """
 
     trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial]
     """The trials the experiment runs, keyed by trial name. This contract field is required by every experiment
-    configuration; ``MesoscopeWaterRewardTrial`` and ``MesoscopeGasPuffTrial`` are Mesoscope-VR's trial classes."""
+    configuration. ``MesoscopeWaterRewardTrial`` and ``MesoscopeGasPuffTrial`` are Mesoscope-VR's trial classes."""
     experiment_states: dict[str, ExperimentState]
     """The experiment state machine, keyed by state name. This contract field is required by every experiment
     configuration."""
@@ -212,9 +211,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
         has_water_reward = any(isinstance(trial, MesoscopeWaterRewardTrial) for trial in trial_structures.values())
         has_gas_puff = any(isinstance(trial, MesoscopeGasPuffTrial) for trial in trial_structures.values())
-        experiment_states: dict[str, ExperimentState] = {}
-        for state_index in range(state_count):
-            experiment_states[f"state_{state_index + 1}"] = ExperimentState(
+        experiment_states: dict[str, ExperimentState] = {
+            f"state_{state_index + 1}": ExperimentState(
                 experiment_state_code=state_index + 1,
                 system_state_code=0,
                 state_duration_s=_DEFAULT_STATE_DURATION_S,
@@ -226,6 +224,8 @@ class MesoscopeExperimentConfiguration(YamlConfig):
                 aversive_recovery_failed_threshold=_DEFAULT_RECOVERY_FAILED_THRESHOLD if has_gas_puff else 0,
                 aversive_recovery_guided_trials=_DEFAULT_RECOVERY_GUIDED_TRIALS if has_gas_puff else 0,
             )
+            for state_index in range(state_count)
+        }
 
         return cls(
             trial_structures=trial_structures,
@@ -279,11 +279,10 @@ def _restore_trial_kind(trial_name: str, trial: Any) -> Any:
     """Returns the stored trial with its trial kind discriminator supplied and checked against the fields it declares.
 
     Notes:
-        A trial written before the discriminator existed carries no ``trial_kind`` field, and an omitted field takes
-        its class default, which would route every such trial to the water reward class. The fields unique to one
-        runtime trial class identify the class instead. A trial declaring none of them predates the split of the two
-        classes and takes the water reward kind, which is the only kind those trials ever held. Fields belonging to
-        neither class are ignored, matching how the loader has always treated a field it does not recognize.
+        A trial that omits the ``trial_kind`` field takes its class default, which would route every such trial to the
+        water reward class. The fields unique to one runtime trial class identify the class instead. A trial declaring
+        none of them takes the water reward kind. Fields belonging to neither class are ignored, matching how the loader
+        treats a field it does not recognize.
 
     Args:
         trial_name: The name the trial is stored under.

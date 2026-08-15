@@ -53,20 +53,16 @@ def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
     The copy is stored under the canonical filename registered for the credentials category, atomically replacing any
     previously configured credentials file for that category. The published file carries umask-derived permissions.
 
-    Notes:
-        The configured credentials file is used for all future interactions with the corresponding external
-        service carried out from this machine.
-
     Args:
         credentials: The ``CredentialsTypes`` member or its string value identifying the credentials category to
             configure.
-        path: The path to the credentials file to copy into the credentials' subdirectory.
+        path: The path to the credentials file to copy into the credentials subdirectory.
 
     Raises:
         ValueError: If the credentials category is not a valid ``CredentialsTypes`` member, or if the specified
             file's extension does not match the canonical credentials filename's extension.
         FileNotFoundError: If the specified credentials file does not exist at the provided path, or if the local
-            working directory has not been configured for the host-machine.
+            working directory has not been configured for the host machine.
     """
     file_name = resolve_credentials_file(credentials=credentials)
 
@@ -114,7 +110,7 @@ def get_credentials(credentials: str | CredentialsTypes) -> Path:
 
     Raises:
         ValueError: If the credentials category is not a valid ``CredentialsTypes`` member.
-        FileNotFoundError: If the local working directory has not been configured for the host-machine, or if the
+        FileNotFoundError: If the local working directory has not been configured for the host machine, or if the
             credentials file for the requested category has not been set.
     """
     file_name = resolve_credentials_file(credentials=credentials)

@@ -1,5 +1,5 @@
-"""Contains tests for the platform configuration utilities provided by the
-``configuration.configuration_utilities`` module.
+"""Contains tests for the platform configuration utilities provided by the ``configuration.configuration_utilities``
+module.
 """
 
 from __future__ import annotations
@@ -26,12 +26,12 @@ if TYPE_CHECKING:
 
 def test_set_working_directory_creates_directory(clean_working_directory: Path) -> None:
     """Verifies that set_working_directory creates the directory if it does not exist."""
-    new_dir = clean_working_directory.parent / "new_working_dir"
-    assert not new_dir.exists()
+    new_directory = clean_working_directory.parent / "new_working_dir"
+    assert not new_directory.exists()
 
-    set_working_directory(path=new_dir)
+    set_working_directory(path=new_directory)
 
-    assert new_dir.exists()
+    assert new_directory.exists()
 
 
 def test_set_working_directory_creates_service_subdirectories(clean_working_directory: Path) -> None:
@@ -46,59 +46,59 @@ def test_set_working_directory_writes_path_file(clean_working_directory: Path) -
     """Verifies that set_working_directory writes the path to the cache file."""
     set_working_directory(path=clean_working_directory)
 
-    app_dir = clean_working_directory.parent / "app_data"
-    path_file = app_dir / "working_directory_path.txt"
+    application_directory = clean_working_directory.parent / "app_data"
+    path_file = application_directory / "working_directory_path.txt"
     assert path_file.exists()
     assert path_file.read_text() == str(clean_working_directory)
 
 
 def test_set_working_directory_creates_app_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_working_directory creates the application data directory."""
-    app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    working_dir = tmp_path / "working"
-    working_dir.mkdir()
+    working_directory = tmp_path / "working"
+    working_directory.mkdir()
 
-    assert not app_dir.exists()
-    set_working_directory(path=working_dir)
-    assert app_dir.exists()
+    assert not application_directory.exists()
+    set_working_directory(path=working_directory)
+    assert application_directory.exists()
 
 
 def test_set_working_directory_overwrites_existing(clean_working_directory: Path) -> None:
     """Verifies that set_working_directory overwrites an existing cached path."""
-    first_dir = clean_working_directory / "first"
-    first_dir.mkdir()
-    set_working_directory(path=first_dir)
+    first_directory = clean_working_directory / "first"
+    first_directory.mkdir()
+    set_working_directory(path=first_directory)
 
-    second_dir = clean_working_directory / "second"
-    second_dir.mkdir()
-    set_working_directory(path=second_dir)
+    second_directory = clean_working_directory / "second"
+    second_directory.mkdir()
+    set_working_directory(path=second_directory)
 
-    app_dir = clean_working_directory.parent / "app_data"
-    path_file = app_dir / "working_directory_path.txt"
-    assert path_file.read_text() == str(second_dir)
+    application_directory = clean_working_directory.parent / "app_data"
+    path_file = application_directory / "working_directory_path.txt"
+    assert path_file.read_text() == str(second_directory)
 
 
 def test_get_working_directory_returns_cached_path(clean_working_directory: Path) -> None:
     """Verifies that get_working_directory returns the cached directory path."""
     set_working_directory(path=clean_working_directory)
-    retrieved_dir = get_working_directory()
+    retrieved_directory = get_working_directory()
 
-    assert retrieved_dir == clean_working_directory
+    assert retrieved_directory == clean_working_directory
 
 
 def test_get_working_directory_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_working_directory raises FileNotFoundError if not configured."""
-    app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     with pytest.raises(FileNotFoundError, match=r"has not been set"):
         get_working_directory()
 
 
 def test_get_working_directory_raises_error_if_directory_missing(clean_working_directory: Path) -> None:
-    """Verifies that get_working_directory raises error if the cached directory does not exist."""
+    """Verifies that get_working_directory raises an error if the cached directory does not exist."""
     set_working_directory(path=clean_working_directory)
 
     # Simulates an out-of-date cache.
@@ -131,20 +131,20 @@ def test_get_working_directory_raises_error_if_record_is_whitespace(clean_workin
 
 def test_set_data_root_creates_directory(clean_working_directory: Path) -> None:
     """Verifies that set_data_root creates the directory if it does not exist (working-directory model)."""
-    new_dir = clean_working_directory.parent / "new_data_root"
-    assert not new_dir.exists()
+    new_directory = clean_working_directory.parent / "new_data_root"
+    assert not new_directory.exists()
 
-    set_data_root(path=new_dir)
+    set_data_root(path=new_directory)
 
-    assert new_dir.exists()
+    assert new_directory.exists()
 
 
 def test_set_data_root_writes_path_file(clean_working_directory: Path) -> None:
     """Verifies that set_data_root writes the path to the cache file."""
     set_data_root(path=clean_working_directory)
 
-    app_dir = clean_working_directory.parent / "app_data"
-    path_file = app_dir / "data_root_path.txt"
+    application_directory = clean_working_directory.parent / "app_data"
+    path_file = application_directory / "data_root_path.txt"
     assert path_file.exists()
     assert path_file.read_text() == str(clean_working_directory)
 
@@ -158,15 +158,15 @@ def test_get_data_root_returns_cached_path(clean_working_directory: Path) -> Non
 
 def test_get_data_root_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_data_root raises FileNotFoundError if not configured."""
-    app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     with pytest.raises(FileNotFoundError, match=r"has not been set"):
         get_data_root()
 
 
 def test_get_data_root_raises_error_if_directory_missing(clean_working_directory: Path) -> None:
-    """Verifies that get_data_root raises error if the cached directory does not exist."""
+    """Verifies that get_data_root raises an error if the cached directory does not exist."""
     set_data_root(path=clean_working_directory)
 
     # Simulates an out-of-date cache.
@@ -199,23 +199,23 @@ def test_get_data_root_raises_error_if_record_is_whitespace(clean_working_direct
 
 def test_set_task_templates_directory_creates_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that set_task_templates_directory caches the directory path."""
-    app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    templates_directory = tmp_path / "templates"
+    templates_directory.mkdir()
 
-    set_task_templates_directory(path=templates_dir)
+    set_task_templates_directory(path=templates_directory)
 
-    cache_file = app_dir / "task_templates_directory_path.txt"
+    cache_file = application_directory / "task_templates_directory_path.txt"
     assert cache_file.exists()
-    assert cache_file.read_text() == str(templates_dir.resolve())
+    assert cache_file.read_text() == str(templates_directory.resolve())
 
 
 def test_set_task_templates_directory_raises_error_not_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that set_task_templates_directory raises error for non-existent directory."""
-    app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    """Verifies that set_task_templates_directory raises an error for non-existent directory."""
+    application_directory = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     nonexistent = tmp_path / "missing_dir"
 
@@ -227,9 +227,9 @@ def test_set_task_templates_directory_raises_error_not_directory(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that set_task_templates_directory raises error when path is a file."""
-    app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    """Verifies that set_task_templates_directory raises an error when the path is a file."""
+    application_directory = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     file_path = tmp_path / "a_file.txt"
     file_path.write_text("content")
@@ -240,22 +240,22 @@ def test_set_task_templates_directory_raises_error_not_directory(
 
 def test_get_task_templates_directory_returns_cached_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies that get_task_templates_directory returns the cached directory path."""
-    app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    templates_directory = tmp_path / "templates"
+    templates_directory.mkdir()
 
-    set_task_templates_directory(path=templates_dir)
+    set_task_templates_directory(path=templates_directory)
     retrieved = get_task_templates_directory()
 
-    assert retrieved == templates_dir.resolve()
+    assert retrieved == templates_directory.resolve()
 
 
 def test_get_task_templates_directory_raises_error_if_not_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that get_task_templates_directory raises error if not configured."""
-    app_dir = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    """Verifies that get_task_templates_directory raises an error if not configured."""
+    application_directory = tmp_path / "empty_app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
     with pytest.raises(FileNotFoundError, match=r"has not been set"):
         get_task_templates_directory()
@@ -265,15 +265,15 @@ def test_get_task_templates_directory_raises_error_if_directory_missing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that get_task_templates_directory raises error if cached directory was deleted."""
-    app_dir = tmp_path / "app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    """Verifies that get_task_templates_directory raises an error if the cached directory was deleted."""
+    application_directory = tmp_path / "app_data"
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    templates_dir = tmp_path / "templates"
-    templates_dir.mkdir()
+    templates_directory = tmp_path / "templates"
+    templates_directory.mkdir()
 
-    set_task_templates_directory(path=templates_dir)
-    shutil.rmtree(templates_dir)
+    set_task_templates_directory(path=templates_directory)
+    shutil.rmtree(templates_directory)
 
     with pytest.raises(FileNotFoundError, match=r"does not exist"):
         get_task_templates_directory()
@@ -284,15 +284,15 @@ def test_get_task_templates_directory_preserves_trailing_whitespace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that get_task_templates_directory preserves a trailing space in a newline-terminated path record."""
-    app_dir = tmp_path / "app_data"
-    app_dir.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "app_data"
+    application_directory.mkdir()
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    templates_dir = tmp_path / "task templates "
-    templates_dir.mkdir()
-    (app_dir / "task_templates_directory_path.txt").write_text(f"{templates_dir}\n")
+    templates_directory = tmp_path / "task templates "
+    templates_directory.mkdir()
+    (application_directory / "task_templates_directory_path.txt").write_text(f"{templates_directory}\n")
 
-    assert get_task_templates_directory() == templates_dir
+    assert get_task_templates_directory() == templates_directory
 
 
 def test_get_task_templates_directory_raises_error_if_record_is_whitespace(
@@ -300,11 +300,11 @@ def test_get_task_templates_directory_raises_error_if_record_is_whitespace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that get_task_templates_directory raises FileNotFoundError for a whitespace-only path record."""
-    app_dir = tmp_path / "app_data"
-    app_dir.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(app_dir))
+    application_directory = tmp_path / "app_data"
+    application_directory.mkdir()
+    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
 
-    (app_dir / "task_templates_directory_path.txt").write_text("\n")
+    (application_directory / "task_templates_directory_path.txt").write_text("\n")
 
     with pytest.raises(FileNotFoundError, match=r"cached path record\s+is empty"):
         get_task_templates_directory()

@@ -124,11 +124,13 @@ def test_mesoscope_experiment_configuration_yaml_deserialization(
     yaml_path = tmp_path / "experiment_config.yaml"
     sample_experiment_config.to_yaml(file_path=yaml_path)
 
-    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+    loaded_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
 
-    assert loaded_config.unity_scene_name == sample_experiment_config.unity_scene_name
-    assert list(loaded_config.trial_structures.keys()) == list(sample_experiment_config.trial_structures.keys())
-    assert list(loaded_config.experiment_states.keys()) == list(sample_experiment_config.experiment_states.keys())
+    assert loaded_configuration.unity_scene_name == sample_experiment_config.unity_scene_name
+    assert list(loaded_configuration.trial_structures.keys()) == list(sample_experiment_config.trial_structures.keys())
+    assert list(loaded_configuration.experiment_states.keys()) == list(
+        sample_experiment_config.experiment_states.keys()
+    )
 
 
 def test_mesoscope_experiment_configuration_loads_trial_without_discriminator(tmp_path: Path) -> None:
@@ -147,9 +149,9 @@ def test_mesoscope_experiment_configuration_loads_trial_without_discriminator(tm
         "unity_scene_name: LegacyScene\n"
     )
 
-    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+    loaded_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
 
-    trial = loaded_config.trial_structures["legacy_trial"]
+    trial = loaded_configuration.trial_structures["legacy_trial"]
     assert isinstance(trial, MesoscopeWaterRewardTrial)
     assert trial.reward_size_ul == 7.5
     assert trial.reward_tone_duration_ms == 250
@@ -171,9 +173,9 @@ def test_mesoscope_experiment_configuration_loads_gas_puff_trial_without_discrim
         "unity_scene_name: OccScene\n"
     )
 
-    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+    loaded_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
 
-    trial = loaded_config.trial_structures["occ"]
+    trial = loaded_configuration.trial_structures["occ"]
     assert isinstance(trial, MesoscopeGasPuffTrial)
     assert trial.puff_duration_ms == 250
     assert trial.trial_kind is TrialKind.PUFF
@@ -259,7 +261,7 @@ def test_restore_excluded_fields_keeps_consistent_discriminator(tmp_path: Path) 
 
 
 def test_mesoscope_experiment_configuration_rejects_unresolved_trial() -> None:
-    """Verifies that a trial left as a mapping by the loader is rejected instead of reaching the acquisition runtime."""
+    """Verifies that a trial left as a mapping by the loader is rejected at construction."""
     with pytest.raises(ValueError, match="must resolve to a Mesoscope-VR runtime trial class"):
         MesoscopeExperimentConfiguration(
             trial_structures={"unresolved": {"reward_size_ul": 5.0}},  # type: ignore[dict-item]
@@ -270,7 +272,7 @@ def test_mesoscope_experiment_configuration_rejects_unresolved_trial() -> None:
 
 def test_mesoscope_experiment_configuration_round_trips_gas_puff_trial(tmp_path: Path) -> None:
     """Verifies that a gas-puff trial survives a MesoscopeExperimentConfiguration YAML round trip."""
-    config = MesoscopeExperimentConfiguration(
+    configuration = MesoscopeExperimentConfiguration(
         trial_structures={"puff": MesoscopeGasPuffTrial(puff_duration_ms=150)},
         experiment_states={
             "state1": ExperimentState(experiment_state_code=1, system_state_code=0, state_duration_s=60.0),
@@ -278,18 +280,18 @@ def test_mesoscope_experiment_configuration_round_trips_gas_puff_trial(tmp_path:
         unity_scene_name="PuffScene",
     )
     yaml_path = tmp_path / "puff_config.yaml"
-    config.to_yaml(file_path=yaml_path)
+    configuration.to_yaml(file_path=yaml_path)
 
-    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+    loaded_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
 
-    trial = loaded_config.trial_structures["puff"]
+    trial = loaded_configuration.trial_structures["puff"]
     assert isinstance(trial, MesoscopeGasPuffTrial)
     assert trial.puff_duration_ms == 150
 
 
 def test_mesoscope_experiment_configuration_round_trips_mixed_trials(tmp_path: Path) -> None:
     """Verifies that a configuration holding both trial classes restores each trial to its own class."""
-    config = MesoscopeExperimentConfiguration(
+    configuration = MesoscopeExperimentConfiguration(
         trial_structures={
             "reward": MesoscopeWaterRewardTrial(reward_size_ul=4.0, reward_tone_duration_ms=200),
             "puff": MesoscopeGasPuffTrial(puff_duration_ms=175),
@@ -300,12 +302,12 @@ def test_mesoscope_experiment_configuration_round_trips_mixed_trials(tmp_path: P
         unity_scene_name="MixedScene",
     )
     yaml_path = tmp_path / "mixed_config.yaml"
-    config.to_yaml(file_path=yaml_path)
+    configuration.to_yaml(file_path=yaml_path)
 
-    loaded_config = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
+    loaded_configuration = MesoscopeExperimentConfiguration.from_yaml(file_path=yaml_path)
 
-    reward_trial = loaded_config.trial_structures["reward"]
-    puff_trial = loaded_config.trial_structures["puff"]
+    reward_trial = loaded_configuration.trial_structures["reward"]
+    puff_trial = loaded_configuration.trial_structures["puff"]
     assert isinstance(reward_trial, MesoscopeWaterRewardTrial)
     assert isinstance(puff_trial, MesoscopeGasPuffTrial)
     assert reward_trial.reward_size_ul == 4.0
@@ -315,7 +317,7 @@ def test_mesoscope_experiment_configuration_round_trips_mixed_trials(tmp_path: P
 
 def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> None:
     """Verifies that MesoscopeExperimentConfiguration accepts mixed WaterReward and GasPuff trials."""
-    config = MesoscopeExperimentConfiguration(
+    configuration = MesoscopeExperimentConfiguration(
         trial_structures={
             "reward": MesoscopeWaterRewardTrial(reward_size_ul=4.0, reward_tone_duration_ms=200),
             "puff": MesoscopeGasPuffTrial(puff_duration_ms=150),
@@ -326,21 +328,21 @@ def test_mesoscope_experiment_configuration_carries_water_and_puff_trials() -> N
         unity_scene_name="MixedScene",
     )
 
-    assert isinstance(config.trial_structures["reward"], MesoscopeWaterRewardTrial)
-    assert isinstance(config.trial_structures["puff"], MesoscopeGasPuffTrial)
-    assert config.trial_structures["reward"].reward_size_ul == 4.0
-    assert config.trial_structures["puff"].puff_duration_ms == 150
+    assert isinstance(configuration.trial_structures["reward"], MesoscopeWaterRewardTrial)
+    assert isinstance(configuration.trial_structures["puff"], MesoscopeGasPuffTrial)
+    assert configuration.trial_structures["reward"].reward_size_ul == 4.0
+    assert configuration.trial_structures["puff"].puff_duration_ms == 150
 
 
 def test_from_task_template_maps_interaction_trial_to_water_reward() -> None:
     """Verifies that from_task_template maps an INTERACTION trigger trial to a MesoscopeWaterRewardTrial."""
     template = _create_base_task_template()
 
-    config = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="TestScene")
+    configuration = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="TestScene")
 
-    assert config.unity_scene_name == "TestScene"
-    assert len(config.trial_structures) == 1
-    trial = config.trial_structures["trial1"]
+    assert configuration.unity_scene_name == "TestScene"
+    assert len(configuration.trial_structures) == 1
+    trial = configuration.trial_structures["trial1"]
     assert isinstance(trial, MesoscopeWaterRewardTrial)
     assert trial.reward_size_ul == 5.0
 
@@ -361,13 +363,13 @@ def test_from_task_template_maps_occupancy_trial_to_gas_puff() -> None:
         }
     )
 
-    config = MesoscopeExperimentConfiguration.from_task_template(
+    configuration = MesoscopeExperimentConfiguration.from_task_template(
         template=template,
         unity_scene_name="OccScene",
         default_puff_duration_ms=200,
     )
 
-    trial = config.trial_structures["occ_trial"]
+    trial = configuration.trial_structures["occ_trial"]
     assert isinstance(trial, MesoscopeGasPuffTrial)
     assert trial.puff_duration_ms == 200
 
@@ -376,12 +378,12 @@ def test_from_task_template_seeds_water_reward_guided_states() -> None:
     """Verifies that from_task_template seeds reinforcing guidance for water-reward trials."""
     template = _create_base_task_template()
 
-    config = MesoscopeExperimentConfiguration.from_task_template(
+    configuration = MesoscopeExperimentConfiguration.from_task_template(
         template=template, unity_scene_name="TestScene", state_count=3
     )
 
-    assert set(config.experiment_states) == {"state_1", "state_2", "state_3"}
-    state_1 = config.experiment_states["state_1"]
+    assert set(configuration.experiment_states) == {"state_1", "state_2", "state_3"}
+    state_1 = configuration.experiment_states["state_1"]
     assert state_1.experiment_state_code == 1
     assert state_1.state_duration_s == 60
     assert state_1.supports_trials is True
@@ -405,11 +407,11 @@ def test_from_task_template_seeds_gas_puff_guided_states() -> None:
         }
     )
 
-    config = MesoscopeExperimentConfiguration.from_task_template(
+    configuration = MesoscopeExperimentConfiguration.from_task_template(
         template=template, unity_scene_name="OccScene", state_count=2
     )
 
-    state_1 = config.experiment_states["state_1"]
+    state_1 = configuration.experiment_states["state_1"]
     assert state_1.reinforcing_initial_guided_trials == 0
     assert state_1.aversive_initial_guided_trials == 3
     assert state_1.aversive_recovery_failed_threshold == 9
@@ -434,8 +436,8 @@ def test_from_task_template_maps_supported_trigger_types() -> None:
                 ),
             }
         )
-        config = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="Scene")
-        assert "trial" in config.trial_structures
+        configuration = MesoscopeExperimentConfiguration.from_task_template(template=template, unity_scene_name="Scene")
+        assert "trial" in configuration.trial_structures
 
     for trigger_type in set(TriggerType) - supported:
         template = _create_base_task_template(

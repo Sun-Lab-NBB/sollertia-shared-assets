@@ -11,7 +11,7 @@ from sollertia_shared_assets.mesoscope_vr import (
 )
 
 _SENTINEL_RAW_PATH: Path = Path("/sentinel/raw")
-"""Placeholder raw_data root used by path-resolution tests; never touched on disk."""
+"""Placeholder raw_data root used by path-resolution tests. Never touched on disk."""
 
 
 def test_mesoscope_raw_data_build_resolves_all_paths() -> None:

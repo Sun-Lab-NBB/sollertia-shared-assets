@@ -1,9 +1,9 @@
 """Provides the cross-system enumerations that define the Sollertia platform vocabulary: acquisition systems, session
 types, external read assets, and credentials categories.
 
-This module is a leaf: it imports nothing from the rest of the library, so every other module — shared,
-system-specific, or interface — can use the enumerations without creating circular imports. The dispatch registries
-keyed by these enumerations are all defined in the ``registries`` module.
+This module is a leaf: it imports nothing from the rest of the library, so every other module, shared, system-specific,
+or interface, can use the enumerations without creating circular imports. The dispatch registries keyed by these
+enumerations are all defined in the ``registries`` module.
 """
 
 from enum import StrEnum
@@ -13,7 +13,7 @@ class AcquisitionSystems(StrEnum):
     """Defines the data acquisition systems supported by the Sollertia platform.
 
     Every Sollertia acquisition system runs in Virtual Reality, presenting a Unity task in the linear infinite
-    corridor. Each acquisition runtime package owns its own system configuration classes; this enum remains the shared
+    corridor. Each acquisition runtime package owns its own system configuration classes. This enum remains the shared
     vocabulary that identifies which runtime a session or dataset was acquired on.
     """
 
@@ -43,8 +43,8 @@ class ReadAssets(StrEnum):
     """Defines the external data-asset formats the platform reads and caches as on-disk dataclasses.
 
     Each member's string value is the canonical identifier for the read-asset format. Members are durable translation
-    contracts added by Sollertia platform maintainers together with a matching ``READ_ASSET_REGISTRY`` entry; this is
-    a platform-contract surface, not a routine extension point.
+    contracts added by Sollertia platform maintainers together with a matching ``READ_ASSET_REGISTRY`` entry. This is a
+    platform-contract surface.
     """
 
     SURGERY_DATA = "surgery_data"
@@ -55,9 +55,9 @@ class ReadAssets(StrEnum):
 class CredentialsTypes(StrEnum):
     """Defines the credentials categories supported by the Sollertia platform.
 
-    Each member's string value is the canonical identifier for the credentials' category. Members are durable
-    contracts added by Sollertia platform maintainers together with a matching ``CREDENTIALS_FILE_REGISTRY`` entry;
-    this is a platform-contract surface, not a routine extension point.
+    Each member's string value is the canonical identifier for the credentials category. Members are durable contracts
+    added by Sollertia platform maintainers together with a matching ``CREDENTIALS_FILE_REGISTRY`` entry. This is a
+    platform-contract surface.
     """
 
     GOOGLE = "google"
