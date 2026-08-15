@@ -565,9 +565,11 @@ class DatasetData(YamlConfig):
         Raises:
             ValueError: If the specified animal is not found in the dataset.
         """
-        for candidate in self.animals:
-            if candidate.animal == animal:
-                return candidate
+        # Tests membership against the session list directly and builds the one requested instance, since resolving a
+        # single animal through the ``animals`` property would sort every distinct name and construct every other
+        # DatasetAnimal only to discard them.
+        if any(session.animal == animal for session in self.sessions):
+            return DatasetAnimal(animal=animal, animal_path=self.dataset_data_path.parent.joinpath(animal))
 
         message = (
             f"Unable to look up the animal '{animal}'. The animal must exist in the '{self.name}' dataset, "

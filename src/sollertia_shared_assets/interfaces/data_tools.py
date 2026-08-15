@@ -1139,12 +1139,16 @@ def _resolve_session_root(session_path: str) -> tuple[Path | None, dict[str, Any
         A tuple of the resolved session root Path and an error dict. Exactly one element is non-None.
     """
     path = Path(session_path)
-    if not path.exists():
-        message = f"Unable to resolve the session root. The path {path} does not exist."
-        return None, error_response(message=message)
+
+    # Both resolution tests subsume the existence test, since neither can succeed for a path that does not exist. They
+    # therefore run first, which resolves a healthy session with one metadata query instead of two and leaves the
+    # existence query for the failure case, where it only chooses between the two error messages.
     if path.joinpath(RAW_DATA_DIRECTORY).is_dir():
         return path, None
     if path.name == RAW_DATA_DIRECTORY and path.is_dir():
         return path.parent, None
+    if not path.exists():
+        message = f"Unable to resolve the session root. The path {path} does not exist."
+        return None, error_response(message=message)
     message = f"Unable to resolve the session root. No {RAW_DATA_DIRECTORY} directory was located under {path}."
     return None, error_response(message=message)

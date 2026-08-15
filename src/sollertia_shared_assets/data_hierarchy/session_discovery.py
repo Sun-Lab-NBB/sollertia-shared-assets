@@ -42,11 +42,15 @@ def validate_directory(directory: str) -> str | None:
         message.
     """
     path = Path(directory)
+
+    # The directory test subsumes the existence test, since a path that does not exist is not a directory either. It
+    # therefore runs first, which answers the success case with one metadata query instead of two and leaves the
+    # second query for the failure case, where it only chooses between the two error messages.
+    if path.is_dir():
+        return None
     if not path.exists():
         return f"Unable to validate the input directory. The path {directory} does not exist."
-    if not path.is_dir():
-        return f"Unable to validate the input directory. The path {directory} is not a directory."
-    return None
+    return f"Unable to validate the input directory. The path {directory} is not a directory."
 
 
 def iterate_sessions(root_path: Path) -> Iterator[SessionData]:
