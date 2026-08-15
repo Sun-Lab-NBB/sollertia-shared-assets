@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
+import math
 from dataclasses import dataclass
 
 from ataraxis_base_utilities import console
@@ -21,10 +22,11 @@ _PROBABILITY_SUM_TOLERANCE: float = 0.001
 _TRIAL_NAME_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
 """Matches trial names that are safe to embed in Unity segment prefab filenames.
 
-Restricts trial names to ASCII letters, digits, and underscores so the ``TemplateName_TrialName``
+Restricts trial names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName``
 segment naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path separators,
-whitespace, or punctuation introduced in a template. Mirrors the equivalent check on the Unity
-side in ``ConfigLoader.cs``.
+whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves is what
+lets a segment filename split back to exactly one owning template. Mirrors the equivalent check on
+the Unity side in ``ConfigLoader.cs``.
 """
 
 
@@ -78,6 +80,9 @@ class Cue:
 
     def __post_init__(self) -> None:
         """Validates cue definition parameters."""
+        if not self.name:
+            message = "Unable to initialize Cue. The name must be a non-empty string, but got an empty value."
+            console.error(message=message, error=ValueError)
         if not 0 <= self.code <= _UINT8_MAX:
             message = (
                 f"Unable to initialize Cue '{self.name}'. The code must be a uint8 value in range [0, 255], but got "
@@ -98,7 +103,9 @@ class VREnvironment:
 
     Notes:
         This class is primarily used by Unity to configure the task environment. Python parses these values
-        from the YAML configuration file but does not use them at runtime.
+        from the YAML configuration file but does not use them at runtime. Every field divides or sizes downstream
+        corridor geometry, so the validation below rejects a value that would leave Unity with an infinite segment
+        length, a zero-depth corridor, or a maze generation loop that never terminates.
     """
 
     corridor_spacing_cm: float
@@ -112,6 +119,33 @@ class VREnvironment:
     cue_offset_cm: float
     """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
     sequence origin, in centimeters."""
+
+    def __post_init__(self) -> None:
+        """Validates corridor geometry parameters."""
+        if self.segments_per_corridor < 1:
+            message = (
+                "Unable to initialize VREnvironment. The segments_per_corridor must be at least 1, but got "
+                f"{self.segments_per_corridor}."
+            )
+            console.error(message=message, error=ValueError)
+        if not math.isfinite(self.cm_per_unity_unit) or self.cm_per_unity_unit <= 0:
+            message = (
+                "Unable to initialize VREnvironment. The cm_per_unity_unit must be a positive, finite value, but got "
+                f"{self.cm_per_unity_unit}."
+            )
+            console.error(message=message, error=ValueError)
+        if not math.isfinite(self.corridor_spacing_cm) or self.corridor_spacing_cm <= 0:
+            message = (
+                "Unable to initialize VREnvironment. The corridor_spacing_cm must be a positive, finite value, but "
+                f"got {self.corridor_spacing_cm}."
+            )
+            console.error(message=message, error=ValueError)
+        if not math.isfinite(self.cue_offset_cm):
+            message = (
+                "Unable to initialize VREnvironment. The cue_offset_cm must be a finite value, but got "
+                f"{self.cue_offset_cm}."
+            )
+            console.error(message=message, error=ValueError)
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +193,16 @@ class TrialStructure:
             console.error(message=message, error=ValueError)
 
         if self.transitions:
+            for target_name, probability in self.transitions.items():
+                # A negative weight lets the set sum to 1.0 while removing its target from the sampled distribution,
+                # and a non-finite weight passes every ordered comparison including the sum tolerance below.
+                if not 0.0 <= probability <= 1.0:
+                    message = (
+                        f"Unable to initialize TrialStructure. The transition probability for '{target_name}' must be "
+                        f"a finite value in range [0.0, 1.0], but got {probability}."
+                    )
+                    console.error(message=message, error=ValueError)
+
             probability_sum = sum(self.transitions.values())
             if abs(probability_sum - 1.0) > _PROBABILITY_SUM_TOLERANCE:
                 message = (
