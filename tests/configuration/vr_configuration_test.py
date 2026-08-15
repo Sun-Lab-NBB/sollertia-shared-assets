@@ -107,14 +107,45 @@ def test_cue_code_negative_raises_error() -> None:
 
 def test_cue_length_zero_raises_error() -> None:
     """Verifies that a Cue with length_cm <= 0 raises ValueError."""
-    with pytest.raises(ValueError, match=r"length_cm must be greater than 0"):
+    with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
         Cue(name="X", code=1, length_cm=0.0)
 
 
 def test_cue_length_negative_raises_error() -> None:
     """Verifies that a Cue with negative length_cm raises ValueError."""
-    with pytest.raises(ValueError, match=r"length_cm must be greater than 0"):
+    with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
         Cue(name="X", code=1, length_cm=-10.0)
+
+
+def test_cue_nan_length_raises_error() -> None:
+    """Verifies that a Cue with a NaN length_cm raises ValueError."""
+    with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
+        Cue(name="X", code=1, length_cm=float("nan"))
+
+
+def test_cue_infinite_length_raises_error() -> None:
+    """Verifies that a Cue with an infinite length_cm raises ValueError."""
+    with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
+        Cue(name="X", code=1, length_cm=float("inf"))
+
+
+def test_cue_name_with_space_raises_error() -> None:
+    """Verifies that a Cue name carrying a space raises ValueError."""
+    with pytest.raises(ValueError, match=r"name must contain only ASCII letters, digits, and underscores"):
+        Cue(name="A B", code=1, length_cm=50.0)
+
+
+def test_cue_name_with_hyphen_raises_error() -> None:
+    """Verifies that a Cue name carrying a hyphen raises ValueError."""
+    with pytest.raises(ValueError, match=r"name must contain only ASCII letters, digits, and underscores"):
+        Cue(name="A-B", code=1, length_cm=50.0)
+
+
+def test_cue_name_with_underscores_and_digits() -> None:
+    """Verifies that a Cue name of ASCII letters, digits, and underscores is accepted."""
+    cue = Cue(name="Cue_01", code=1, length_cm=50.0)
+
+    assert cue.name == "Cue_01"
 
 
 def test_trial_structure_empty_cue_sequence_raises_error() -> None:
@@ -455,7 +486,7 @@ def test_task_template_location_precedes_start_raises_error() -> None:
 
 def test_trial_structure_non_positive_occupancy_duration_raises_error() -> None:
     """Verifies that a TrialStructure with a non-positive occupancy_duration_ms raises ValueError."""
-    with pytest.raises(ValueError, match=r"occupancy_duration_ms must be greater than 0"):
+    with pytest.raises(ValueError, match=r"occupancy_duration_ms must be a positive, finite value"):
         TrialStructure(
             cue_sequence=["A"],
             stimulus_trigger_zone_start_cm=0.0,
@@ -464,6 +495,20 @@ def test_trial_structure_non_positive_occupancy_duration_raises_error() -> None:
             show_stimulus_collision_boundary=False,
             trigger_type=TriggerType.OCCUPANCY_DISARM,
             occupancy_duration_ms=0.0,
+        )
+
+
+def test_trial_structure_nan_occupancy_duration_raises_error() -> None:
+    """Verifies that a TrialStructure with a NaN occupancy_duration_ms raises ValueError."""
+    with pytest.raises(ValueError, match=r"occupancy_duration_ms must be a positive, finite value"):
+        TrialStructure(
+            cue_sequence=["A"],
+            stimulus_trigger_zone_start_cm=0.0,
+            stimulus_trigger_zone_end_cm=10.0,
+            stimulus_location_cm=5.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.OCCUPANCY_DISARM,
+            occupancy_duration_ms=float("nan"),
         )
 
 
