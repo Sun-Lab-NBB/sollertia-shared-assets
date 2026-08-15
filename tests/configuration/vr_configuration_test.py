@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import pytest
@@ -52,6 +53,22 @@ def _create_base_task_template(
     )
 
 
+def _create_vr_environment(
+    corridor_spacing_cm: float = 100.0,
+    segments_per_corridor: int = 3,
+    cm_per_unity_unit: float = 10.0,
+    cue_offset_cm: float = 0.0,
+) -> VREnvironment:
+    """Builds a VREnvironment with valid defaults so a test overrides only the field it exercises."""
+    return VREnvironment(
+        corridor_spacing_cm=corridor_spacing_cm,
+        segments_per_corridor=segments_per_corridor,
+        padding_prefab_name="Padding",
+        cm_per_unity_unit=cm_per_unity_unit,
+        cue_offset_cm=cue_offset_cm,
+    )
+
+
 def test_trigger_type_values() -> None:
     """Verifies the supported TriggerType enumeration values."""
     assert TriggerType.INTERACTION == "interaction"
@@ -68,6 +85,12 @@ def test_trigger_type_is_string_enum() -> None:
     assert isinstance(TriggerType.OCCUPANCY_DISARM, str)
     assert isinstance(TriggerType.OCCUPANCY_ARM, str)
     assert isinstance(TriggerType.OCCUPANCY_TRIGGER, str)
+
+
+def test_cue_empty_name_raises_error() -> None:
+    """Verifies that a Cue with an empty name raises ValueError."""
+    with pytest.raises(ValueError, match=r"name must be a non-empty string"):
+        Cue(name="", code=1, length_cm=50.0)
 
 
 def test_cue_code_above_uint8_raises_error() -> None:
@@ -121,6 +144,34 @@ def test_trial_structure_invalid_transitions_sum_raises_error() -> None:
         )
 
 
+def test_trial_structure_negative_transition_probability_raises_error() -> None:
+    """Verifies that a negative transition probability raises ValueError even when the set sums to 1.0."""
+    with pytest.raises(ValueError, match=r"transition probability for 'trial1'"):
+        TrialStructure(
+            cue_sequence=["A"],
+            stimulus_trigger_zone_start_cm=0.0,
+            stimulus_trigger_zone_end_cm=10.0,
+            stimulus_location_cm=5.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.INTERACTION,
+            transitions={"trial1": -0.5, "trial2": 1.5},
+        )
+
+
+def test_trial_structure_non_finite_transition_probability_raises_error() -> None:
+    """Verifies that a non-finite transition probability raises ValueError."""
+    with pytest.raises(ValueError, match=r"transition probability for 'trial1'"):
+        TrialStructure(
+            cue_sequence=["A"],
+            stimulus_trigger_zone_start_cm=0.0,
+            stimulus_trigger_zone_end_cm=10.0,
+            stimulus_location_cm=5.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.INTERACTION,
+            transitions={"trial1": math.nan},
+        )
+
+
 def test_trial_structure_valid_transitions() -> None:
     """Verifies that a TrialStructure with transitions summing to 1.0 initializes correctly."""
     trial = TrialStructure(
@@ -163,6 +214,42 @@ def test_vr_environment_initialization() -> None:
     assert environment.padding_prefab_name == "PaddingV2"
     assert environment.cm_per_unity_unit == 12.5
     assert environment.cue_offset_cm == 8.0
+
+
+def test_vr_environment_zero_segments_per_corridor_raises_error() -> None:
+    """Verifies that a VREnvironment with fewer than one segment per corridor raises ValueError."""
+    with pytest.raises(ValueError, match=r"segments_per_corridor must be at least 1"):
+        _create_vr_environment(segments_per_corridor=0)
+
+
+def test_vr_environment_zero_cm_per_unity_unit_raises_error() -> None:
+    """Verifies that a VREnvironment with a non-positive cm_per_unity_unit raises ValueError."""
+    with pytest.raises(ValueError, match=r"cm_per_unity_unit must be a positive, finite value"):
+        _create_vr_environment(cm_per_unity_unit=0.0)
+
+
+def test_vr_environment_non_finite_cm_per_unity_unit_raises_error() -> None:
+    """Verifies that a VREnvironment with a non-finite cm_per_unity_unit raises ValueError."""
+    with pytest.raises(ValueError, match=r"cm_per_unity_unit must be a positive, finite value"):
+        _create_vr_environment(cm_per_unity_unit=math.inf)
+
+
+def test_vr_environment_negative_corridor_spacing_raises_error() -> None:
+    """Verifies that a VREnvironment with a non-positive corridor_spacing_cm raises ValueError."""
+    with pytest.raises(ValueError, match=r"corridor_spacing_cm must be a positive, finite value"):
+        _create_vr_environment(corridor_spacing_cm=-20.0)
+
+
+def test_vr_environment_non_finite_corridor_spacing_raises_error() -> None:
+    """Verifies that a VREnvironment with a non-finite corridor_spacing_cm raises ValueError."""
+    with pytest.raises(ValueError, match=r"corridor_spacing_cm must be a positive, finite value"):
+        _create_vr_environment(corridor_spacing_cm=math.nan)
+
+
+def test_vr_environment_non_finite_cue_offset_raises_error() -> None:
+    """Verifies that a VREnvironment with a non-finite cue_offset_cm raises ValueError."""
+    with pytest.raises(ValueError, match=r"cue_offset_cm must be a finite value"):
+        _create_vr_environment(cue_offset_cm=math.nan)
 
 
 def test_task_template_valid_initialization() -> None:

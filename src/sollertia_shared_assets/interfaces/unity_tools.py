@@ -23,7 +23,7 @@ _UNITY_BRIDGE_URL: str = "http://localhost:8090/"
 
 
 @mcp.tool()
-def create_task_tool(template_name: str) -> dict[str, Any]:
+def create_task_tool(template_name: str, unsaved_changes: Literal["save", "discard"] | None = None) -> dict[str, Any]:
     """Creates a Unity task end-to-end from a YAML task template.
 
     Generates the task prefab and the matching scene in one call. Mirrors the ``CreateTask/New Task`` Editor
@@ -45,17 +45,27 @@ def create_task_tool(template_name: str) -> dict[str, Any]:
     before any cue or segment is touched. Templates outside ``Configurations/`` are not visible to the
     MCP surface and are rejected by the Editor menu as well.
 
+    Scene generation opens the new scene, which discards unsaved edits in the active one. When the active
+    scene has unsaved edits and ``unsaved_changes`` is omitted, the bridge returns an error before any asset
+    is written, matching the policy :func:`open_scene_tool` applies.
+
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Args:
         template_name: The template filename without extension (e.g., ``SSO_Merging``). Must exist in the
             Unity project's ``Assets/InfiniteCorridorTask/Configurations/`` directory.
+        unsaved_changes: The policy applied when the active scene has unsaved edits. ``save`` persists the
+            active scene first, ``discard`` abandons the edits, and ``None`` returns an error so the caller
+            can prompt the user.
 
     Returns:
         A response dict with ``template_name``, ``prefab_path``, ``scene_path``,
         ``simulated_controller_added``, and ``message`` on success.
     """
-    return _unity_relay(tool="create_task", arguments={"template_name": template_name})
+    relay_arguments: dict[str, Any] = {"template_name": template_name}
+    if unsaved_changes is not None:
+        relay_arguments["unsaved_changes"] = unsaved_changes
+    return _unity_relay(tool="create_task", arguments=relay_arguments)
 
 
 @mcp.tool()
@@ -63,8 +73,10 @@ def delete_task_tool(template_name: str) -> dict[str, Any]:
     """Removes every Unity artifact that ``create_task_tool`` produces for a given template in a single call.
 
     Removes the scene plus its ``savedFullScreenViews`` companion, the task prefab, and every segment prefab
-    the template owns (resolved by the longest matching template basename, so a template whose name prefixes
-    another does not sweep the longer template's segments). Mirrors ``create_task_tool`` — the two tools cover the
+    the template owns. A segment is named ``TemplateName-TrialName`` and neither half may contain a hyphen, so
+    the prefix resolves to exactly one owning template even where one template basename nests another. A
+    template name matching a protected hand-authored asset, such as the base scene template, is refused before
+    anything is deleted. Mirrors ``create_task_tool`` — the two tools cover the
     full lifecycle of a task's generated artifacts. Cue prefabs and cue materials are intentionally not removed
     because they are shared
     across every template that declares a matching ``(name, length_cm)`` identity; deleting them
@@ -95,7 +107,7 @@ def inspect_prefab_tool(prefab_path: str) -> dict[str, Any]:
 
     Args:
         prefab_path: The project-relative path to the prefab (e.g.,
-            ``Assets/InfiniteCorridorTask/Prefabs/SSO_Merging_ABC.prefab``).
+            ``Assets/InfiniteCorridorTask/Prefabs/SSO_Merging-ABC.prefab``).
 
     Returns:
         A response dict with ``prefab_path`` and ``hierarchy`` (recursive GameObject tree with transforms,
@@ -126,8 +138,8 @@ def clone_zone_prefab_tool(
     literal, the ``CreateTask`` placement branch, the ``McpBridge`` protected-path set, and the Python
     ``TriggerType`` registry) remains the documented zone-extension recipe. A new region behavior should
     follow the zone-modifier architecture: subclass an existing zone, or add a standalone ``IResettable``
-    registered in ``ResetZone``, on a root that subclasses ``StimulusTriggerZone`` and publishes the
-    standard ``Stimulus`` event.
+    registered in ``Task.FindResettableZones``, on a root that subclasses ``StimulusTriggerZone`` and
+    publishes the standard ``Stimulus`` event.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 
@@ -364,6 +376,7 @@ def write_task_parameters_tool(
         task: Optional dict with ``require_interaction`` (bool), ``require_wait`` (bool), ``track_length``
             (float), and/or ``track_seed`` (int). ``require_interaction`` is rejected when the scene has no
             ``GuidanceZone``; ``require_wait`` is rejected when the scene has no ``OccupancyZone``.
+            ``track_length`` must be a positive, finite number of Unity units long enough to fill one corridor.
 
     Returns:
         A post-write snapshot in the same shape as :func:`read_task_parameters_tool`, so callers get
