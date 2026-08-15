@@ -51,7 +51,7 @@ dependencies = [
     "click>=8,<9",
 
     # Natural sorting of discovered project, experiment, and animal names for human-friendly ordering
-    "natsort>=8,<9",
+    "natsort>=8.2,<9",  # 8.2 first auto-coerces pathlib.Path inputs, which every Path call site passes
 
     # Date parsing (used by session-discovery filter helpers)
     "python-dateutil>=2,<3",
@@ -60,7 +60,7 @@ dependencies = [
     "polars>=1,<2",
 
     # Provides IANA timezone data for zoneinfo on Windows, which does not ship system tzdata.
-    "tzdata>=2024,<2027; sys_platform == 'win32'",
+    "tzdata>=2026,<2027; sys_platform == 'win32'",
 
     # YAML serialization (used directly by MCP helpers to stage caller-supplied dicts for YamlConfig validation)
     "pyyaml>=6,<7",
