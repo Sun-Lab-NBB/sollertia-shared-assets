@@ -17,8 +17,11 @@ from .enums import (
 from .registries import (
     DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
+    SYSTEM_SESSION_TYPES,
+    HARDWARE_STATE_REGISTRY,
     CREDENTIALS_FILE_REGISTRY,
     SESSION_TYPES_USING_VR_TASK,
+    EXPERIMENT_CONFIGURATION_REGISTRY,
     resolve_read_asset,
 )
 from .credentials import (
@@ -90,6 +93,7 @@ from .data_hierarchy import (
     iter_project_animals,
     get_projects_for_animal,
     parse_session_timestamp,
+    get_session_root_from_marker,
 )
 
 # This library drives its own pipeline, so it owns the console state for the runtimes that import it.
@@ -102,11 +106,14 @@ __all__ = [
     "CREDENTIALS_FILE_REGISTRY",
     "DATASET_MARKER_FILENAME",
     "DESCRIPTOR_REGISTRY",
+    "EXPERIMENT_CONFIGURATION_REGISTRY",
+    "HARDWARE_STATE_REGISTRY",
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
     "READ_ASSET_REGISTRY",
     "SESSION_TYPES_USING_VR_TASK",
+    "SYSTEM_SESSION_TYPES",
     "AcquisitionSystems",
     "AnimalData",
     "CredentialsTypes",
@@ -153,6 +160,7 @@ __all__ = [
     "get_credentials",
     "get_data_root",
     "get_projects_for_animal",
+    "get_session_root_from_marker",
     "get_task_templates_directory",
     "get_working_directory",
     "iter_animal_sessions",
