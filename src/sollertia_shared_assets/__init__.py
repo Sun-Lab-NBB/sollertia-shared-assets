@@ -96,8 +96,10 @@ from .data_hierarchy import (
     get_session_root_from_marker,
 )
 
-# This library drives its own pipeline, so it owns the console state for the runtimes that import it.
-if not console.enabled:
+# This library drives its own pipeline, so it owns the console state for the runtimes that import it. The console
+# starts disabled on a fresh interpreter and this module body runs once per process, including in each xdist worker,
+# so the guard never observes an already-enabled console under test.
+if not console.enabled:  # pragma: no branch
     console.enable()
 
 __all__ = [

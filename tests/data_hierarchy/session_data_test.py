@@ -519,6 +519,35 @@ def test_session_data_create_without_experiment_name_skips_experiment_config(cle
     assert not session_vr_configuration.exists()
 
 
+def test_session_data_create_skips_vr_snapshot_for_non_corridor_session_type(
+    clean_working_directory: Path,
+    sample_experiment_config: MesoscopeExperimentConfiguration,
+) -> None:
+    """Verifies that create() copies the experiment configuration but writes no VR snapshot for a session type that
+    does not run the corridor task."""
+    set_working_directory(path=clean_working_directory)
+
+    project_path = clean_working_directory / "test_project"
+    project_path.mkdir()
+    configuration_path = project_path / "configuration"
+    configuration_path.mkdir()
+    sample_experiment_config.to_yaml(file_path=configuration_path / "test_experiment.yaml")
+
+    # The task templates directory is deliberately left unconfigured, so a session type outside
+    # SESSION_TYPES_USING_VR_TASK that reached the template lookup would fail rather than pass silently.
+    session_data = SessionData.create(
+        animal=AnimalData(root=clean_working_directory, project_name="test_project", animal_id="test_animal"),
+        session_type=SessionTypes.LICK_TRAINING,
+        experiment_name="test_experiment",
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+    )
+
+    assert (session_data.raw_data_path / RawDataFiles.EXPERIMENT_CONFIGURATION).exists()
+    assert not (session_data.raw_data_path / RawDataFiles.VR_CONFIGURATION).exists()
+
+
 def test_session_data_post_init_coerces_string_session_type() -> None:
     """Verifies that __post_init__ converts a string session_type into a SessionTypes enum member."""
     session_data = SessionData(
@@ -532,6 +561,53 @@ def test_session_data_post_init_coerces_string_session_type() -> None:
     )
 
     assert session_data.session_type == SessionTypes.LICK_TRAINING
+
+
+def test_session_data_post_init_preserves_enum_members() -> None:
+    """Verifies that __post_init__ leaves a session_type and an acquisition_system that are already enum members
+    unchanged."""
+    session_data = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.RUN_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+    )
+
+    assert session_data.session_type is SessionTypes.RUN_TRAINING
+    assert session_data.acquisition_system is AcquisitionSystems.MESOSCOPE_VR
+
+
+@pytest.mark.parametrize("corrupt_value", [None, 5, ["lick training"], {"a": "b"}])
+def test_session_data_post_init_rejects_values_outside_the_vocabulary(corrupt_value: object) -> None:
+    """Verifies that __post_init__ rejects a session_type outside the platform vocabulary rather than storing it."""
+    with pytest.raises(ValueError, match="is not a valid SessionTypes"):
+        SessionData(
+            project_name="test_project",
+            animal_id="test_animal",
+            session_name="2024-01-15-12-30-45-123456",
+            session_type=corrupt_value,  # type: ignore[arg-type]
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            python_version=_DEFAULT_PYTHON_VERSION,
+            sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        )
+
+
+def test_session_data_load_rejects_marker_with_null_session_type(tmp_path: Path) -> None:
+    """Verifies that load() rejects a marker whose session_type is null instead of returning an instance carrying
+    None."""
+    # The loader runs with per-field type checking disabled, so a null reaches __post_init__ as None rather than
+    # being rejected during deserialization.
+    session_root = tmp_path / "2024-01-15-12-30-45-123456"
+    raw_data_path = session_root / "raw_data"
+    raw_data_path.mkdir(parents=True)
+    marker = _write_session_marker(session_root).raw_data_path / RawDataFiles.SESSION_DATA
+    marker.write_text(marker.read_text().replace("session_type: lick training", "session_type: null"))
+
+    with pytest.raises(ValueError, match="is not a valid SessionTypes"):
+        SessionData.load(session_path=session_root)
 
 
 def test_session_data_raw_data_file_paths() -> None:

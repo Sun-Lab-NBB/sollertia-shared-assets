@@ -2,6 +2,7 @@
 sollertia_shared_assets.data_hierarchy.dataset_data.
 """
 
+import shutil
 from pathlib import Path
 
 import polars as pl
@@ -14,6 +15,7 @@ from sollertia_shared_assets import (
     DatasetSession,
     AcquisitionSystems,
 )
+from sollertia_shared_assets.data_hierarchy import dataset_data as dataset_data_module
 
 # A representative column-description binding, passed to nearly every create() call. The empty-mapping test passes {}
 # instead. The mapping is intentionally small. The assembly worker that produces the real mapping lives in the
@@ -79,6 +81,32 @@ def test_dataset_data_direct_initialization() -> None:
     assert dataset_data.session_type == SessionTypes.LICK_TRAINING
     assert dataset_data.acquisition_system == AcquisitionSystems.MESOSCOPE_VR
     assert dataset_data.sessions == ()
+
+
+@pytest.mark.parametrize("corrupt_value", [None, 5, ["lick training"]])
+def test_dataset_data_post_init_rejects_values_outside_the_vocabulary(corrupt_value: object) -> None:
+    """Verifies that __post_init__ rejects a session_type outside the platform vocabulary rather than storing it."""
+    with pytest.raises(ValueError, match="is not a valid SessionTypes"):
+        DatasetData(
+            name="test_dataset",
+            project="test_project",
+            session_type=corrupt_value,  # type: ignore[arg-type]
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        )
+
+
+def test_dataset_data_post_init_preserves_enum_members() -> None:
+    """Verifies that __post_init__ leaves a session_type and an acquisition_system that are already enum members
+    unchanged."""
+    dataset_data = DatasetData(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+    )
+
+    assert dataset_data.session_type is SessionTypes.LICK_TRAINING
+    assert dataset_data.acquisition_system is AcquisitionSystems.MESOSCOPE_VR
 
 
 def test_dataset_data_create_initializes_directory_structure(tmp_path: Path) -> None:
@@ -159,6 +187,203 @@ def test_dataset_data_create_raises_on_empty_sessions(tmp_path: Path) -> None:
         )
 
 
+def test_dataset_data_create_materializes_a_lazy_sessions_iterable(tmp_path: Path) -> None:
+    """Verifies that create() materializes a generator before the screens read it, so every yielded session lands in
+    the hierarchy."""
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),
+        DatasetSession(session="2024-01-16-09-15-22-654321", animal="animal_b"),
+    )
+
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=(session for session in sessions),  # type: ignore[arg-type]
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+    dataset_root = tmp_path / "test_dataset"
+    assert len(dataset_data.sessions) == 2
+    assert (dataset_root / "animal_a" / "2024-01-15-12-30-45-123456").is_dir()
+    assert (dataset_root / "animal_b" / "2024-01-16-09-15-22-654321").is_dir()
+
+
+def test_dataset_data_create_rejects_an_empty_lazy_sessions_iterable(tmp_path: Path) -> None:
+    """Verifies that create() rejects a generator that yields nothing instead of persisting a session-less dataset."""
+    with pytest.raises(ValueError, match="at least one"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=(session for session in ()),  # type: ignore[arg-type]
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("corrupt_name", ["", ".", "..", "nested/dataset", "trailing/"])
+def test_dataset_data_create_rejects_a_name_outside_one_directory(corrupt_name: str, tmp_path: Path) -> None:
+    """Verifies that create() rejects a dataset name that does not resolve to a single directory under the root."""
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),)
+
+    with pytest.raises(ValueError, match="The name must be a non-empty string naming a single directory"):
+        DatasetData.create(
+            name=corrupt_name,
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "animal, session",
+    [
+        ("", "2024-01-15-12-30-45-123456"),
+        (".", "2024-01-15-12-30-45-123456"),
+        ("..", "2024-01-15-12-30-45-123456"),
+        ("nested/animal", "2024-01-15-12-30-45-123456"),
+        ("/absolute", "2024-01-15-12-30-45-123456"),
+        ("animal_a", ""),
+        ("animal_a", "../escape"),
+    ],
+)
+def test_dataset_data_create_rejects_identifiers_outside_one_directory(
+    animal: str,
+    session: str,
+    tmp_path: Path,
+) -> None:
+    """Verifies that create() rejects an animal or session identifier that does not name a single directory."""
+    with pytest.raises(ValueError, match="Every animal and session identifier"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=(DatasetSession(session=session, animal=animal),),
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_dataset_data_create_names_every_invalid_identifier(tmp_path: Path) -> None:
+    """Verifies that create() reports every offending identifier in one error rather than aborting on the first."""
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="../escape"),
+        DatasetSession(session="nested/session", animal="animal_b"),
+    )
+
+    with pytest.raises(ValueError, match=r"'\.\./escape',\s+'nested/session'"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("corrupt_value", [None, 5, "bogus", ["lick training"]])
+def test_dataset_data_create_rejects_session_type_outside_the_vocabulary(
+    corrupt_value: object,
+    tmp_path: Path,
+) -> None:
+    """Verifies that create() rejects a session_type outside the platform vocabulary before it creates any
+    directory."""
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),)
+
+    with pytest.raises(ValueError, match="must be one of the SessionTypes"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=corrupt_value,  # type: ignore[arg-type]
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("corrupt_value", [None, 5, "bogus", ["mesoscope"]])
+def test_dataset_data_create_rejects_acquisition_system_outside_the_vocabulary(
+    corrupt_value: object,
+    tmp_path: Path,
+) -> None:
+    """Verifies that create() rejects an acquisition_system outside the platform vocabulary before it creates any
+    directory."""
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),)
+
+    with pytest.raises(ValueError, match="must be one of the AcquisitionSystems"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=corrupt_value,  # type: ignore[arg-type]
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_dataset_data_create_retries_under_the_same_name_after_a_vocabulary_rejection(tmp_path: Path) -> None:
+    """Verifies that a create() call rejected for its vocabulary releases the dataset name, so the corrected retry
+    completes instead of failing as an already-existing dataset."""
+    sessions = (
+        DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),
+        DatasetSession(session="2024-01-16-09-15-22-123456", animal="animal_b"),
+    )
+
+    with pytest.raises(ValueError, match="Unable to create the 'test_dataset' forged dataset"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type="bogus",
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=COLUMN_DESCRIPTIONS,
+        )
+
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=sessions,
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+    # The retry reuses the rejected request's name, so a completed hierarchy is what proves the rejected request left
+    # the datasets root untouched.
+    dataset_root = tmp_path / "test_dataset"
+    assert dataset_data.session_type is SessionTypes.LICK_TRAINING
+    assert (dataset_root / "dataset.yaml").is_file()
+    assert (dataset_root / DatasetFiles.DESCRIPTIONS).is_file()
+    assert (dataset_root / "animal_a" / "2024-01-15-12-30-45-123456").is_dir()
+    assert (dataset_root / "animal_b" / "2024-01-16-09-15-22-123456").is_dir()
+
+
 def test_dataset_data_create_rejects_session_repeated_in_request(tmp_path: Path) -> None:
     """Verifies that create() rejects a tuple naming the same animal and session twice."""
     sessions = (
@@ -210,28 +435,89 @@ def test_dataset_data_create_writes_marker_after_descriptions(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verifies that create() publishes the dataset marker only once the descriptions companion is on disk."""
-    failure = OSError("simulated descriptions write failure")
+    real_save = DatasetData.save
+    companion_present: list[bool] = []
 
-    def _fail_descriptions(self, column_descriptions):
-        """Fails the descriptions write, standing in for an interruption partway through create()."""
-        raise failure
+    def _record_save(self):
+        """Records whether the descriptions companion is already on disk when the marker write starts."""
+        companion_present.append(self.descriptions_path.is_file())
+        real_save(self)
 
-    monkeypatch.setattr(DatasetData, "_write_column_descriptions", _fail_descriptions)
+    monkeypatch.setattr(DatasetData, "save", _record_save)
 
-    with pytest.raises(OSError, match="simulated descriptions write failure"):
+    dataset_data = DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=(DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),),
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+    # The marker is what makes a dataset discoverable, so publishing it last is what keeps every discoverable dataset
+    # one whose column_descriptions() resolves. The ordering is observed directly, since a creation interrupted before
+    # the marker write now rolls the whole hierarchy back and leaves nothing to inspect afterwards.
+    assert companion_present == [True]
+    assert dataset_data.dataset_data_path.is_file()
+
+
+@pytest.mark.parametrize(
+    "corrupt_descriptions",
+    [
+        {"time_us": None},
+        {"time_us": 5},
+        {"time_us": ""},
+        {"": "Microsecond-precision sample timestamps."},
+        {5: "Microsecond-precision sample timestamps."},
+        {("time_us",): "Microsecond-precision sample timestamps."},
+    ],
+)
+def test_dataset_data_create_rejects_invalid_column_descriptions(
+    corrupt_descriptions: dict[str, str],
+    tmp_path: Path,
+) -> None:
+    """Verifies that create() rejects a column_descriptions entry that does not bind two non-empty strings."""
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),)
+
+    with pytest.raises(ValueError, match="Every column_descriptions entry must bind a non-empty string"):
         DatasetData.create(
             name="test_dataset",
             project="test_project",
             session_type=SessionTypes.LICK_TRAINING,
             acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-            sessions=(DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),),
+            sessions=sessions,
             datasets_root=tmp_path,
-            column_descriptions=COLUMN_DESCRIPTIONS,
+            column_descriptions=corrupt_descriptions,
         )
 
-    # A dataset that never received its companion feather stays undiscoverable, so no consumer loads a dataset whose
-    # column_descriptions() would raise.
-    assert not (tmp_path / "test_dataset" / "dataset.yaml").exists()
+    # The mapping is the dataset's permanent interpretation contract, so a rejected mapping must not leave a dataset
+    # that would carry a null or a partial one forever.
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_dataset_data_create_names_every_invalid_column_description(tmp_path: Path) -> None:
+    """Verifies that create() reports every offending column_descriptions entry in one error."""
+    sessions = (DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),)
+    corrupt_descriptions = {
+        "time_us": None,
+        "lick": "",
+        "valve": 5,
+        "torque": "Torque sensor readout at each sample.",
+    }
+
+    with pytest.raises(ValueError, match=r"'lick',\s+'time_us',\s+'valve'"):
+        DatasetData.create(
+            name="test_dataset",
+            project="test_project",
+            session_type=SessionTypes.LICK_TRAINING,
+            acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+            sessions=sessions,
+            datasets_root=tmp_path,
+            column_descriptions=corrupt_descriptions,  # type: ignore[arg-type]
+        )
+
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_dataset_data_create_rejects_existing_directory(tmp_path: Path) -> None:
@@ -249,6 +535,205 @@ def test_dataset_data_create_rejects_existing_directory(tmp_path: Path) -> None:
             datasets_root=tmp_path,
             column_descriptions=COLUMN_DESCRIPTIONS,
         )
+
+
+# Tests for the transactional guarantee of create()
+
+
+def _fail_descriptions(self, column_descriptions):
+    """Fails the descriptions write, standing in for a failure partway through create()."""
+    message = "simulated descriptions write failure"
+    raise OSError(message)
+
+
+def _fail_save(self):
+    """Fails the marker write, standing in for a full disk, a read-only mount, or a revoked permission."""
+    message = "simulated marker write failure"
+    raise OSError(message)
+
+
+def _interrupt_save(self):
+    """Interrupts the marker write, standing in for a Ctrl-C landing inside a mutation."""
+    raise KeyboardInterrupt
+
+
+def _leave_directory(directory_path):
+    """Stands in for a delete_directory() call that exhausts its attempts and leaves the directory in place."""
+
+
+def _fail_delete(directory_path):
+    """Stands in for a delete_directory() call that cannot read the tree it is asked to remove."""
+    message = "simulated rollback failure"
+    raise OSError(message)
+
+
+def _make_failing_directory_creator(failing_call: int):
+    """Returns an ensure_directory_exists() stand-in that fails on the requested call and delegates on every other."""
+    real_creator = dataset_data_module.ensure_directory_exists
+    calls: list[Path] = []
+
+    def _create(path, is_file):
+        """Creates the directory unless this is the call the test asked to fail."""
+        calls.append(path)
+        if len(calls) == failing_call:
+            message = "simulated directory creation failure"
+            raise OSError(message)
+        real_creator(path=path, is_file=is_file)
+
+    return _create
+
+
+def _create_rollback_dataset(tmp_path: Path) -> DatasetData:
+    """Creates the two-animal dataset every rollback test builds, so the retries repeat an identical request."""
+    return DatasetData.create(
+        name="test_dataset",
+        project="test_project",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        sessions=(
+            DatasetSession(session="2024-01-15-12-30-45-123456", animal="animal_a"),
+            DatasetSession(session="2024-01-16-09-15-22-654321", animal="animal_b"),
+        ),
+        datasets_root=tmp_path,
+        column_descriptions=COLUMN_DESCRIPTIONS,
+    )
+
+
+def test_dataset_data_create_rolls_back_when_the_descriptions_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a descriptions write failure removes the hierarchy and releases the dataset name."""
+    monkeypatch.setattr(DatasetData, "_write_column_descriptions", _fail_descriptions)
+
+    with pytest.raises(OSError, match="simulated descriptions write failure"):
+        _create_rollback_dataset(tmp_path)
+
+    assert list(tmp_path.iterdir()) == []
+
+    # The identical request is what proves the name was released, since create() refuses an existing destination.
+    monkeypatch.undo()
+    dataset_data = _create_rollback_dataset(tmp_path)
+    assert dataset_data.dataset_data_path.is_file()
+    assert dataset_data.descriptions_path.is_file()
+
+
+def test_dataset_data_create_rolls_back_when_a_session_directory_cannot_be_created(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a session directory the filesystem refuses removes the dataset root created before it."""
+    # The second call is the first per-session directory, so the dataset root is already on disk when it fails.
+    monkeypatch.setattr(dataset_data_module, "ensure_directory_exists", _make_failing_directory_creator(2))
+
+    with pytest.raises(OSError, match="simulated directory creation failure"):
+        _create_rollback_dataset(tmp_path)
+
+    assert list(tmp_path.iterdir()) == []
+
+    monkeypatch.undo()
+    assert _create_rollback_dataset(tmp_path).dataset_data_path.is_file()
+
+
+def test_dataset_data_create_rolls_back_when_the_marker_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a marker write failure removes the whole hierarchy, companion feather included."""
+    monkeypatch.setattr(DatasetData, "save", _fail_save)
+
+    with pytest.raises(OSError, match="simulated marker write failure"):
+        _create_rollback_dataset(tmp_path)
+
+    assert list(tmp_path.iterdir()) == []
+
+    monkeypatch.undo()
+    assert _create_rollback_dataset(tmp_path).dataset_data_path.is_file()
+
+
+def test_dataset_data_create_rolls_back_on_an_interrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a Ctrl-C landing inside create() removes the hierarchy and re-raises the interruption."""
+    monkeypatch.setattr(DatasetData, "save", _interrupt_save)
+
+    with pytest.raises(KeyboardInterrupt):
+        _create_rollback_dataset(tmp_path)
+
+    assert list(tmp_path.iterdir()) == []
+
+    monkeypatch.undo()
+    assert _create_rollback_dataset(tmp_path).dataset_data_path.is_file()
+
+
+def test_dataset_data_create_skips_the_rollback_when_no_directory_was_created(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that create() attempts no removal when the dataset root directory never came to be."""
+    removals: list[Path] = []
+
+    def _record_removal(directory_path):
+        """Records every removal the rollback attempts."""
+        removals.append(directory_path)
+
+    monkeypatch.setattr(dataset_data_module, "ensure_directory_exists", _make_failing_directory_creator(1))
+    monkeypatch.setattr(dataset_data_module, "delete_directory", _record_removal)
+
+    with pytest.raises(OSError, match="simulated directory creation failure"):
+        _create_rollback_dataset(tmp_path)
+
+    # A rollback that runs unconditionally would target a path this call never claimed, which is what admits a
+    # dangling symlink at the destination being unlinked by a creation that never touched it.
+    assert removals == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_dataset_data_create_leaves_a_colliding_dataset_intact(tmp_path: Path) -> None:
+    """Verifies that a request colliding with an existing dataset leaves that dataset untouched."""
+    existing = _create_rollback_dataset(tmp_path)
+    (existing.dataset_data_path.parent / "animal_a" / "2024-01-15-12-30-45-123456" / "data.feather").write_bytes(
+        b"payload"
+    )
+
+    with pytest.raises(FileExistsError, match="must not exist"):
+        _create_rollback_dataset(tmp_path)
+
+    # Every screen runs outside the rollback, so a rejected request never removes the dataset it collided with.
+    reloaded = DatasetData.load(dataset_path=tmp_path / "test_dataset")
+    assert len(reloaded.sessions) == 2
+    assert reloaded.get_session(animal="animal_a", session="2024-01-15-12-30-45-123456").data_path.is_file()
+
+
+def test_dataset_data_create_reports_a_rollback_that_leaves_the_hierarchy_behind(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that create() raises when the rollback returns with the hierarchy still on disk."""
+    monkeypatch.setattr(DatasetData, "save", _fail_save)
+    monkeypatch.setattr(dataset_data_module, "delete_directory", _leave_directory)
+
+    with pytest.raises(RuntimeError, match="partially created hierarchy must be removed"):
+        _create_rollback_dataset(tmp_path)
+
+    # delete_directory reports an exhausted removal as a warning on a console that is disabled by default, so the
+    # surviving hierarchy has to be raised or it goes unreported.
+    assert (tmp_path / "test_dataset").is_dir()
+
+
+def test_dataset_data_create_reports_a_rollback_that_cannot_remove_the_hierarchy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that an OSError raised by the rollback itself is reported as the surviving hierarchy it leaves."""
+    monkeypatch.setattr(DatasetData, "save", _fail_save)
+    monkeypatch.setattr(dataset_data_module, "delete_directory", _fail_delete)
+
+    with pytest.raises(RuntimeError, match="partially created hierarchy must be removed"):
+        _create_rollback_dataset(tmp_path)
+
+    assert (tmp_path / "test_dataset").is_dir()
 
 
 def test_dataset_data_load_roundtrips_through_yaml(tmp_path: Path) -> None:
@@ -503,6 +988,128 @@ def test_dataset_data_add_sessions_accepts_set_of_sessions(tmp_path: Path) -> No
     assert len(dataset_data.sessions) == 3
 
 
+def test_dataset_data_add_sessions_materializes_a_lazy_sessions_iterable(tmp_path: Path) -> None:
+    """Verifies that add_sessions() materializes a generator before the screens read it."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+    requested = (DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),)
+
+    added = dataset_data.add_sessions(sessions=(session for session in requested))  # type: ignore[arg-type]
+
+    assert len(added) == 1
+    assert added[0].session_path.is_dir()
+    assert len(dataset_data.sessions) == 2
+
+
+def test_dataset_data_add_sessions_rejects_an_empty_lazy_sessions_iterable(tmp_path: Path) -> None:
+    """Verifies that add_sessions() rejects a generator that yields nothing instead of rewriting the marker."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    with pytest.raises(ValueError, match="at least one"):
+        dataset_data.add_sessions(sessions=(session for session in ()))  # type: ignore[arg-type]
+
+    assert len(dataset_data.sessions) == 1
+
+
+def test_dataset_data_add_sessions_rejects_identifiers_outside_one_directory(tmp_path: Path) -> None:
+    """Verifies that add_sessions() rejects an identifier that does not name a single directory."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+
+    escaping = (DatasetSession(session="2024-01-16-09-15-22-000002", animal="../escape"),)
+
+    with pytest.raises(ValueError, match="Every animal and session identifier"):
+        dataset_data.add_sessions(sessions=escaping)
+
+    assert list((tmp_path / "test_dataset").parent.iterdir()) == [tmp_path / "test_dataset"]
+    assert len(dataset_data.sessions) == 1
+
+
+def test_dataset_data_add_sessions_removes_directories_when_a_later_session_cannot_be_created(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a session directory the filesystem refuses removes the directories the same call created."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+    dataset_root = tmp_path / "test_dataset"
+
+    # The second call is the second requested session, so the first session's directories are already on disk.
+    monkeypatch.setattr(dataset_data_module, "ensure_directory_exists", _make_failing_directory_creator(2))
+
+    with pytest.raises(OSError, match="simulated directory creation failure"):
+        dataset_data.add_sessions(
+            sessions=(
+                DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+                DatasetSession(session="2024-01-17-09-15-22-000003", animal="animal_c"),
+            )
+        )
+
+    assert not (dataset_root / "animal_b").exists()
+    assert not (dataset_root / "animal_c").exists()
+    assert (dataset_root / "animal_a" / "2024-01-15-12-30-45-000001").is_dir()
+    assert len(dataset_data.sessions) == 1
+
+
+def test_dataset_data_add_sessions_restores_sessions_when_the_marker_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a failed marker write restores the instance's session list and removes the created directories."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+    dataset_root = tmp_path / "test_dataset"
+    request = (DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),)
+
+    monkeypatch.setattr(DatasetData, "save", _fail_save)
+
+    with pytest.raises(OSError, match="simulated marker write failure"):
+        dataset_data.add_sessions(sessions=request)
+
+    assert len(dataset_data.sessions) == 1
+    assert not (dataset_root / "animal_b").exists()
+    assert {session.session for session in DatasetData.load(dataset_path=dataset_root).sessions} == {
+        "2024-01-15-12-30-45-000001"
+    }
+
+    # The identical request is what proves the instance is retryable, since a session left in the instance's list
+    # would be refused as a duplicate.
+    monkeypatch.undo()
+    dataset_data.add_sessions(sessions=request)
+    assert len(dataset_data.sessions) == 2
+    assert (dataset_root / "animal_b" / "2024-01-16-09-15-22-000002").is_dir()
+
+
+def test_dataset_data_add_sessions_restores_sessions_when_the_marker_write_is_interrupted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a Ctrl-C landing inside the marker write restores the instance's session list and the tree."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+    dataset_root = tmp_path / "test_dataset"
+    request = (DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),)
+
+    monkeypatch.setattr(DatasetData, "save", _interrupt_save)
+
+    with pytest.raises(KeyboardInterrupt):
+        dataset_data.add_sessions(sessions=request)
+
+    assert len(dataset_data.sessions) == 1
+    assert not (dataset_root / "animal_b").exists()
+
+    monkeypatch.undo()
+    dataset_data.add_sessions(sessions=request)
+    assert len(dataset_data.sessions) == 2
+
+
 def test_dataset_data_add_sessions_rejects_empty_collection(tmp_path: Path) -> None:
     """Verifies that add_sessions() rejects an empty sessions collection."""
     dataset_data = _make_hierarchy_dataset(
@@ -596,6 +1203,107 @@ def test_dataset_data_remove_animal_rejects_unknown_animal(tmp_path: Path) -> No
 
     assert (tmp_path / "test_dataset" / "animal_a").is_dir()
     assert len(dataset_data.sessions) == 1
+
+
+def test_dataset_data_remove_animal_tolerates_missing_animal_directory(tmp_path: Path) -> None:
+    """Verifies that remove_animal() drops the animal from the marker when its directory is already absent."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path,
+        (
+            DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),
+            DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+        ),
+    )
+    dataset_root = tmp_path / "test_dataset"
+
+    # Reproduces a removal interrupted after the directory tree was cleared but before the marker was rewritten.
+    shutil.rmtree(dataset_root / "animal_a")
+
+    removed = dataset_data.remove_animal(animal="animal_a")
+
+    assert {session.session for session in removed} == {"2024-01-15-12-30-45-000001"}
+    assert (dataset_root / "animal_b" / "2024-01-16-09-15-22-000002").is_dir()
+
+    reloaded = DatasetData.load(dataset_path=dataset_root)
+    assert tuple(animal.animal for animal in reloaded.animals) == ("animal_b",)
+
+
+def test_dataset_data_remove_animal_reports_a_directory_that_survives_the_removal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that remove_animal() raises, instead of rewriting the marker, when the directory survives."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path,
+        (
+            DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),
+            DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+        ),
+    )
+    dataset_root = tmp_path / "test_dataset"
+
+    monkeypatch.setattr(dataset_data_module, "delete_directory", _leave_directory)
+
+    with pytest.raises(RuntimeError, match=r"directory must no longer\s+exist"):
+        dataset_data.remove_animal(animal="animal_a")
+
+    # Dropping the animal from the marker while its data survives is the exact state the removal ordering exists to
+    # prevent, so the marker keeps describing the tree that is still on disk.
+    assert (dataset_root / "animal_a").is_dir()
+    assert len(dataset_data.sessions) == 2
+    assert tuple(animal.animal for animal in DatasetData.load(dataset_path=dataset_root).animals) == (
+        "animal_a",
+        "animal_b",
+    )
+
+
+def test_dataset_data_remove_animal_rejects_an_identifier_outside_one_directory(tmp_path: Path) -> None:
+    """Verifies that remove_animal() refuses an identifier that resolves outside the animal's own directory."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path, (DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),)
+    )
+    dataset_root = tmp_path / "test_dataset"
+
+    # Reproduces a marker written before the creation-time screen existed, whose animal identifier joins onto the
+    # dataset root itself rather than onto a directory under it.
+    dataset_data.sessions = (DatasetSession(session="2024-01-15-12-30-45-000001", animal=""),)
+
+    with pytest.raises(ValueError, match="The animal identifier must be a non-empty string"):
+        dataset_data.remove_animal(animal="")
+
+    assert (dataset_root / "dataset.yaml").is_file()
+    assert (dataset_root / DatasetFiles.DESCRIPTIONS).is_file()
+    assert (dataset_root / "animal_a" / "2024-01-15-12-30-45-000001").is_dir()
+
+
+def test_dataset_data_remove_animal_restores_sessions_when_the_marker_write_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Verifies that a failed marker write restores the instance's session list, so the removal can be retried."""
+    dataset_data = _make_hierarchy_dataset(
+        tmp_path,
+        (
+            DatasetSession(session="2024-01-15-12-30-45-000001", animal="animal_a"),
+            DatasetSession(session="2024-01-16-09-15-22-000002", animal="animal_b"),
+        ),
+    )
+    dataset_root = tmp_path / "test_dataset"
+
+    monkeypatch.setattr(DatasetData, "save", _fail_save)
+
+    with pytest.raises(OSError, match="simulated marker write failure"):
+        dataset_data.remove_animal(animal="animal_a")
+
+    assert len(dataset_data.sessions) == 2
+
+    # The identical call is what proves the instance is retryable, since an animal already dropped from the instance's
+    # list would be refused as one the dataset does not hold.
+    monkeypatch.undo()
+    removed = dataset_data.remove_animal(animal="animal_a")
+
+    assert {session.session for session in removed} == {"2024-01-15-12-30-45-000001"}
+    assert tuple(animal.animal for animal in DatasetData.load(dataset_path=dataset_root).animals) == ("animal_b",)
 
 
 def test_dataset_data_remove_animal_then_add_sessions_rebuilds_animal(tmp_path: Path) -> None:

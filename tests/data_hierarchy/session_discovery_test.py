@@ -168,6 +168,19 @@ def test_iter_animal_sessions_yields_only_session_directories(tmp_path: Path) ->
     assert all(session.parent == animal.path for session in sessions)
 
 
+def test_iter_animal_sessions_skips_directory_with_out_of_range_timestamp(tmp_path: Path) -> None:
+    """Verifies that a directory whose name carries an out-of-range timestamp component is skipped rather than
+    aborting the scan."""
+    animal = AnimalData(root=tmp_path, project_name="proj_a", animal_id="1")
+    animal.path.mkdir(parents=True)
+    animal.session_path(session_name="2026-03-01-12-00-00-000000").mkdir()
+    animal.session_path(session_name="99999999999999999999-01-01-00-00-00-000000").mkdir()
+
+    sessions = list(iter_animal_sessions(animal=animal))
+
+    assert [session.name for session in sessions] == ["2026-03-01-12-00-00-000000"]
+
+
 def test_iter_animal_sessions_missing_animal_directory_yields_nothing(tmp_path: Path) -> None:
     """Verifies that iter_animal_sessions yields nothing when the animal directory does not exist."""
     animal = AnimalData(root=tmp_path, project_name="proj_a", animal_id="ghost")
@@ -332,6 +345,8 @@ def test_parse_session_timestamp_converts_to_local_when_requested() -> None:
         "2026-03-15-14-30-45",  # Six components instead of seven.
         "2026-03-15-14-30-45-abcdef",  # Non-numeric microseconds.
         "not-a-session",  # Entirely wrong format.
+        "99999999999999999999-01-01-00-00-00-000000",  # Year component outside the range datetime accepts.
+        "2026-13-15-14-30-45-000000",  # Month outside the calendar range.
     ],
 )
 def test_parse_session_timestamp_returns_none_for_malformed_input(malformed: str) -> None:

@@ -312,11 +312,20 @@ class SessionData(YamlConfig):
     ``load`` re-resolves it from the marker's own on-disk location."""
 
     def __post_init__(self) -> None:
-        """Coerces the string values loaded from YAML into their typed enum equivalents."""
-        if isinstance(self.session_type, str):
-            self.session_type = SessionTypes(self.session_type)
-        if isinstance(self.acquisition_system, str):
-            self.acquisition_system = AcquisitionSystems(self.acquisition_system)
+        """Resolves the session type and the acquisition system identifiers into their typed enumeration members.
+
+        Notes:
+            The conversion is unconditional, because ``SessionTypes`` and ``AcquisitionSystems`` are ``StrEnum``
+            subclasses whose members are themselves strings and whose constructors accept an existing member. The
+            loader runs with per-field type checking disabled, so a marker carrying a null or a non-string value
+            delivers it here unchanged. Converting unconditionally rejects such a value at construction instead of
+            storing it and re-persisting it on the next save.
+
+        Raises:
+            ValueError: If the session type or the acquisition system falls outside the platform vocabulary.
+        """
+        self.session_type = SessionTypes(self.session_type)
+        self.acquisition_system = AcquisitionSystems(self.acquisition_system)
 
     @classmethod
     def create(
