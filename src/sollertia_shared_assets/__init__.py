@@ -15,8 +15,10 @@ from .enums import (
     AcquisitionSystems,
 )
 from .registries import (
+    DESCRIPTOR_REGISTRY,
     READ_ASSET_REGISTRY,
     CREDENTIALS_FILE_REGISTRY,
+    SESSION_TYPES_USING_VR_TASK,
     resolve_read_asset,
 )
 from .credentials import (
@@ -64,6 +66,7 @@ from .configuration import (
 )
 from .data_hierarchy import (
     RAW_DATA_DIRECTORY,
+    DATASET_MARKER_FILENAME,
     PROCESSED_DATA_DIRECTORY,
     PERSISTENT_DATA_DIRECTORY,
     RawData,
@@ -97,10 +100,13 @@ __all__ = [
     "CONFIGURATION_DIRECTORY",
     "CREDENTIALS_DIRECTORY",
     "CREDENTIALS_FILE_REGISTRY",
+    "DATASET_MARKER_FILENAME",
+    "DESCRIPTOR_REGISTRY",
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
     "RAW_DATA_DIRECTORY",
     "READ_ASSET_REGISTRY",
+    "SESSION_TYPES_USING_VR_TASK",
     "AcquisitionSystems",
     "AnimalData",
     "CredentialsTypes",
