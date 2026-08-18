@@ -26,8 +26,8 @@ Restricts both names to ASCII letters, digits, and underscores so the ``Template
 and the ``Cue_Name_LengthCm`` cue naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path
 separators, whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves of a segment name
 is what lets a segment filename split back to exactly one owning template. Barring whitespace from a cue name also keeps
-the space-joined cue sequence signature that Unity compares trials on unambiguous. Mirrors the equivalent check on the
-Unity side in ``ConfigLoader.cs``.
+the space-joined cue sequence signature that Unity compares trials on unambiguous. Unity applies the same pattern to the
+template filename stem and to each trial name in ``ConfigLoader.cs``, and the cue-name half is enforced here alone.
 """
 
 
@@ -74,10 +74,9 @@ class Cue:
     """The unique uint8 code (0-255) that identifies the cue during MQTT communication and data analysis."""
     length_cm: float
     """The length of the cue in centimeters."""
-    texture: str = ""
+    texture: str
     """The texture filename (e.g., ``Cue 016 - 4x1.png``) located in the Unity project's
-    ``Assets/InfiniteCorridorTask/Textures/`` directory. Applied 1:1 to the cue wall panels during prefab generation.
-    Defaults to an empty string when the template omits the field."""
+    ``Assets/InfiniteCorridorTask/Textures/`` directory. Applied 1:1 to the cue wall panels during prefab generation."""
 
     def __post_init__(self) -> None:
         """Validates cue definition parameters."""
@@ -105,6 +104,14 @@ class Cue:
                 f"{self.length_cm} cm."
             )
             console.error(message=message, error=ValueError)
+        # Unity resolves this filename against its own Textures directory and refuses a cue that names none, so the
+        # same requirement is enforced here, where the template is authored.
+        if not self.texture:
+            message = (
+                f"Unable to initialize Cue '{self.name}'. The texture must be a non-empty filename naming a texture "
+                f"in the Unity project's Textures directory, but got an empty value."
+            )
+            console.error(message=message, error=ValueError)
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,17 +122,20 @@ class VREnvironment:
         Every field divides or sizes downstream corridor geometry, so the validation below rejects a value that would
         leave Unity with an infinite segment length, a zero-depth corridor, or a maze generation loop that never
         terminates.
+
+        Each default matches the one the Unity ``VREnvironment`` class declares for the same field, so a template that
+        omits the key loads here with the geometry Unity would apply to it.
     """
 
-    corridor_spacing_cm: float
+    corridor_spacing_cm: float = 20.0
     """The horizontal spacing between corridor instances in centimeters."""
-    segments_per_corridor: int
+    segments_per_corridor: int = 3
     """The number of segments visible in each corridor instance (corridor depth)."""
-    padding_prefab_name: str
+    padding_prefab_name: str = "Padding"
     """The name of the Unity prefab used for corridor padding."""
-    cm_per_unity_unit: float
+    cm_per_unity_unit: float = 10.0
     """The conversion factor from centimeters to Unity units."""
-    cue_offset_cm: float
+    cue_offset_cm: float = 0.0
     """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
     sequence origin, in centimeters."""
 
@@ -180,7 +190,9 @@ class TrialStructure:
     stimulus_trigger_zone_end_cm: float
     """The position of the trial stimulus trigger zone ending boundary, in centimeters."""
     stimulus_location_cm: float
-    """The location of the invisible boundary (wall) with which the animal must collide to elicit the stimulus."""
+    """The position of the stimulus boundary (invisible wall), in centimeters. The collision, occupancy_disarm, and
+    occupancy_arm trigger types elicit the stimulus on collision with this boundary, while the interaction and
+    occupancy_trigger types elicit it from the sensor and the occupancy timer instead."""
     show_stimulus_collision_boundary: bool
     """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
     the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""

@@ -26,8 +26,8 @@ def _create_base_task_template(
     """Builds a TaskTemplate populated with defaults suitable for tests."""
     if cues is None:
         cues = [
-            Cue(name="A", code=1, length_cm=50.0),
-            Cue(name="B", code=2, length_cm=50.0),
+            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
         ]
     if trial_structures is None:
         trial_structures = {
@@ -90,62 +90,68 @@ def test_trigger_type_is_string_enum() -> None:
 def test_cue_empty_name_raises_error() -> None:
     """Verifies that a Cue with an empty name raises ValueError."""
     with pytest.raises(ValueError, match=r"name must be a non-empty string"):
-        Cue(name="", code=1, length_cm=50.0)
+        Cue(name="", code=1, length_cm=50.0, texture="Cue.png")
 
 
 def test_cue_code_above_uint8_raises_error() -> None:
     """Verifies that a Cue code above 255 raises ValueError."""
     with pytest.raises(ValueError, match=r"uint8"):
-        Cue(name="X", code=256, length_cm=50.0)
+        Cue(name="X", code=256, length_cm=50.0, texture="Cue.png")
 
 
 def test_cue_code_negative_raises_error() -> None:
     """Verifies that a negative Cue code raises ValueError."""
     with pytest.raises(ValueError, match=r"uint8"):
-        Cue(name="X", code=-1, length_cm=50.0)
+        Cue(name="X", code=-1, length_cm=50.0, texture="Cue.png")
 
 
 def test_cue_length_zero_raises_error() -> None:
     """Verifies that a Cue with length_cm <= 0 raises ValueError."""
     with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
-        Cue(name="X", code=1, length_cm=0.0)
+        Cue(name="X", code=1, length_cm=0.0, texture="Cue.png")
 
 
 def test_cue_length_negative_raises_error() -> None:
     """Verifies that a Cue with negative length_cm raises ValueError."""
     with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
-        Cue(name="X", code=1, length_cm=-10.0)
+        Cue(name="X", code=1, length_cm=-10.0, texture="Cue.png")
 
 
 def test_cue_nan_length_raises_error() -> None:
     """Verifies that a Cue with a NaN length_cm raises ValueError."""
     with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
-        Cue(name="X", code=1, length_cm=float("nan"))
+        Cue(name="X", code=1, length_cm=float("nan"), texture="Cue.png")
 
 
 def test_cue_infinite_length_raises_error() -> None:
     """Verifies that a Cue with an infinite length_cm raises ValueError."""
     with pytest.raises(ValueError, match=r"length_cm must be a positive, finite value"):
-        Cue(name="X", code=1, length_cm=float("inf"))
+        Cue(name="X", code=1, length_cm=float("inf"), texture="Cue.png")
 
 
 def test_cue_name_with_space_raises_error() -> None:
     """Verifies that a Cue name carrying a space raises ValueError."""
     with pytest.raises(ValueError, match=r"name must contain only ASCII letters, digits, and underscores"):
-        Cue(name="A B", code=1, length_cm=50.0)
+        Cue(name="A B", code=1, length_cm=50.0, texture="Cue.png")
 
 
 def test_cue_name_with_hyphen_raises_error() -> None:
     """Verifies that a Cue name carrying a hyphen raises ValueError."""
     with pytest.raises(ValueError, match=r"name must contain only ASCII letters, digits, and underscores"):
-        Cue(name="A-B", code=1, length_cm=50.0)
+        Cue(name="A-B", code=1, length_cm=50.0, texture="Cue.png")
 
 
 def test_cue_name_with_underscores_and_digits() -> None:
     """Verifies that a Cue name of ASCII letters, digits, and underscores is accepted."""
-    cue = Cue(name="Cue_01", code=1, length_cm=50.0)
+    cue = Cue(name="Cue_01", code=1, length_cm=50.0, texture="Cue.png")
 
     assert cue.name == "Cue_01"
+
+
+def test_cue_empty_texture_raises_error() -> None:
+    """Verifies that a Cue with an empty texture raises ValueError."""
+    with pytest.raises(ValueError, match=r"texture must be a non-empty filename"):
+        Cue(name="X", code=1, length_cm=50.0, texture="")
 
 
 def test_trial_structure_empty_cue_sequence_raises_error() -> None:
@@ -247,6 +253,17 @@ def test_vr_environment_initialization() -> None:
     assert environment.cue_offset_cm == 8.0
 
 
+def test_vr_environment_defaults_match_unity() -> None:
+    """Verifies that an omitted field falls back to the value the Unity VREnvironment class declares."""
+    environment = VREnvironment()
+
+    assert environment.corridor_spacing_cm == 20.0
+    assert environment.segments_per_corridor == 3
+    assert environment.padding_prefab_name == "Padding"
+    assert environment.cm_per_unity_unit == 10.0
+    assert environment.cue_offset_cm == 0.0
+
+
 def test_vr_environment_zero_segments_per_corridor_raises_error() -> None:
     """Verifies that a VREnvironment with fewer than one segment per corridor raises ValueError."""
     with pytest.raises(ValueError, match=r"segments_per_corridor must be an integer of at least 1"):
@@ -312,8 +329,8 @@ def test_task_template_valid_initialization() -> None:
 def test_task_template_duplicate_cue_codes_raises_error() -> None:
     """Verifies that duplicate cue codes raise ValueError."""
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="B", code=1, length_cm=50.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+        Cue(name="B", code=1, length_cm=50.0, texture="Cue.png"),
     ]
     with pytest.raises(ValueError, match=r"duplicate codes"):
         _create_base_task_template(cues=cues)
@@ -322,8 +339,8 @@ def test_task_template_duplicate_cue_codes_raises_error() -> None:
 def test_task_template_duplicate_cue_names_raises_error() -> None:
     """Verifies that duplicate cue names raise ValueError."""
     cues = [
-        Cue(name="A", code=1, length_cm=50.0),
-        Cue(name="A", code=2, length_cm=50.0),
+        Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+        Cue(name="A", code=2, length_cm=50.0, texture="Cue.png"),
     ]
     with pytest.raises(ValueError, match=r"duplicate names"):
         _create_base_task_template(cues=cues)
@@ -331,7 +348,7 @@ def test_task_template_duplicate_cue_names_raises_error() -> None:
 
 def test_task_template_trial_references_unknown_cue_raises_error() -> None:
     """Verifies that a trial referencing an unknown cue raises ValueError."""
-    cues = [Cue(name="A", code=1, length_cm=50.0)]
+    cues = [Cue(name="A", code=1, length_cm=50.0, texture="Cue.png")]
     trial_structures = {
         "trial1": TrialStructure(
             cue_sequence=["A", "Z"],

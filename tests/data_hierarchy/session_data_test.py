@@ -82,8 +82,8 @@ def _build_sample_task_template() -> TaskTemplate:
     """Builds a minimal TaskTemplate suitable for testing the VR template caching behavior."""
     return TaskTemplate(
         cues=[
-            Cue(name="A", code=1, length_cm=50.0),
-            Cue(name="B", code=2, length_cm=50.0),
+            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
         ],
         vr_environment=VREnvironment(
             corridor_spacing_cm=100.0,
