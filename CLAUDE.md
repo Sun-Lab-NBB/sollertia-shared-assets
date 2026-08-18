@@ -116,21 +116,25 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 | Shared MCP instance | `interfaces/mcp_instance.py`        | MCPServer instance, response helpers, serialization, validators   |
 | Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, credentials, templates dir, experiments   |
 | Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, hardware, data assets |
+| Dataset tools       | `interfaces/dataset_tools.py`       | dataset discovery, inspection, marker read/write, descriptions    |
 | Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                     |
 
 Project conventions for MCP tools:
 - MCP tool functions are excluded from unit tests by project convention. Do NOT write tests for `@mcp.tool()` functions.
   Test the helper functions they delegate to instead. Coverage configuration in `pyproject.toml` already omits
   `*/sollertia_shared_assets/interfaces/*`.
-- Every MCP tool in `configuration_tools.py` and `data_tools.py` returns a `dict[str, Any]` response constructed via
-  `ok_response(...)` or `error_response(...)` from `mcp_instance`. The `unity_tools.py` relay tools instead return the
-  McpBridge response payload verbatim on success, and `error_response(...)` only on relay failure. Return shapes
-  documented in each tool's `Returns` docstring section are part of the public contract.
-- Tools that take a session path use file-path-based access, so the caller passes the path explicitly, not a session ID.
+- Every MCP tool in `configuration_tools.py`, `data_tools.py`, and `dataset_tools.py` returns a `dict[str, Any]`
+  response constructed via `ok_response(...)` or `error_response(...)` from `mcp_instance`. The `unity_tools.py` relay
+  tools instead return the McpBridge response payload verbatim on success, and `error_response(...)` only on relay
+  failure. Return shapes documented in each tool's `Returns` docstring section are part of the public contract.
+- Tools that take a session or dataset path use file-path-based access, so the caller passes the path explicitly, not an
+  identifier. A `dataset_path` argument accepts the dataset root or its `dataset.yaml` marker, while the `file_path`
+  argument of the marker read and write tools names the `dataset.yaml` file itself.
 - Tool responses chain: `get_data_root_overview_tool` produces `sessions` entries, `filter_sessions_tool` consumes
   them and returns a `session_paths` list that downstream `sollertia-*` MCP servers (forgery, etc.) accept directly.
   Non-Sollertia MCP servers (`cindra`, `ataraxis-video-system`, `ataraxis-communication-interface`) do not consume
-  `session_paths`, so pass them concrete paths or recordings instead.
+  `session_paths`, so pass them concrete paths or recordings instead. `discover_datasets_tool` produces the matching
+  `dataset_paths` list, which sollertia-forgery's `generate_dataset_state_tool` and `plan_dataset_jobs_tool` accept.
 
 For server connectivity issues, invoke `/assets-mcp-environment-setup`.
 
@@ -217,7 +221,10 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   `load()` rehydrates one and re-resolves every path against the marker's on-disk location, `add_sessions()` appends
   sessions to an existing dataset, and `remove_animal()` drops one animal with its directory tree. The mutators
   enforce structural invariants alone, so whether a given session belongs in a given dataset is decided by the
-  consuming pipeline rather than here.
+  consuming pipeline rather than here. The same split governs the MCP surface. This library exposes the dataset
+  container through `dataset_tools.py`, covering discovery, structural inspection, marker read and repair-write, schema
+  introspection, and the column-description contract. Composing a dataset and reading its forging job state belong to
+  sollertia-forgery, so `dataset_tools.py` never reports tracker state or job counts.
 - **Interface layer**: A single `MCPServer` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and dataclass-introspection helpers. Tool modules import the instance and register `@mcp.tool()`
   functions. `run_server()` enables JSON responses when it starts the streamable-http transport. The CLI (`slsa`)

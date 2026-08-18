@@ -482,8 +482,8 @@ def _create_base_task_template(
     """Builds a TaskTemplate populated with defaults suitable for tests."""
     if cues is None:
         cues = [
-            Cue(name="A", code=1, length_cm=50.0),
-            Cue(name="B", code=2, length_cm=50.0),
+            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
         ]
     if trial_structures is None:
         trial_structures = {

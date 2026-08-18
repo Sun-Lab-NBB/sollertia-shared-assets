@@ -24,8 +24,8 @@ shared assets both depend on.
 
 The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, subjects, hardware
 state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
-configuration and an MCP server with tools for agentic configuration management, session operations, and Unity Editor
-integration, with a subset relaying commands to a running Editor via the McpBridge plugin from
+configuration and an MCP server with tools for agentic configuration management, session and dataset operations, and
+Unity Editor integration. A subset of those tools relays commands to a running Editor via the McpBridge plugin from
 [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality).
 
 ___
@@ -130,8 +130,10 @@ Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND 
 
 ### MCP Server
 
-This library provides an MCP server that exposes configuration management, session operations, and Unity Editor relay
-tools for AI agent integration.
+This library provides an MCP server that exposes configuration management, session and dataset operations, and Unity
+Editor relay tools for AI agent integration. The dataset tools cover the forged-dataset container: its marker, its
+structure, and its self-consistency. Composing a dataset and reading its forging job state are owned by
+[sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery).
 
 #### Starting the Server
 
@@ -154,12 +156,14 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `create_task_tool`                              | Creates a Unity task end-to-end from a YAML task template         |
 | `delete_asset_tool`                             | Deletes a non-scene Unity asset and refreshes the AssetDatabase   |
 | `delete_task_tool`                              | Removes every Unity artifact created for a given task template    |
+| `describe_dataset_data_schema_tool`             | Returns the DatasetData and nested DatasetSession schemas         |
 | `describe_experiment_configuration_schema_tool` | Returns the experiment configuration schema for a system          |
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                  |
 | `describe_session_descriptor_schema_tool`       | Returns the descriptor schema for a given session type            |
 | `describe_session_hardware_state_schema_tool`   | Returns the hardware-state schema for an acquisition system       |
 | `describe_data_asset_schema_tool`               | Returns the read-asset dataclass schema for a data asset          |
 | `describe_template_schema_tool`                 | Returns the TaskTemplate schema and its nested class schemas      |
+| `discover_datasets_tool`                        | Discovers every forged dataset marker under the data root         |
 | `discover_experiments_tool`                     | Discovers every experiment configuration YAML under the data root |
 | `discover_templates_tool`                       | Lists the task templates in the configured templates directory    |
 | `enter_play_mode_tool`                          | Enters Play Mode in the Unity Editor                              |
@@ -168,6 +172,7 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `get_data_root_overview_tool`                   | Groups session markers into a project, animal, session tree       |
 | `get_platform_environment_status_tool`          | Reports the health of the platform configuration components       |
 | `get_play_state_tool`                           | Returns the Unity Editor play state and active scene name         |
+| `inspect_datasets_tool`                         | Produces a structural inventory report for each dataset path      |
 | `inspect_prefab_tool`                           | Returns a prefab's hierarchy, components, and collider details    |
 | `inspect_scene_tool`                            | Returns the active scene's metadata and object hierarchy          |
 | `inspect_sessions_tool`                         | Produces a health and inventory report for each session path      |
@@ -184,6 +189,8 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `open_scene_tool`                               | Opens a Unity scene, applying the unsaved-changes policy          |
 | `read_credentials_tool`                         | Returns the path to the requested credentials file                |
 | `read_data_root_tool`                           | Returns the configured Sollertia platform data root path          |
+| `read_dataset_column_descriptions_tool`         | Reads a dataset's per-column data descriptions companion          |
+| `read_dataset_data_tool`                        | Loads a dataset.yaml file via the DatasetData schema              |
 | `read_experiment_configuration_tool`            | Loads an experiment configuration YAML for a system               |
 | `read_session_data_tool`                        | Loads a session_data.yaml file via the SessionData schema         |
 | `read_session_descriptor_tool`                  | Loads a session descriptor YAML for a given session type          |
@@ -198,8 +205,10 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `set_data_root_tool`                            | Sets the local Sollertia platform data root                       |
 | `set_task_templates_directory_tool`             | Sets the path to the task templates directory                     |
 | `set_working_directory_tool`                    | Sets the local Sollertia platform working directory               |
+| `validate_dataset_descriptions_tool`            | Verifies every emitted dataset column carries a description       |
 | `validate_experiment_configuration_tool`        | Validates an experiment configuration YAML against its schema     |
 | `validate_template_tool`                        | Validates a TaskTemplate against its schema and constraints       |
+| `write_dataset_data_tool`                       | Creates or replaces a validated dataset.yaml marker file          |
 | `write_experiment_configuration_tool`           | Creates or replaces an experiment configuration YAML              |
 | `write_session_data_tool`                       | Creates or replaces a validated session_data.yaml file            |
 | `write_session_descriptor_tool`                 | Creates or replaces a session's descriptor YAML                   |
