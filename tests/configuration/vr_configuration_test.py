@@ -395,6 +395,35 @@ def test_task_template_transition_references_unknown_trial_raises_error() -> Non
         _create_base_task_template(trial_structures=trial_structures)
 
 
+def test_task_template_accepts_transitions_between_defined_trials() -> None:
+    """Verifies that a TaskTemplate accepts a multi-trial state machine whose transitions all name defined trials."""
+    trial_structures = {
+        "trial1": TrialStructure(
+            cue_sequence=["A", "B"],
+            stimulus_trigger_zone_start_cm=80.0,
+            stimulus_trigger_zone_end_cm=100.0,
+            stimulus_location_cm=90.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.INTERACTION,
+            transitions={"trial1": 0.25, "trial2": 0.75},
+        ),
+        "trial2": TrialStructure(
+            cue_sequence=["B", "A"],
+            stimulus_trigger_zone_start_cm=10.0,
+            stimulus_trigger_zone_end_cm=40.0,
+            stimulus_location_cm=30.0,
+            show_stimulus_collision_boundary=False,
+            trigger_type=TriggerType.INTERACTION,
+            transitions={"trial1": 1.0},
+        ),
+    }
+
+    template = _create_base_task_template(trial_structures=trial_structures)
+
+    assert template.trial_structures["trial1"].transitions == {"trial1": 0.25, "trial2": 0.75}
+    assert template.trial_structures["trial2"].transitions == {"trial1": 1.0}
+
+
 def test_task_template_invalid_trigger_type_raises_error() -> None:
     """Verifies that an invalid trigger_type raises ValueError."""
     trial_structures = {

@@ -225,6 +225,10 @@ addopts = "--import-mode=importlib"
 # the test suite already covers, and the shared MCP helpers in 'mcp_instance.py' and the server bootstrap in
 # 'mcp_server.py' are excluded with them by project convention.
 [tool.coverage.run]
+# Measures both arms of every conditional alongside the statements, so a guard whose false arm no input can reach
+# fails the gate instead of passing unnoticed. Declared here rather than as a '--cov-branch' flag, since the setting
+# is recorded into the coverage data file and the 'coverage' task must read it back when it combines the results.
+branch = true
 omit = [
     "*/sollertia_shared_assets/interfaces/*",
 ]

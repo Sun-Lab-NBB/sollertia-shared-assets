@@ -309,7 +309,11 @@ def parse_session_timestamp(session_name: str, *, utc_timezone: bool = True) -> 
             microsecond=int(microseconds),
             tzinfo=ZoneInfo("UTC"),
         )
-    except ValueError, IndexError:
+    # The component-count check above guarantees the unpack succeeds, so the only failures left come from the values
+    # themselves. A component outside the range the C library accepts raises OverflowError, which does not derive
+    # from ValueError, so both are named. A name the calendar rejects reads as unparsable rather than aborting the
+    # scan that the caller is walking.
+    except ValueError, OverflowError:
         return None
 
     if utc_timezone:
