@@ -1,0 +1,83 @@
+from enum import StrEnum
+from pathlib import Path
+from dataclasses import field, dataclass
+
+from ataraxis_data_structures import YAML_EXCLUDE_METADATA, YamlConfig
+
+from ..enums import (
+    SessionTypes as SessionTypes,
+    AcquisitionSystems as AcquisitionSystems,
+)
+from .session_data import RawDataFiles as RawDataFiles
+from .project_hierarchy import DATASET_MARKER_FILENAME as DATASET_MARKER_FILENAME
+
+class DatasetFiles(StrEnum):
+    DATA = "data.feather"
+    DESCRIPTIONS = "data_descriptions.feather"
+
+@dataclass(frozen=True, slots=True)
+class DatasetSession:
+    session: str
+    animal: str
+    session_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
+    @property
+    def data_path(self) -> Path: ...
+    @property
+    def descriptor_path(self) -> Path: ...
+    @property
+    def vr_configuration_path(self) -> Path: ...
+    @property
+    def experiment_configuration_path(self) -> Path: ...
+
+@dataclass(frozen=True, slots=True)
+class DatasetAnimal:
+    animal: str
+    animal_path: Path = ...
+    @property
+    def surgery_path(self) -> Path: ...
+
+@dataclass
+class DatasetData(YamlConfig):
+    name: str
+    project: str
+    session_type: str | SessionTypes
+    acquisition_system: str | AcquisitionSystems
+    sessions: tuple[DatasetSession, ...] = field(default_factory=tuple)
+    dataset_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
+    def __post_init__(self) -> None: ...
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        project: str,
+        session_type: str | SessionTypes,
+        acquisition_system: str | AcquisitionSystems,
+        sessions: tuple[DatasetSession, ...] | set[DatasetSession],
+        datasets_root: Path,
+        column_descriptions: dict[str, str],
+    ) -> DatasetData: ...
+    @classmethod
+    def load(cls, dataset_path: Path) -> DatasetData: ...
+    def save(self) -> None: ...
+    def add_sessions(
+        self, sessions: tuple[DatasetSession, ...] | set[DatasetSession]
+    ) -> tuple[DatasetSession, ...]: ...
+    def remove_animal(self, animal: str) -> tuple[DatasetSession, ...]: ...
+    @property
+    def descriptions_path(self) -> Path: ...
+    def column_descriptions(self) -> dict[str, str]: ...
+    def get_column_description(self, column: str) -> str: ...
+    def verify_data_descriptions(self) -> None: ...
+    @property
+    def animals(self) -> tuple[DatasetAnimal, ...]: ...
+    def get_animal(self, animal: str) -> DatasetAnimal: ...
+    def get_sessions_for_animal(self, animal: str) -> tuple[DatasetSession, ...]: ...
+    def get_session(self, animal: str, session: str) -> DatasetSession: ...
+    def _write_column_descriptions(self, column_descriptions: dict[str, str]) -> None: ...
+    def _commit_sessions(self, sessions: tuple[DatasetSession, ...]) -> None: ...
+
+def _is_path_component(value: object) -> bool: ...
+def _screen_session_identifiers(sessions: tuple[DatasetSession, ...], action: str) -> None: ...
+def _screen_duplicate_sessions(
+    sessions: tuple[DatasetSession, ...], existing_sessions: tuple[DatasetSession, ...], action: str
+) -> None: ...
