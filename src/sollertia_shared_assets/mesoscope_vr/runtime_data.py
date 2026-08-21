@@ -68,9 +68,10 @@ class LickTrainingDescriptor(YamlConfig):
     maximum_training_time_min: int = 20
     """The maximum time, in minutes, the system is allowed to run the training."""
     maximum_unconsumed_rewards: int = 1
-    """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If
-    the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal
-    consumes the delivered rewards."""
+    """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If the animal
+    receives this many rewards without licking (consuming) them, reward delivery is paused until the animal consumes
+    the delivered rewards. Setting this field to zero removes the limit, allowing every delivered reward to remain
+    unconsumed."""
     water_reward_size_ul: float = 5.0
     """The volume of water, in microliters, dispensed to the animal on each reward of the training's pseudorandom
     reward-delay sequence."""
@@ -120,9 +121,10 @@ class RunTrainingDescriptor(YamlConfig):
     maximum_training_time_min: int = 40
     """The maximum time, in minutes, the system is allowed to run the training."""
     maximum_unconsumed_rewards: int = 1
-    """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If
-    the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal
-    consumes the delivered rewards."""
+    """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If the animal
+    receives this many rewards without licking (consuming) them, reward delivery is paused until the animal consumes
+    the delivered rewards. Setting this field to zero removes the limit, allowing every delivered reward to remain
+    unconsumed."""
     maximum_idle_time_s: float = 0.3
     """The maximum time, in seconds, the animal can dip below the running speed threshold to still receive the
     reward. This allows animals that 'run' by taking a series of large steps, briefly dipping below speed threshold at
@@ -155,9 +157,10 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     animal_weight_g: float
     """The weight of the animal, in grams, at the beginning of the session."""
     maximum_unconsumed_rewards: int = 1
-    """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If
-    the animal receives this many rewards without licking (consuming) them, reward delivery is paused until the animal
-    consumes the delivered rewards."""
+    """The maximum number of consecutive rewards that can be delivered without the animal consuming them. If the animal
+    receives this many rewards without licking (consuming) them, reward delivery is paused until the animal consumes
+    the delivered rewards. Setting this field to zero removes the limit, allowing every delivered reward to remain
+    unconsumed."""
     dispensed_water_volume_ml: float = 0.0
     """The total water volume, in milliliters, dispensed during runtime. This excludes the water volume
     dispensed during the paused (idle) state."""
