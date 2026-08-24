@@ -502,9 +502,9 @@ therefore does not require a branch in every system.
 
 **Step 3: Update downstream libraries**
 
-A new trigger type also requires Unity-side assets in sollertia-virtual-reality, namely the zone prefab and the
-task-generation pipeline. The unity plugin's `/zone-prefabs` and `/task-generator` skills own that work, which is out
-of scope for this library.
+A new trigger type also requires Unity-side assets in sollertia-virtual-reality, namely the zone prefab, the
+task-generation pipeline, and the fixtures that pin the trigger enum. The unity plugin's `/zone-prefabs`,
+`/task-generator`, and `/unity-tests` skills own that work, which is out of scope for this library.
 
 ### Adding a New Read Asset
 
