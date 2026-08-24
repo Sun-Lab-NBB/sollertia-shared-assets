@@ -29,8 +29,9 @@ appropriate skill results in style violations that block release.
 ## Cross-referenced library verification
 
 This library depends on `ataraxis-base-utilities`, `ataraxis-time`, and `ataraxis-data-structures`, and is itself
-consumed by `sollertia-experiment`, `sollertia-forgery`, and the `sollertia-virtual-reality` McpBridge. Local
-clones of all of these typically live alongside this repository, in its parent directory.
+consumed by `sollertia-experiment` and `sollertia-forgery`. It also drives the `sollertia-virtual-reality` McpBridge
+over HTTP localhost through `interfaces/unity_tools.py`. Local clones of all of these typically live alongside this
+repository, in its parent directory.
 
 **Before writing code that interacts with a cross-referenced library, you MUST:**
 
@@ -92,10 +93,11 @@ repositories.
 | `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
 | `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
-The `unity` plugin's ten skills (`gimbl-framework`, `mqtt-contract`, `play-mode`, `scene-setup`, `task-generator`,
-`task-parameters`, `task-prefabs`, `task-scenes`, `unity-mcp-environment-setup`, `zone-prefabs`) are authored and
-invoked on the Unity side, so they are intentionally absent from the table above. Reach for them when changing
-`interfaces/unity_tools.py`, since they document the bridge contract the relay must match.
+The `unity` plugin's eleven skills (`gimbl-framework`, `mqtt-contract`, `play-mode`, `scene-setup`, `task-generator`,
+`task-parameters`, `task-prefabs`, `task-scenes`, `unity-mcp-environment-setup`, `unity-tests`, `zone-prefabs`) are
+authored and invoked on the Unity side, so they are intentionally absent from the table above. Reach for them when
+changing `interfaces/unity_tools.py`, since they document the bridge contract the relay must match:
+`unity-mcp-environment-setup` owns the bridge-tool contract each `@mcp.tool()` wrapper mirrors.
 
 You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
 member, `SessionTypes` member, runtime trial class (a sibling of `MesoscopeWaterRewardTrial` / `MesoscopeGasPuffTrial`),
