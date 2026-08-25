@@ -87,10 +87,8 @@ class Directories(StrEnum):
     living in a dedicated raw-side directory."""
     CINDRA = "cindra"
     """Cindra output directory under ``processed_data``. The root of cindra's single-recording and multi-recording
-    outputs. Cindra is reusable by any photometry-data-generating acquisition system."""
-    MULTI_RECORDING = "multi_recording"
-    """Multi-recording subdirectory inside cindra's output directory. Each child is a dataset-named directory holding
-    cindra's multi-day analysis output."""
+    outputs. Cindra is reusable by any photometry-data-generating acquisition system. The name mirrors cindra's own
+    ``OUTPUT_DIRECTORY_NAME`` constant, which cindra owns and which nothing here imports, so the two can drift."""
 
 
 class ProcessingTrackers(StrEnum):
@@ -111,10 +109,10 @@ class ProcessingTrackers(StrEnum):
     re-packaging). Lives under ``processed_data/video_data``."""
     TWO_PHOTON = "single_recording_tracker.yaml"
     """Tracker for the two-photon (calcium-imaging) processing stage. The filename is owned and written by cindra's
-    single-recording pipeline. Sollertia-forgery only reads it. Lives under ``processed_data/cindra``."""
-    CINDRA_MULTI_RECORDING = "multi_recording_tracker.yaml"
-    """Tracker for cindra's multi-recording pipeline. Written by cindra per dataset under
-    ``processed_data/cindra/multi_recording`` and read by the project manifest."""
+    single-recording pipeline. Sollertia-forgery only reads it. Lives under ``processed_data/cindra``. The value
+    mirrors cindra's own ``SINGLE_RECORDING_TRACKER_FILENAME`` constant, which nothing here imports, so the two can
+    drift. Cindra's multi-recording tracker is deliberately absent from this enum, since it is written once per
+    dataset inside a dataset-named directory that no fixed per-session path addresses."""
     FORGING = "forging_tracker.yaml"
     """Tracker for the sollertia-forgery dataset-forging pipeline. Lives at the forged dataset root."""
     MANIFEST = "manifest_processing_tracker.yaml"
@@ -227,9 +225,6 @@ class ProcessedData:
     """Tracks the outcome of the two-photon (calcium-imaging) processing stage. The tracker file is written by cindra's
     single-recording pipeline and only read by sollertia-forgery. Resolves to
     ``cindra/single_recording_tracker.yaml``."""
-    cindra_multi_recording_path: Path
-    """Acts as the root for cindra's multi-recording analysis outputs. Each child holds the multi-day analysis output
-    produced by cindra's multi-recording pipeline for a particular dataset that this session participates in."""
 
     @classmethod
     def build(cls, root: Path) -> ProcessedData:
@@ -254,7 +249,6 @@ class ProcessedData:
             microcontroller_tracker_path=microcontroller_data_path.joinpath(ProcessingTrackers.MICROCONTROLLER),
             cindra_data_path=cindra_data_path,
             two_photon_tracker_path=cindra_data_path.joinpath(ProcessingTrackers.TWO_PHOTON),
-            cindra_multi_recording_path=cindra_data_path.joinpath(Directories.MULTI_RECORDING),
         )
 
 
