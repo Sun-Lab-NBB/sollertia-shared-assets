@@ -666,7 +666,6 @@ def test_session_data_processing_tracker_paths() -> None:
         == processed.microcontroller_data_path / ProcessingTrackers.MICROCONTROLLER
     )
     assert processed.two_photon_tracker_path == processed.cindra_data_path / ProcessingTrackers.TWO_PHOTON
-    assert processed.cindra_multi_recording_path == processed.cindra_data_path / Directories.MULTI_RECORDING
 
 
 def test_session_data_paths_on_default_instance() -> None:
@@ -810,7 +809,6 @@ def test_directories_enum_is_string_enum() -> None:
     """Verifies that Directories members are strings (StrEnum)."""
     assert isinstance(Directories.CINDRA, str)
     assert Directories.CINDRA == "cindra"
-    assert Directories.MULTI_RECORDING == "multi_recording"
     assert Directories.RUNTIME_DATA == "runtime_data"
     assert Directories.VIDEO_DATA == "video_data"
 
@@ -823,6 +821,5 @@ def test_processing_trackers_enum_is_string_enum() -> None:
     assert ProcessingTrackers.MICROCONTROLLER == "microcontroller_processing_tracker.yaml"
     assert ProcessingTrackers.VIDEO == "video_processing_tracker.yaml"
     assert ProcessingTrackers.TWO_PHOTON == "single_recording_tracker.yaml"
-    assert ProcessingTrackers.CINDRA_MULTI_RECORDING == "multi_recording_tracker.yaml"
     assert ProcessingTrackers.FORGING == "forging_tracker.yaml"
     assert ProcessingTrackers.MANIFEST == "manifest_processing_tracker.yaml"

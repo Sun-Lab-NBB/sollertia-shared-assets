@@ -38,7 +38,6 @@ class Directories(StrEnum):
     VIDEO_DATA = "video_data"
     MICROCONTROLLER_DATA = "microcontroller_data"
     CINDRA = "cindra"
-    MULTI_RECORDING = "multi_recording"
 
 class ProcessingTrackers(StrEnum):
     CHECKSUM = "checksum_processing_tracker.yaml"
@@ -46,7 +45,6 @@ class ProcessingTrackers(StrEnum):
     MICROCONTROLLER = "microcontroller_processing_tracker.yaml"
     VIDEO = "video_processing_tracker.yaml"
     TWO_PHOTON = "single_recording_tracker.yaml"
-    CINDRA_MULTI_RECORDING = "multi_recording_tracker.yaml"
     FORGING = "forging_tracker.yaml"
     MANIFEST = "manifest_processing_tracker.yaml"
 
@@ -77,7 +75,6 @@ class ProcessedData:
     microcontroller_tracker_path: Path
     cindra_data_path: Path
     two_photon_tracker_path: Path
-    cindra_multi_recording_path: Path
     @classmethod
     def build(cls, root: Path) -> ProcessedData: ...
 

@@ -416,8 +416,6 @@ def list_processing_trackers_tool() -> dict[str, Any]:
         "performed by the sollertia-forgery video-processing pipeline.",
         ProcessingTrackers.TWO_PHOTON: "Tracks the outcome of single-recording two-photon (calcium-imaging) analysis. "
         "Written by cindra's single-recording pipeline and read by sollertia-forgery.",
-        ProcessingTrackers.CINDRA_MULTI_RECORDING: "Tracks the outcome of multi-recording neural imaging analysis "
-        "performed by cindra's multi-recording pipeline.",
         ProcessingTrackers.FORGING: "Tracks the outcome of dataset forging performed by the sollertia-forgery "
         "dataset-forging pipeline.",
         ProcessingTrackers.MANIFEST: "Tracks the outcome of project manifest generation.",
