@@ -567,10 +567,10 @@ representation, and the dataclass keeps every downstream consumer storage-agnost
 Claude Code skills and other AI development assets for this project are distributed through two marketplaces:
 
 - [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace:
-  - **assets** plugin, which registers the `slsa mcp` server with compatible MCP clients. It also provides
-    configuration and data skills for working directory setup, session discovery, session data, descriptors, hardware
-    state, subject metadata, task templates, experiment configuration, library extension, and MCP environment setup.
-    The server also fronts the Unity Editor relay that the **unity** plugin's skills drive.
+  - **assets** plugin, which registers the `slsa mcp` server with compatible MCP clients. It also provides configuration
+    and data skills for working directory setup, project hierarchy, session discovery, session data, descriptors,
+    hardware state, subject metadata, forged datasets, task templates, experiment configuration, library extension, and
+    MCP environment setup. The server also fronts the Unity Editor relay that the **unity** plugin's skills drive.
   - **unity** plugin, which provides Unity Editor skills that drive the `McpBridge` relay tools served by the
     `slsa mcp` server, document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger
     zone prefabs.
