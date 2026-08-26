@@ -59,8 +59,9 @@ state to prevent integration errors.
 
 The sollertia marketplace ships an `assets` plugin with skills that target this library directly, and a `unity` plugin
 whose Unity Editor skills drive the `McpBridge` relay tools that this library's `slsa mcp` server exposes through
-`interfaces/unity_tools.py`. The ataraxis marketplace ships the `automation` plugin used across all Sollertia platform
-repositories.
+`interfaces/unity_tools.py`. It also ships the `experiment`, `mesoscope`, and `forging` plugins, which document the
+downstream consumers of these shared assets and the Mesoscope-VR record schemas held in `mesoscope_vr/`. The ataraxis
+marketplace ships the `automation` plugin used across all Sollertia platform repositories.
 
 | Skill                           | Description                                                                      |
 |---------------------------------|----------------------------------------------------------------------------------|
@@ -82,8 +83,8 @@ repositories.
 | `/audit-performance`            | Audit source code for speed, memory use, and dtype predictability                |
 | `/audit-project`                | Orchestrate the four audits and merge their findings into one report             |
 | `/assets-mcp-environment-setup` | Diagnose and resolve `slsa mcp` server connectivity issues                       |
-| `/working-directory`            | Initialize the working directory, credentials files, and templates path          |
-| `/project-hierarchy`            | Discover the project / animal / session tree under the data root                 |
+| `/working-directory`            | Prerequisite setup of the working directory, data root, credentials, templates   |
+| `/project-hierarchy`            | Discover and create the project / animal / session tree under the data root      |
 | `/session-discovery`            | Discover and filter sessions by date, animal, or name (`session_paths` flow)     |
 | `/session-data`                 | Read, write, and validate `session_data.yaml` markers                            |
 | `/session-descriptors`          | Read, write, and validate per-session-type `session_descriptor.yaml` files       |
@@ -92,7 +93,7 @@ repositories.
 | `/datasets`                     | Discover, inspect, read, write, and validate forged datasets and descriptions    |
 | `/experiment-configuration`     | Author per-project, per-system experiment configuration YAMLs                    |
 | `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
-| `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
+| `assets:library-extension`      | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
 The `unity` plugin's eleven skills (`gimbl-framework`, `mqtt-contract`, `play-mode`, `scene-setup`, `task-generator`,
 `task-parameters`, `task-prefabs`, `task-scenes`, `unity-mcp-environment-setup`, `unity-tests`, `zone-prefabs`) are
@@ -100,11 +101,12 @@ authored and invoked on the Unity side, so they are intentionally absent from th
 changing `interfaces/unity_tools.py`, since they document the bridge contract the relay must match:
 `unity-mcp-environment-setup` owns the bridge-tool contract each `@mcp.tool()` wrapper mirrors.
 
-You MUST invoke `/library-extension` instead of editing the registries directly when adding a new `AcquisitionSystems`
-member, `SessionTypes` member, runtime trial class (a sibling of `MesoscopeWaterRewardTrial` / `MesoscopeGasPuffTrial`),
-or `TriggerType` member. The skill owns the touch list and the import-time parity check. Its touch list enumerates
-every registry and sibling-skill update required, including the README's "Adding New Session Types" and "Adding New
-Acquisition Systems" sections.
+You MUST invoke `assets:library-extension` rather than editing the registries directly. It covers a new
+`AcquisitionSystems` member, `SessionTypes` member, runtime trial class (a sibling of `MesoscopeWaterRewardTrial` /
+`MesoscopeGasPuffTrial`), `TriggerType` member, `ReadAssets` member, `CredentialsTypes` member, and MCP tool module. The
+`experiment` plugin ships a skill of the same name, so the `assets:` prefix is required. The skill owns the touch list
+and the import-time parity check. Its touch list enumerates every registry and sibling-skill update required, including
+the README's "Adding New Session Types" and "Adding New Acquisition Systems" sections.
 
 ## MCP server
 
@@ -149,12 +151,14 @@ contracts, or canonical filenames ripple through three downstream libraries:
 - **sollertia-experiment** (acquisition runtime). Consumes `SessionData.create` / `load`, every descriptor class,
   `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials file resolved through
   `get_credentials`. Owns the system-level `MesoscopeSystemConfiguration`, which extends but does not live in this
-  library.
+  library. The `experiment` plugin's `/acquisition-system-design` skill owns that configuration layer, and
+  `mesoscope:mesoscope-vr` documents the Mesoscope-VR instance of it.
 - **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `iterate_sessions`, `DatasetData`,
   the working directory's `configuration/` subdirectory (where the forgery server configuration is persisted) and its
   remote-state subdirectory, the `ProcessingTrackers` enum, `MesoscopeHardwareState`, and
   `MesoscopeExperimentConfiguration`. Its per-project manifest is written at the project root under the data root as
-  `<project>/<project>_manifest.feather`, not under the working directory.
+  `<project>/<project>_manifest.feather`, not under the working directory. The `forging` plugin's
+  `/server-configuration` and `/project-manifest` skills own those two assets.
 - **sollertia-virtual-reality** (Unity Editor McpBridge plugin). Consumed by `interfaces/unity_tools.py` over HTTP
   localhost, and the plugin itself is authored on the Unity side.
 
@@ -227,7 +231,8 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
   consuming pipeline rather than here. The same split governs the MCP surface. This library exposes the dataset
   container through `dataset_tools.py`, covering discovery, structural inspection, marker read and repair-write, schema
   introspection, and the column-description contract. Composing a dataset and reading its forging job state belong to
-  sollertia-forgery, so `dataset_tools.py` never reports tracker state or job counts.
+  sollertia-forgery and its `forging:dataset-definition` skill, so `dataset_tools.py` never reports tracker state or
+  job counts.
 - **Interface layer**: A single `MCPServer` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and dataclass-introspection helpers. Tool modules import the instance and register `@mcp.tool()`
   functions. `run_server()` enables JSON responses when it starts the streamable-http transport. The CLI (`slsa`)
@@ -249,8 +254,8 @@ enums in the leaf `enums.py` module. The registries form two governance tiers. T
 the `SYSTEM_SESSION_TYPES` association, and `SESSION_TYPES_USING_VR_TASK`) form the designed extension point: they grow
 whenever a new acquisition system or session type is added. The contract registries (`READ_ASSET_REGISTRY`,
 `CREDENTIALS_FILE_REGISTRY`) are durable translation contracts curated by Sollertia platform maintainers. Adding an
-entry there is a platform-contract decision, not a routine extension. Use the `/library-extension` skill for system
-and session-type extensions.
+entry there is a platform-contract decision, not a routine extension. Use the `assets:library-extension` skill for both
+tiers, since it owns the touch list for every extension scenario.
 
 | Registry                            | Keyed by             | Tier                       |
 |-------------------------------------|----------------------|----------------------------|
@@ -308,7 +313,7 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
 
 **Adding a new session type or acquisition system:**
 
-Invoke `/library-extension`.
+Invoke `assets:library-extension`.
 
 **Modifying configuration dataclasses:**
 
@@ -333,7 +338,9 @@ Invoke `/library-extension`.
 
 **Adding or modifying MCP tools:**
 
-1. Add the `@mcp.tool()`-decorated function to the appropriate module under `src/sollertia_shared_assets/interfaces/`
+1. Add the `@mcp.tool()`-decorated function to the appropriate module under `src/sollertia_shared_assets/interfaces/`.
+   Invoke `assets:library-extension` for a new `*_tools.py` module, since it owns the glob-import registration seam
+   and the coverage-gate exemption that lets a tool module ship without a mirrored test package
 2. Use `ok_response(...)` and `error_response(...)` from `mcp_instance` for all responses
 3. Document the response key shape in the `Returns` docstring section, since it is part of the public contract
 4. Update the README's MCP tool table, ensuring each row description matches the source docstring summary, and

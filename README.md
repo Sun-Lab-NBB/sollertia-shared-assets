@@ -349,7 +349,8 @@ If it requires some other extra asset, extend `required_raw_assets` accordingly.
 **Step 5: Update downstream libraries**
 
 Coordinate with sollertia-experiment, which is the package that actually creates sessions of the new type during
-acquisition.
+acquisition. The experiment plugin's `/acquisition-system-runtime` skill owns that runtime wiring, and the mesoscope
+plugin's `/mesoscope-vr-runtime` skill covers it for the Mesoscope-VR system.
 
 ### Adding New Acquisition Systems
 
@@ -377,7 +378,8 @@ class AcquisitionSystems(StrEnum):
 
 Create a new `<system>/` subpackage (a sibling of `mesoscope_vr/`) holding the new system's dataclasses, and export
 every class from the subpackage's `__init__.py`. The Mesoscope-VR subpackage is the reference for both the module
-split and the contents:
+split and the contents, and the mesoscope plugin's `/mesoscope-vr-session-schema`, `/mesoscope-vr-experiment-schema`,
+and `/mesoscope-vr-snapshots` skills document its three modules in that order:
 
 1. `<system>/runtime_data.py` defines a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records
    the configuration of every active hardware module on the new system, plus the system's per-session-type
@@ -429,7 +431,8 @@ reference. The generic `write_experiment_configuration_tool` authors or repairs 
 **Step 5: Update downstream libraries**
 
 Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
-acquisition runtime) and sollertia-forgery (data processing) as needed.
+acquisition runtime) and sollertia-forgery (data processing) as needed. The experiment plugin's
+`/system-design-pipeline` skill orchestrates the four build layers and names the skill that owns each one.
 
 ### Adding a New Trial Class
 
@@ -559,8 +562,9 @@ The parity check catches a forgotten registry entry at import time, naming the m
 **Step 4: Wire the translation downstream**
 
 Coordinate with sollertia-experiment, which reads the external source, translates it into the new dataclass, and
-caches it on disk for sollertia-forgery to consume. This is the only place that knows the source's storage-specific
-representation, and the dataclass keeps every downstream consumer storage-agnostic.
+caches it on disk for sollertia-forgery to consume. The experiment plugin's `/google-sheets-processing` skill owns
+that reader. This is the only place that knows the source's storage-specific representation, and the dataclass keeps
+every downstream consumer storage-agnostic.
 
 ### AI-Assisted Development
 
@@ -569,18 +573,22 @@ Claude Code skills and other AI development assets for this project are distribu
 - [sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace:
   - **assets** plugin, which registers the `slsa mcp` server with compatible MCP clients. It also provides configuration
     and data skills for working directory setup, project hierarchy, session discovery, session data, descriptors,
-    hardware state, subject metadata, forged datasets, task templates, experiment configuration, library extension, and
+    hardware state, read assets, forged datasets, task templates, experiment configuration, library extension, and
     MCP environment setup. The server also fronts the Unity Editor relay that the **unity** plugin's skills drive.
   - **unity** plugin, which provides Unity Editor skills that drive the `McpBridge` relay tools served by the
     `slsa mcp` server, document the MQTT contract and `CreateTask` pipeline, and guide manufacturing of new trigger
     zone prefabs.
+  - **experiment**, **mesoscope**, and **forging** plugins, which document the libraries that consume these shared
+    assets. The **mesoscope** plugin also carries the Mesoscope-VR record schemas held in the `mesoscope_vr/`
+    subpackage, and the **forging** plugin owns dataset composition and forging job state.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
   - **automation** plugin, which provides shared development skills that enforce Sollertia Platform coding
     conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose
     codebase exploration tools.
 
-Install all three plugins to make the full skill set available to compatible AI coding agents. The **unity** plugin
-depends on the **assets** plugin for the backing `slsa mcp` server that drives the Unity Editor relay.
+Install the **assets**, **unity**, and **automation** plugins for work inside this library, and add the remaining
+sollertia plugins when a change reaches a consuming library. The **unity** plugin depends on the **assets** plugin for
+the backing `slsa mcp` server that drives the Unity Editor relay.
 
 ### Automation Troubleshooting
 
