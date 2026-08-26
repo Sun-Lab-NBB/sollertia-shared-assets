@@ -89,6 +89,7 @@ repositories.
 | `/session-descriptors`          | Read, write, and validate per-session-type `session_descriptor.yaml` files       |
 | `/session-hardware-state`       | Read, write, and validate `hardware_state.yaml` snapshots                        |
 | `/data-assets`                  | Read, write, and describe `READ_ASSET_REGISTRY` assets such as `surgery_data`    |
+| `/datasets`                     | Discover, inspect, read, write, and validate forged datasets and descriptions    |
 | `/experiment-configuration`     | Author per-project, per-system experiment configuration YAMLs                    |
 | `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
 | `/library-extension`            | Orchestrate cross-cutting changes when extending the library's vocabulary        |
