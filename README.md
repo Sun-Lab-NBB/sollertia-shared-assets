@@ -349,8 +349,8 @@ If it requires some other extra asset, extend `required_raw_assets` accordingly.
 **Step 5: Update downstream libraries**
 
 Coordinate with sollertia-experiment, which is the package that actually creates sessions of the new type during
-acquisition. The experiment plugin's `/acquisition-system-runtime` skill owns that runtime wiring, and the mesoscope
-plugin's `/mesoscope-vr-runtime` skill covers it for the Mesoscope-VR system.
+acquisition. The experiment plugin's `experiment:acquisition-system-runtime` skill owns that runtime wiring, and the
+mesoscope plugin's `mesoscope:mesoscope-vr-runtime` skill covers it for the Mesoscope-VR system.
 
 ### Adding New Acquisition Systems
 
@@ -377,9 +377,10 @@ class AcquisitionSystems(StrEnum):
 **Step 2: Create the system subpackage**
 
 Create a new `<system>/` subpackage (a sibling of `mesoscope_vr/`) holding the new system's dataclasses, and export
-every class from the subpackage's `__init__.py`. The Mesoscope-VR subpackage is the reference for both the module
-split and the contents, and the mesoscope plugin's `/mesoscope-vr-session-schema`, `/mesoscope-vr-experiment-schema`,
-and `/mesoscope-vr-snapshots` skills document its three modules in that order:
+every class from the subpackage's `__init__.py`. The Mesoscope-VR subpackage is the reference for both the module split
+and the contents, and the mesoscope plugin's `mesoscope:mesoscope-vr-session-schema`,
+`mesoscope:mesoscope-vr-experiment-schema`, and `mesoscope:mesoscope-vr-snapshots` skills document its three modules in
+that order:
 
 1. `<system>/runtime_data.py` defines a `<System>HardwareState` dataclass inheriting from `YamlConfig` that records
    the configuration of every active hardware module on the new system, plus the system's per-session-type
@@ -432,7 +433,7 @@ reference. The generic `write_experiment_configuration_tool` authors or repairs 
 
 Coordinate with sollertia-experiment (which owns the system-level hardware/software configuration classes and the
 acquisition runtime) and sollertia-forgery (data processing) as needed. The experiment plugin's
-`/system-design-pipeline` skill orchestrates the four build layers and names the skill that owns each one.
+`experiment:system-design-pipeline` skill orchestrates the four build layers and names the skill that owns each one.
 
 ### Adding a New Trial Class
 
@@ -506,8 +507,8 @@ therefore does not require a branch in every system.
 **Step 3: Update downstream libraries**
 
 A new trigger type also requires Unity-side assets in sollertia-virtual-reality, namely the zone prefab, the
-task-generation pipeline, and the fixtures that pin the trigger enum. The unity plugin's `/zone-prefabs`,
-`/task-generator`, and `/unity-tests` skills own that work, which is out of scope for this library.
+task-generation pipeline, and the fixtures that pin the trigger enum. The unity plugin's `unity:zone-prefabs`,
+`unity:task-generator`, and `unity:unity-tests` skills own that work, which is out of scope for this library.
 
 ### Adding a New Read Asset
 
@@ -561,8 +562,8 @@ The parity check catches a forgotten registry entry at import time, naming the m
 
 **Step 4: Wire the translation downstream**
 
-Coordinate with sollertia-experiment, which reads the external source, translates it into the new dataclass, and
-caches it on disk for sollertia-forgery to consume. The experiment plugin's `/google-sheets-processing` skill owns
+Coordinate with sollertia-experiment, which reads the external source, translates it into the new dataclass, and caches
+it on disk for sollertia-forgery to consume. The experiment plugin's `experiment:google-sheets-processing` skill owns
 that reader. This is the only place that knows the source's storage-specific representation, and the dataclass keeps
 every downstream consumer storage-agnostic.
 
