@@ -93,6 +93,7 @@ marketplace ships the `automation` plugin used across all Sollertia platform rep
 | `/datasets`                     | Discover, inspect, read, write, and validate forged datasets and descriptions    |
 | `/experiment-configuration`     | Author per-project, per-system experiment configuration YAMLs                    |
 | `/task-templates`               | Author and validate reusable Unity `TaskTemplate` YAMLs                          |
+| `assets:cli-reference`          | Document the human-facing `slsa` CLI, its `get` and `configure` subgroups        |
 | `assets:library-extension`      | Orchestrate cross-cutting changes when extending the library's vocabulary        |
 
 The `unity` plugin's eleven skills (`gimbl-framework`, `mqtt-contract`, `play-mode`, `scene-setup`, `task-generator`,
@@ -151,20 +152,28 @@ contracts, or canonical filenames ripple through three downstream libraries:
 - **sollertia-experiment** (acquisition runtime). Consumes `SessionData.create` / `load`, every descriptor class,
   `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials file resolved through
   `get_credentials`. Owns the system-level `MesoscopeSystemConfiguration`, which extends but does not live in this
-  library. The `experiment` plugin's `/acquisition-system-design` skill owns that configuration layer, and
+  library. The `experiment` plugin's `experiment:acquisition-system-design` skill owns that configuration layer, and
   `mesoscope:mesoscope-vr` documents the Mesoscope-VR instance of it.
 - **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `iterate_sessions`, `DatasetData`,
   the working directory's `configuration/` subdirectory (where the forgery server configuration is persisted) and its
   remote-state subdirectory, the `ProcessingTrackers` enum, `MesoscopeHardwareState`, and
   `MesoscopeExperimentConfiguration`. Its per-project manifest is written at the project root under the data root as
-  `<project>/<project>_manifest.feather`, not under the working directory. The `forging` plugin's
-  `/server-configuration` and `/project-manifest` skills own those two assets.
+  `<project>/<project>_manifest.feather`, not under the working directory. `forging:server-configuration` and
+  `forging:project-state` own those two assets.
 - **sollertia-virtual-reality** (Unity Editor McpBridge plugin). Consumed by `interfaces/unity_tools.py` over HTTP
   localhost, and the plugin itself is authored on the Unity side.
 
 You MUST maintain backwards compatibility for any class, constant, or filename that is exported through
 `src/sollertia_shared_assets/__init__.py` unless the user explicitly requests a breaking change. When breaking
 changes are necessary, coordinate with the downstream library maintainers and bump the major version.
+
+## Distribution model
+
+The library source, tests, the `slsa` CLI, and the MCP server implementation live in this repository and ship to PyPI
+as `sollertia-shared-assets`. Its Claude Code skills and its MCP server registration ship separately, through the
+[sollertia](https://github.com/Sun-Lab-NBB/sollertia) marketplace, in its `assets` plugin. An agent asked to add or
+change a skill edits that repository rather than this one, while a change to a `@mcp.tool()` function or to library
+code edits the source files here.
 
 ## Project context
 
@@ -249,43 +258,9 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 ### Extension contracts
 
 Every dispatch registry is defined, fully populated, in the top-level `registries.py` module, keyed by the vocabulary
-enums in the leaf `enums.py` module. The registries form two governance tiers. The system registries
-(`DESCRIPTOR_REGISTRY`, `HARDWARE_STATE_REGISTRY`, `EXPERIMENT_CONFIGURATION_REGISTRY`, `SYSTEM_RAW_DATA_REGISTRY`,
-the `SYSTEM_SESSION_TYPES` association, and `SESSION_TYPES_USING_VR_TASK`) form the designed extension point: they grow
-whenever a new acquisition system or session type is added. The contract registries (`READ_ASSET_REGISTRY`,
-`CREDENTIALS_FILE_REGISTRY`) are durable translation contracts curated by Sollertia platform maintainers. Adding an
-entry there is a platform-contract decision, not a routine extension. Use the `assets:library-extension` skill for both
-tiers, since it owns the touch list for every extension scenario.
-
-| Registry                            | Keyed by             | Tier                       |
-|-------------------------------------|----------------------|----------------------------|
-| `DESCRIPTOR_REGISTRY`               | `SessionTypes`       | System (extension point)   |
-| `HARDWARE_STATE_REGISTRY`           | `AcquisitionSystems` | System (extension point)   |
-| `EXPERIMENT_CONFIGURATION_REGISTRY` | `AcquisitionSystems` | System (extension point)   |
-| `SYSTEM_RAW_DATA_REGISTRY`          | `AcquisitionSystems` | System (extension point)   |
-| `SYSTEM_SESSION_TYPES`              | `AcquisitionSystems` | System (extension point)   |
-| `READ_ASSET_REGISTRY`               | `ReadAssets`         | Contract (maintainer-only) |
-| `CREDENTIALS_FILE_REGISTRY`         | `CredentialsTypes`   | Contract (maintainer-only) |
-
-`SESSION_TYPES_USING_VR_TASK` is the seventh system-tier touch point and has no row above, because it is a
-`frozenset[SessionTypes]` gate rather than a keyed registry. Extend it whenever a new session type runs the corridor
-task, since it decides whether `SessionData.required_raw_assets` demands the `vr_configuration.yaml` snapshot.
-
-`DESCRIPTOR_REGISTRY` is deliberately flat: a session type maps to exactly one descriptor platform-wide, so an
-acquisition system that needs a different descriptor must mint a new `SessionTypes` member.
-`_assert_registry_coverage()` in `registries.py` runs on a bare `import sollertia_shared_assets` (the hub loads
-without the MCP server) and raises `RuntimeError` if any registry is missing entries for a known enum member. It
-raises the same error if `SYSTEM_SESSION_TYPES` leaves an acquisition system with no session types or a session type
-unclaimed by any system. The hub additionally runs `_assert_descriptor_contract()`, which requires every registered
-descriptor to declare the `incomplete` field the inspection tooling reads. It also runs
-`_assert_experiment_configuration_contract()`, which requires every registered experiment configuration to declare the
-`experiment_states`, `trial_structures`, and `unity_scene_name` contract fields and to provide a `from_task_template`
-classmethod. That classmethod must accept `template`, `unity_scene_name`, and `state_count` by keyword and give every
-other parameter a default, so `create_experiment_from_vr_template_tool` can call it generically. A half-wired
-acquisition system fails fast instead of having its template-creation tool refuse it at runtime.
-
-Each acquisition system's trial vocabulary and the nested schemas of its experiment configuration are derived by
-introspection from that system's `<System>ExperimentConfiguration` dataclass.
+enums in the leaf `enums.py` module. The registries split into a system tier that grows with each new acquisition system
+or session type and a maintainer-curated contract tier. Invoke `assets:library-extension` before touching either tier,
+since it owns the tier table, the import-time guardrail contract, and the touch list for every extension scenario.
 
 ### Code standards
 
@@ -301,8 +276,9 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
 - **Library naming in prose**: Write `sollertia-shared-assets`, not `slsa`, in documentation, comments, and commit
   messages. The short form is reserved for the CLI entry point and the mamba environment name (`slsa_dev`).
 - **Minimal machinery**: Prefer concrete classes, explicit `Path` fields, and `if`/`elif` dispatch over ABCs,
-  `@property`-derived state, back-references, or unnecessary registries. The registries and the `SYSTEM_SESSION_TYPES`
-  association listed above are necessary because they cross enum boundaries. Do not add more without justification.
+  `@property`-derived state, back-references, or unnecessary registries. The dispatch registries and the
+  `SYSTEM_SESSION_TYPES` association in `registries.py` are necessary because they cross enum boundaries. Do not add
+  more without justification.
 - **Frozen acquisition snapshots**: The per-session acquisition snapshots in `raw_data/` (descriptor, hardware state,
   system configuration, experiment configuration, VR configuration, surgery metadata) are immutable records of the
   session's acquisition context. MCP write tools repair corruption, and they do not edit live runtime state. The
@@ -311,56 +287,4 @@ introspection from that system's `<System>ExperimentConfiguration` dataclass.
 
 ### Workflow guidance
 
-**Adding a new session type or acquisition system:**
-
-Invoke `assets:library-extension`.
-
-**Modifying configuration dataclasses:**
-
-1. Read the relevant module: shared primitives live under `src/sollertia_shared_assets/configuration/`,
-   system-specific experiment configurations under the system's subpackage (e.g.,
-   `mesoscope_vr/experiment_configuration.py`)
-2. Preserve the `YamlConfig` inheritance, because downstream libraries serialize and deserialize these
-3. Update `__post_init__` validation when adding fields with cross-field constraints
-4. Run `tox -e lint` and verify no field renames break sollertia-experiment or sollertia-forgery
-
-**Modifying session or descriptor dataclasses:**
-
-1. Read the relevant module: `SessionData` and the hierarchy views live under
-   `src/sollertia_shared_assets/data_hierarchy/`, per-system descriptors and raw-data layouts under the system's
-   subpackage (e.g., `mesoscope_vr/runtime_data.py`, `mesoscope_vr/raw_data.py`)
-2. New canonical filenames require an entry in `RawDataFiles` (`data_hierarchy/session_data.py`) or a system-specific
-   `*RawDataFiles` enum (`<system>/raw_data.py`)
-3. New canonical subdirectories require an entry in `Directories` or a system-specific `*Directories` enum
-4. New required `raw_data` assets require updating `SessionData.required_raw_assets` in `data_hierarchy/session_data.py`
-   (for a session type that runs the corridor task, add it to the `SESSION_TYPES_USING_VR_TASK` gate in
-   `registries.py`)
-
-**Adding or modifying MCP tools:**
-
-1. Add the `@mcp.tool()`-decorated function to the appropriate module under `src/sollertia_shared_assets/interfaces/`.
-   Invoke `assets:library-extension` for a new `*_tools.py` module, since it owns the glob-import registration seam
-   and the coverage-gate exemption that lets a tool module ship without a mirrored test package
-2. Use `ok_response(...)` and `error_response(...)` from `mcp_instance` for all responses
-3. Document the response key shape in the `Returns` docstring section, since it is part of the public contract
-4. Update the README's MCP tool table, ensuring each row description matches the source docstring summary, and
-   re-run `tox -e docs` to regenerate the API documentation
-
-**Running tests, linting, the docs build, and the release tasks:**
-
-```bash
-tox -e lint                # purge stubs, ruff format, ruff check over ./src and ./tests, mypy over ./src
-tox -e stubs               # generate .pyi stubs after lint passes
-tox -e py314-test          # run pytest with coverage
-tox -e coverage            # combine coverage data, render the reports, apply the 100% gate
-tox -e docs                # build Sphinx HTML documentation
-tox -e build               # build sdist + wheel
-tox -e upload              # publish the built distributions to PyPI
-tox -e deploy              # publish the built documentation to the project's Netlify site
-```
-
-The `tox` envlist runs `uninstall → export → lint → stubs → py314-test → coverage → docs → build → install` end to end.
-The `coverage` task applies the `fail_under = 100` gate declared in `pyproject.toml`, so an uncovered statement fails
-the run. The `upload` and `deploy` tasks stay outside the envlist and run manually as release steps, `upload` after
-`tox -e build` and `deploy` after `tox -e docs`. The `deploy` task reads the target site from the tracked
-`.netlify-site` file at the project root.
+@.claude/rules/workflow.md
