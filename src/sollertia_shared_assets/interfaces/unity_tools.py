@@ -211,6 +211,25 @@ def list_assets_tool(asset_type: str = "Prefab", search_path: str = "Assets/Infi
 
 
 @mcp.tool()
+def refresh_assets_tool() -> dict[str, Any]:
+    """Imports pending asset changes into the Unity Editor and reports whether a compilation followed.
+
+    The agentic counterpart of the Editor's automatic refresh when it regains focus. A headless Editor never regains
+    focus, so a C# file written from outside stays unimported and the type it declares stays unresolvable until this
+    runs. Call it after authoring a script and before any tool that references the new type, such as
+    :func:`clone_zone_prefab_tool`.
+
+    Compilation is queued rather than immediate, so a true ``is_compiling`` means the domain reload has not finished.
+    Poll :func:`get_play_state_tool` until it reports a state other than ``compiling`` before issuing further calls.
+    Requires the Unity Editor to be running with the McpBridge plugin active.
+
+    Returns:
+        A response dict with ``message``, ``is_compiling``, and ``is_updating`` on success.
+    """
+    return _unity_relay(tool="refresh_assets")
+
+
+@mcp.tool()
 def list_scenes_tool() -> dict[str, Any]:
     """Lists all Unity scene assets in the project and identifies the currently active scene.
 
@@ -245,6 +264,22 @@ def open_scene_tool(scene_path: str, unsaved_changes: Literal["save", "discard"]
     if unsaved_changes is not None:
         relay_arguments["unsaved_changes"] = unsaved_changes
     return _unity_relay(tool="open_scene", arguments=relay_arguments)
+
+
+@mcp.tool()
+def save_scene_tool() -> dict[str, Any]:
+    """Saves the active Unity scene to its existing asset path.
+
+    Clears the dirty flag that every :func:`write_task_parameters_tool` call sets, which the Play Mode preflight
+    requires. A scene that has never been saved has no asset path to write to, and the bridge returns an error rather
+    than opening a save dialog, because it answers a caller that cannot dismiss one. Saving while the Editor sits in
+    Play Mode is likewise refused, since the Editor discards scene edits on exit. Requires the Unity Editor to be
+    running with the McpBridge plugin active.
+
+    Returns:
+        A response dict with ``message``, ``scene_path``, and ``is_dirty`` on success.
+    """
+    return _unity_relay(tool="save_scene")
 
 
 @mcp.tool()
@@ -403,6 +438,41 @@ def refresh_monitors_tool() -> dict[str, Any]:
         list reflects the re-detected monitor geometry.
     """
     return _unity_relay(tool="refresh_monitors")
+
+
+@mcp.tool()
+def read_console_tool(
+    level: Literal["all", "log", "warning", "error"] = "all",
+    limit: int = 100,
+    since_sequence: int | None = None,
+) -> dict[str, Any]:
+    """Returns the Unity Console entries the Editor has logged since it loaded the project.
+
+    The bridge keeps the last 500 entries in memory, so this reports what the current Editor session logged rather than
+    what the Console window currently displays, and a domain reload resets it. Each entry carries a monotonic
+    ``sequence``, its ``type``, its ``message``, and its ``stack_trace``.
+
+    Supplying ``since_sequence`` selects polling behavior, which returns the oldest unread matching entries and reports
+    a ``next_sequence`` to pass back on the following call, so a backlog larger than ``limit`` arrives across successive
+    calls rather than being skipped. Omitting it selects one-shot behavior, which returns the newest matching entries,
+    which is what a diagnosis after a failure needs. Entries go missing through two channels, a non-zero ``dropped``
+    meaning the 500-entry bound evicted entries never read, and a ``matched`` above ``count`` meaning ``limit``
+    truncated that many further matching entries out of this response. Requires the Unity Editor to be running with the
+    McpBridge plugin active.
+
+    Args:
+        level: The severity group to return. ``error`` covers Unity's Error, Exception, and Assert types together.
+        limit: The maximum number of entries to return. Defaults to 100.
+        since_sequence: The sequence number to resume after, selecting polling behavior. Omit it for one-shot behavior.
+
+    Returns:
+        A response dict with ``entries``, ``count``, ``matched``, ``next_sequence``, ``dropped``, and ``capacity`` on
+        success.
+    """
+    relay_arguments: dict[str, Any] = {"level": level, "limit": limit}
+    if since_sequence is not None:
+        relay_arguments["since_sequence"] = since_sequence
+    return _unity_relay(tool="read_console", arguments=relay_arguments)
 
 
 def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
