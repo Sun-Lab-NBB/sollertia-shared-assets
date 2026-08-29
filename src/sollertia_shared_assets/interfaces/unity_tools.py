@@ -222,10 +222,10 @@ def list_assets_tool(asset_type: str = "Prefab", search_path: str = "Assets/Infi
 def refresh_assets_tool() -> dict[str, Any]:
     """Imports pending asset changes into the Unity Editor and reports whether a compilation followed.
 
-    The agentic counterpart of the Editor's automatic refresh when it regains focus. A headless Editor never regains
-    focus, so a C# file written from outside stays unimported and the type it declares stays unresolvable until this
-    runs. Call it after authoring a script and before any tool that references the new type, such as
-    :func:`clone_zone_prefab_tool`.
+    The agentic counterpart of the Editor's automatic refresh on focus. A running Editor that nobody focuses, such
+    as one left open on an unattended rig, never receives that event, so a C# file written from outside stays
+    unimported and the type it declares stays unresolvable until this runs. Call it after authoring a script and
+    before any tool that references the new type, such as :func:`clone_zone_prefab_tool`.
 
     A true ``is_compiling`` means a domain reload is in flight, while a false one does not prove the import produced
     no compilation, because the Editor may not have started one by the time the handler reads the flag. Poll
