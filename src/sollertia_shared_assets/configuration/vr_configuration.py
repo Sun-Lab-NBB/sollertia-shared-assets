@@ -26,8 +26,9 @@ Restricts both names to ASCII letters, digits, and underscores so the ``Template
 and the ``Cue_Name_LengthCm`` cue naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path
 separators, whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves of a segment name
 is what lets a segment filename split back to exactly one owning template. Barring whitespace from a cue name also keeps
-the space-joined cue sequence signature that Unity compares trials on unambiguous. Unity applies the same pattern to the
-template filename stem and to each trial name in ``ConfigLoader.cs``, and the cue-name half is enforced here alone.
+the space-joined cue sequence signature that Unity compares trials on unambiguous. ``ConfigLoader.cs`` compiles the same
+pattern and applies it independently to the template filename stem, to each cue name, and to each trial name, so both
+repositories enforce all three.
 """
 
 
@@ -194,8 +195,11 @@ class TrialStructure:
     occupancy_arm trigger types elicit the stimulus on collision with this boundary, while the interaction and
     occupancy_trigger types elicit it from the sensor and the occupancy timer instead."""
     show_stimulus_collision_boundary: bool
-    """Determines whether the stimulus collision boundary is visible to the animal during this trial type. When True,
-    the boundary marker is displayed in the Virtual Reality environment at the stimulus location."""
+    """Determines whether the stimulus collision boundary marker is visible to the animal during this trial type.
+    When True, Unity enables the MeshRenderer on the trigger zone's root object, so the marker sits wherever the
+    trigger type places that root. A collision trial anchors that root on the stimulus location, an interaction
+    trial places it at the trigger-zone midpoint, and an occupancy trial offsets it from the stimulus location by
+    half the zone length."""
     trigger_type: str | TriggerType
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
     occupancy_duration_ms: float | None = None
