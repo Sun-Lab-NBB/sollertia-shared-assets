@@ -109,8 +109,9 @@ def inspect_prefab_tool(prefab_path: str) -> dict[str, Any]:
             ``Assets/InfiniteCorridorTask/Prefabs/SSO_Merging-ABC.prefab``).
 
     Returns:
-        A response dict with ``prefab_path`` and ``hierarchy`` (recursive GameObject tree with transforms, components,
-        and collider geometry).
+        A response dict with ``prefab_path`` and ``hierarchy``, a recursive GameObject tree carrying transforms,
+        collider geometry, ``active_self``, a ``components`` list of type names, and a ``component_states`` list
+        pairing each type with its ``enabled`` flag, which is null for a type that cannot be disabled.
     """
     return _unity_relay(tool="inspect_prefab", arguments={"prefab_path": prefab_path})
 
@@ -292,8 +293,10 @@ def inspect_scene_tool() -> dict[str, Any]:
     ``open_scene_tool`` call. Requires the Unity Editor to be running with the McpBridge plugin active.
 
     Returns:
-        A response dict with ``scene_path``, ``scene_name``, ``is_dirty``, and ``root_objects`` (list of recursive
-        GameObject hierarchies with transforms, components, and collider geometry).
+        A response dict with ``scene_path``, ``scene_name``, ``is_dirty``, and ``root_objects``, a list of recursive
+        GameObject hierarchies carrying transforms, collider geometry, ``active_self``, a ``components`` list of type
+        names, and a ``component_states`` list pairing each type with its ``enabled`` flag, which is null for a type
+        that cannot be disabled.
     """
     return _unity_relay(tool="inspect_scene")
 
@@ -352,7 +355,9 @@ def read_task_parameters_tool() -> dict[str, Any]:
         per-section current values. ``actor`` carries ``model`` and ``controller``. ``mqtt`` carries ``ip`` and
         ``port``. ``display`` carries ``current_brightness``, ``brightness``, and ``height_in_vr``. ``camera_mapping``
         carries a list of per-monitor dicts with ``monitor``, ``left``, ``top``, and ``camera``. ``task`` carries
-        ``require_interaction``, ``require_wait``, ``track_length``, and ``track_seed``. The ``options`` key lists
+        ``require_interaction``, ``require_wait``, ``track_length``, ``track_seed``, ``actor`` (the assigned actor's
+        GameObject name, or null when the reference is unassigned), and ``config_path``. The last two are read-only,
+        because the Parameters window exposes no control for either. The ``options`` key lists
         enumerated alternatives for fields with a finite valid set. ``actor.model`` lists every Resources actor prefab
         plus the literal ``"None"``. ``actor.controller`` lists every scene ControllerOutput plus the literal
         ``"None"``. ``camera_mapping.camera`` lists every scene Camera not tagged MainCamera or named ``Main Camera``,
