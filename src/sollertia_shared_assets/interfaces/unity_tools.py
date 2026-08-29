@@ -92,7 +92,8 @@ def delete_task_tool(template_name: str) -> dict[str, Any]:
         A response dict with ``template_name``, ``deleted_paths`` (the scene, the task prefab, and every segment prefab
         removed. The per-scene companion is reported separately), ``deleted`` (boolean), and ``message`` on success.
         When a per-scene companion asset existed, the response also carries ``companion_deleted`` with the
-        project-relative path of the removed companion. The call returns an error when no artifacts existed for the
+        project-relative path of the removed companion, or ``companion_delete_failed`` with that path when the cascade
+        located the companion but was unable to remove it. The call returns an error when no artifacts existed for the
         template.
     """
     return _unity_relay(tool="delete_task", arguments={"template_name": template_name})
@@ -131,8 +132,11 @@ def clone_zone_prefab_tool(
     script references, and parent-child wiring are assigned by Unity and stay consistent. The clone copies one of the
     two protected base zone prefabs, optionally swaps the root and named region modifier scripts for new compiled
     ``MonoBehaviour`` types, and applies serialized field overrides. Every requested script name is resolved before any
-    asset is written, and the created asset is rolled back if a later edit fails, so a failed call leaves a clean
-    working tree. Unity names the new prefab's root after the destination filename.
+    asset is written, so a missing, ambiguous, or abstract script name fails with the destination left untouched. A
+    failure during the later edit phase, covering an unmatched region name, a wrong modifier count, and an unknown or
+    unsupported ``fields`` key, deletes the destination instead. With ``overwrite`` set, the existing asset is deleted
+    before the copy, so such a failure leaves the path empty and the replaced prefab recoverable only from version
+    control. Unity names the new prefab's root after the destination filename.
 
     This tool only produces the prefab. Wiring it into the runtime (the ``ConfigLoader`` trigger_type literal, the
     ``CreateTask`` placement branch, the ``McpBridge`` protected-path set, and the Python ``TriggerType`` registry)
@@ -398,8 +402,9 @@ def write_task_parameters_tool(
         display: Optional dict with ``current_brightness`` (0-100 float), ``brightness`` (0-100 float), and/or
             ``height_in_vr`` (float, Unity units).
         camera_mapping: Optional list of per-monitor dicts. Each entry requires ``monitor`` (1-based index, matching the
-            GUI row index) and ``camera`` (str matching ``options.camera_mapping.camera``). Omitted monitors keep their
-            current assignment.
+            GUI row index), and an entry that omits it is rejected along with the whole write. ``camera`` (str matching
+            ``options.camera_mapping.camera``) is optional, and an entry that omits it is skipped rather than rejected.
+            Omitted monitors keep their current assignment.
         task: Optional dict with ``require_interaction`` (bool), ``require_wait`` (bool), ``track_length`` (float),
             and/or ``track_seed`` (int). ``require_interaction`` is rejected when the scene has no ``GuidanceZone``.
             ``require_wait`` is rejected when the scene has no ``OccupancyZone``. ``track_length`` must be a positive,
