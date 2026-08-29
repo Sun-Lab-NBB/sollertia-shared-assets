@@ -390,9 +390,12 @@ def write_task_parameters_tool(
     """Writes a subset of the Task Parameters fields in a single atomic relay call.
 
     Each top-level argument corresponds to one section of the Task Parameters window. Passing ``None`` (the default)
-    leaves the section untouched. Fields within a supplied section are also individually optional so callers can update
-    one value at a time. Writes flow through the same code paths the GUI uses, so the scene is marked dirty and modified
-    asset files (``DisplaySettings``, ``savedFullScreenViews``) are flagged for save.
+    leaves the section untouched. Fields within a supplied section are also individually optional, but a field is
+    omitted by leaving its key out of the dict rather than by setting it to ``None``. An explicit ``None`` reaching
+    ``mqtt.port``, any ``display`` field, or ``task.require_interaction``, ``require_wait``, or ``track_seed`` converts
+    to ``0`` or ``false`` and is written, and the call still reports success. Writes flow through the same code paths
+    the GUI uses, so the scene is marked dirty and modified asset files (``DisplaySettings``, ``savedFullScreenViews``)
+    are flagged for save.
 
     Validation rejects values that fall outside the enumeration reported by :func:`read_task_parameters_tool`,
     mismatched monitor indices, and writes targeting ``task.require_interaction`` / ``task.require_wait`` when the
