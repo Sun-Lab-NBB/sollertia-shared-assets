@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 import shutil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from pathlib import Path
 from dataclasses import field, dataclass
 
@@ -44,7 +44,8 @@ class RawDataFiles(StrEnum):
     """The session-embedded descriptor YAML written by the acquisition runtime. The concrete descriptor class is
     determined by the session's session_type, but the filename is flat across all session types."""
     SURGERY_METADATA = "surgery_metadata.yaml"
-    """The per-animal surgery metadata YAML cached into the session's raw_data at acquisition time."""
+    """The per-animal surgery metadata YAML cached into the session's raw_data by acquisition-system preprocessing
+    after the session ends. Absent until preprocessing runs."""
     HARDWARE_STATE = "hardware_state.yaml"
     """The hardware state snapshot YAML written at the start of acquisition."""
     EXPERIMENT_CONFIGURATION = "experiment_configuration.yaml"
@@ -134,7 +135,8 @@ class RawData:
     determined by the session's session_type and is dispatched via DESCRIPTOR_REGISTRY."""
     surgery_metadata_path: Path
     """Stores a frozen snapshot of the animal's surgical history (subject, procedure, drugs, implants, injections) as
-    it stood at the moment the session was acquired."""
+    it stood at the moment the session was acquired. The acquisition system writes it during post-session
+    preprocessing, so the path resolves before the file exists."""
     hardware_state_path: Path
     """Records the configuration of every active hardware module on the acquisition system, used to interpret the raw
     data during downstream processing. The concrete parsing class is determined by the session's acquisition_system
@@ -304,6 +306,22 @@ class SessionData(YamlConfig):
     processed_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
     """The path to the root directory that stores the session's processed data. Kept out of the written marker, since
     ``load`` re-resolves it from the marker's own on-disk location."""
+
+    # The three runtime-only attributes that _build_sub_dataclasses() assigns. They are declared with init=False and
+    # no default, so they stay out of the constructor signature and remain genuinely unset until create() or load()
+    # populates them, and an early access still raises AttributeError as the class docstring promises. repr=False
+    # keeps repr() from touching them while they are unset, and the exclusion metadata keeps them out of the written
+    # marker. Declaring them here is what lets stubgen emit real annotations: left undeclared, the generated stub
+    # carries bare assignments that resolve to EllipsisType and break every downstream 'session.raw_data.<asset>'
+    # access under strict type checking.
+    raw_data: RawData = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
+    """The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by ``create()`` and
+    ``load()``."""
+    processed_data: ProcessedData = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
+    """The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated by ``load()``."""
+    system_raw_data: Any = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
+    """The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset paths, populated by
+    ``create()`` and ``load()``."""
 
     def __post_init__(self) -> None:
         """Resolves the session type and the acquisition system identifiers into their typed enumeration members.
