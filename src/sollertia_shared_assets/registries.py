@@ -185,7 +185,8 @@ def _assert_registry_coverage() -> None:
             message = (
                 f"{registry_name} is missing entries for {missing_names}. Every enum member must have a registered "
                 f"dispatch class. See the README's 'Adding New Session Types' / 'Adding New Acquisition Systems' / "
-                f"'Adding a New Read Asset' sections for the full extension touch list."
+                f"'Adding a New Read Asset' / 'Adding a New Credentials Category' sections, or the "
+                f"assets:library-extension skill, for the full extension touch list."
             )
             console.error(message=message, error=RuntimeError)
 
