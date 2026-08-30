@@ -20,7 +20,7 @@ acquisition and processing platform, built on the [Ataraxis](https://github.com/
 developed in the Sun (NeuroAI) lab at Cornell University. It keeps the two main Sollertia libraries used for data
 acquisition ([sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-experiment)) and processing
 ([sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)) independent of each other by providing the
-shared assets both depend on.
+shared assets that both require.
 
 The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, subjects, hardware
 state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
@@ -64,7 +64,7 @@ ___
 - [Python](https://www.python.org/downloads/) **3.14** (the only currently supported interpreter version).
 - An optional [Google service account credentials JSON
   file](https://cloud.google.com/iam/docs/service-account-overview), required only when downstream Sollertia libraries
-  read subject metadata from, or write water-restriction logs to, Google Sheets.
+  read subject metadata from Google Sheets, or write water-restriction logs to them.
 - An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
   [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality), required only by the MCP
   tools that generate task prefabs, manage scenes, and control Play Mode.
@@ -394,10 +394,10 @@ that order:
 2. `<system>/experiment_configuration.py` defines a `<System>ExperimentConfiguration` dataclass inheriting from
    `YamlConfig` that captures the runtime experiment parameters for the new system. Every
    `<System>ExperimentConfiguration` shares one contract of three fields and one classmethod. The `experiment_states`
-   field holds a mapping of `ExperimentState`, the experiment state machine that every experiment runs as, and the
-   `trial_structures` field holds the trials the experiment runs, whose concrete trial classes vary per system. The
-   `unity_scene_name` field names the linear infinite corridor task the experiment runs, and the `from_task_template`
-   classmethod builds the configuration from a task template. Fields beyond that contract are system-specific. Use
+   field holds a mapping of `ExperimentState`, the state machine every experiment runs, and the `trial_structures`
+   field holds the trials the experiment runs, whose concrete trial classes vary per system. The `unity_scene_name`
+   field names the linear infinite corridor task the experiment runs, and the `from_task_template` classmethod builds
+   the configuration from a task template. Fields beyond that contract are system-specific. Use
    `mesoscope_vr/experiment_configuration.py` as reference.
 3. `<system>/raw_data.py` defines a `<System>RawData` `@dataclass(frozen=True, slots=True)` that holds the absolute
    paths to all system-specific raw assets and exposes a `build(cls, root: Path) -> <System>RawData` classmethod
@@ -580,7 +580,7 @@ can resolve it by name instead of by path. `CredentialsTypes` (in `enums.py`) en
 is stored inside the working directory's `credentials/` subdirectory.
 
 Like `ReadAssets`, this is a contract surface curated by Sollertia platform maintainers rather than a routine
-extension: the canonical filename is a durable contract that every consuming library resolves against. The
+extension: the canonical filename is a durable contract against which every consuming library resolves. The
 import-time parity check (`_assert_registry_coverage`) enforces that every `CredentialsTypes` member has a registered
 filename.
 
@@ -637,7 +637,7 @@ Claude Code skills and other AI development assets for this project are distribu
     assets. The **mesoscope** plugin also carries the Mesoscope-VR record schemas held in the `mesoscope_vr/`
     subpackage, and the **forging** plugin owns dataset composition and forging job state.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
-  - **automation** plugin, which provides shared development skills that enforce Sollertia Platform coding
+  - **automation** plugin, which provides shared development skills that enforce Sollertia platform coding
     conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose
     codebase exploration tools.
 

@@ -3,8 +3,8 @@
 ## Session start behavior
 
 You MUST build a comprehensive understanding of the codebase by invoking the `/explore-codebase` skill at the beginning
-of each coding session, before making any code changes, since changes made without it introduce inconsistencies and
-break integrations with the downstream libraries that consume this library.
+of each coding session, before making any code changes. Changes made without it introduce inconsistencies and break
+integrations with the downstream libraries that consume this library.
 
 ## Style guide compliance
 
@@ -154,8 +154,8 @@ contracts, or canonical filenames ripple through three downstream libraries:
 
 - **sollertia-experiment** (acquisition runtime). Consumes `SessionData.create` / `load`, every descriptor class,
   `MesoscopeExperimentConfiguration`, the working directory, and the Google credentials file resolved through
-  `get_credentials`. Owns the system-level `MesoscopeSystemConfiguration`, which extends but does not live in this
-  library. The `experiment` plugin's `experiment:acquisition-system-design` skill owns that configuration layer, and
+  `get_credentials`. Owns the system-level `MesoscopeSystemConfiguration`, which extends this library's configuration
+  layer while living in sollertia-experiment. The `experiment` plugin's `experiment:acquisition-system-design` skill owns that configuration layer, and
   `mesoscope:mesoscope-vr` documents the Mesoscope-VR instance of it.
 - **sollertia-forgery** (data-processing pipeline). Consumes `SessionData.load`, `iterate_sessions`, `DatasetData`,
   the working directory's `configuration/` subdirectory (where the forgery server configuration is persisted) and its

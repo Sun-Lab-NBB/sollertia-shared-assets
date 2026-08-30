@@ -17,10 +17,10 @@ Configuration Assets
    :undoc-members:
    :show-inheritance:
 
-.. The automodule directive above discovers module-level data through the source of the module it documents, so it
-   skips a constant the package re-exports, and the constant never reaches the rendered page. These directives name
-   the defining module rather than the re-exporting package, because autodoc reads the attribute docstring from that
-   module's source and otherwise falls back to the docstring of the value's own type.
+.. Documents the package constants explicitly, since the automodule directive above discovers module-level data through
+   the source of the module it documents and therefore skips a constant this package re-exports. The directive names
+   the defining module rather than the package, because autodoc reads the attribute docstring from that module's
+   source and falls back to the docstring of the value's own type when it is pointed at the re-exporting package.
 
 .. autodata:: sollertia_shared_assets.configuration.configuration_utilities.CONFIGURATION_DIRECTORY
 
@@ -42,10 +42,7 @@ Data Hierarchy Assets
    :undoc-members:
    :show-inheritance:
 
-.. The automodule directive above discovers module-level data through the source of the module it documents, so it
-   skips a constant the package re-exports, and the constant never reaches the rendered page. These directives name
-   the defining module rather than the re-exporting package, because autodoc reads the attribute docstring from that
-   module's source and otherwise falls back to the docstring of the value's own type.
+.. Documents the package constants explicitly, for the reason given above the Configuration Assets autodata directives.
 
 .. autodata:: sollertia_shared_assets.data_hierarchy.session_data.RAW_DATA_DIRECTORY
 
