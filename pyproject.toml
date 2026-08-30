@@ -206,7 +206,7 @@ extra_checks = true
 pretty = true
 
 exclude = [
-    "sollertia-shared-assets-\\d+",  # The temporary folder created when building the sdist
+    "sollertia_shared_assets-\\d+",  # The temporary folder created when building the sdist
     "venv.*/",
     "build/",
     "dist/",
