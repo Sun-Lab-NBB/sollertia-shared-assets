@@ -1,9 +1,6 @@
 """Provides the cross-system enumerations that define the Sollertia platform vocabulary: acquisition systems, session
-types, external read assets, and credentials categories.
-
-This module is a leaf: it imports nothing from the rest of the library, so every other module, shared, system-specific,
-or interface, can use the enumerations without creating circular imports. The dispatch registries keyed by these
-enumerations are all defined in the ``registries`` module.
+types, external read assets, and credentials categories. The module is a leaf that imports nothing from the rest of the
+library, so every consumer can use the enumerations without creating circular imports.
 """
 
 from enum import StrEnum
@@ -14,7 +11,7 @@ class AcquisitionSystems(StrEnum):
 
     Every Sollertia acquisition system runs in Virtual Reality, presenting a Unity task in the linear infinite
     corridor. Each acquisition runtime package owns its own system configuration classes. This enum remains the shared
-    vocabulary that identifies which runtime a session or dataset was acquired on.
+    vocabulary that identifies which runtime acquired a session or a dataset.
     """
 
     MESOSCOPE_VR = "mesoscope"
@@ -48,7 +45,7 @@ class ReadAssets(StrEnum):
     """
 
     SURGERY_DATA = "surgery_data"
-    """The animal's surgical-intervention record read from the platform surgery log and stored on disk as
+    """Stores the animal's surgical-intervention record read from the platform surgery log, held on disk as
     ``SurgeryData`` (canonical filename ``surgery_metadata.yaml``)."""
 
 
@@ -61,5 +58,5 @@ class CredentialsTypes(StrEnum):
     """
 
     GOOGLE = "google"
-    """The Google service account credentials used for all interactions with the Google Sheets API (canonical
+    """Stores the Google service account credentials used for all interactions with the Google Sheets API (canonical
     filename ``google_credentials.json``)."""

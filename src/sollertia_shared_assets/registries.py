@@ -1,9 +1,6 @@
 """Collects every sollertia-shared-assets dispatch registry in one place and runs the import-time checks that guard
-them. The module holds two governance tiers, the system registries that grow whenever a new acquisition system or
-session type is added, and the contract registries that Sollertia platform maintainers curate. It imports each
-acquisition system's subpackage and wires that system's classes into the registries, so the shared configuration and
-data modules never import from a system subpackage. The keying enumerations live in the leaf ``enums`` module, which
-keeps this module importable by every registry consumer without circular imports.
+them. The module imports each acquisition system's subpackage and wires that system's classes into the registries, so
+the shared configuration and data modules never import from a system subpackage.
 """
 
 from __future__ import annotations
@@ -93,7 +90,7 @@ SYSTEM_SESSION_TYPES: dict[AcquisitionSystems, frozenset[SessionTypes]] = {
 """Maps each acquisition system to the set of session types it can run."""
 
 SESSION_TYPES_USING_VR_TASK: frozenset[SessionTypes] = frozenset({SessionTypes.MESOSCOPE_EXPERIMENT})
-"""The session types that use VR and therefore write a ``vr_configuration.yaml`` task-template snapshot."""
+"""Collects the session types that use VR and therefore write a ``vr_configuration.yaml`` task-template snapshot."""
 
 READ_ASSET_REGISTRY: dict[ReadAssets, type[YamlConfig]] = {
     ReadAssets.SURGERY_DATA: SurgeryData,
@@ -191,9 +188,8 @@ def _assert_registry_coverage() -> None:
             console.error(message=message, error=RuntimeError)
 
     # SYSTEM_SESSION_TYPES is an association (system -> session-type set) rather than a dispatch registry, so it is
-    # checked separately. Every acquisition system must declare at least one session type, and every session type
-    # must be claimed by at least one system. Either gap would make SessionData.create reject a legitimate session,
-    # since an empty session-type set rejects every type and an unclaimed session type is rejected by every system.
+    # checked separately. Either gap would make SessionData.create reject a legitimate session, since an empty
+    # session-type set rejects every type and an unclaimed session type is rejected by every system.
     systems_missing_session_types = frozenset(AcquisitionSystems) - frozenset(
         system for system, session_types in SYSTEM_SESSION_TYPES.items() if session_types
     )

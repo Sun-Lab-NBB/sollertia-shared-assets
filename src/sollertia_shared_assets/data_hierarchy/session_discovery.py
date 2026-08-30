@@ -219,11 +219,8 @@ def filter_sessions(
 ) -> set[tuple[str, str]]:
     """Filters ``(session_name, animal)`` pairs by date range and inclusion-exclusion criteria.
 
-    Provides a general-purpose filtering mechanism for selecting a subset of sessions. Animal filtering
-    is applied before session filtering. Exclusion filtering takes precedence over inclusion filtering.
-
-    Notes:
-        The input is intentionally a plain iterable of ``(session_name, animal)`` tuples rather than a richer type.
+    Animal filtering is applied before session filtering. Exclusion filtering takes precedence over inclusion
+    filtering.
 
     Args:
         sessions: An iterable of ``(session_name, animal)`` string tuples. The first element is the canonical session
@@ -232,10 +229,10 @@ def filter_sessions(
             Accepts formats like ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``. When ``None``, no start bound is applied.
         end_date: The end date for the date range filter. Sessions recorded on or before this date are included.
             Date-only values include the entire day. When ``None``, no end bound is applied.
-        include_sessions: Session names to include regardless of the date range. Sessions in this set are added even
-            when they fall outside the ``start_date`` / ``end_date`` range, unless they are also in
-            ``exclude_sessions``, or their animal is removed by ``exclude_animals``, or absent from a non-empty
-            ``include_animals``.
+        include_sessions: Session names to include regardless of the date range. A session in this set is added even
+            when it falls outside the ``start_date`` / ``end_date`` range. It is still dropped when it appears in
+            ``exclude_sessions``, when ``exclude_animals`` removes its animal, or when a non-empty ``include_animals``
+            omits its animal.
         exclude_sessions: Session names to exclude from the results. Takes precedence over every other inclusion
             criterion.
         include_animals: Animal identifiers to include. When provided and non-empty, only sessions from these animals

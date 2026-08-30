@@ -42,7 +42,7 @@ def set_working_directory(path: Path) -> None:
     ensure_directory_exists(path=path.joinpath(CREDENTIALS_DIRECTORY), is_file=False)
 
     # The path is written atomically, so a process killed mid-write leaves the previously configured directory
-    # readable instead of truncating the record every later session resolves the working directory from.
+    # readable, and every later session still resolves the working directory from a complete record.
     with atomic_write(file_path=path_file) as file:
         file.write(str(path))
 
@@ -56,7 +56,7 @@ def get_working_directory() -> Path:
         The path to the local working directory.
 
     Raises:
-        FileNotFoundError: If the local working directory has not been configured for the host-machine, if the cached
+        FileNotFoundError: If the local working directory has not been configured for the host machine, if the cached
             path record is empty, or if the currently configured directory does not exist at the expected path.
     """
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
@@ -131,7 +131,7 @@ def get_data_root() -> Path:
         The path to the local data root, the directory under which all project directories are stored.
 
     Raises:
-        FileNotFoundError: If the local data root has not been configured for the host-machine, if the cached path
+        FileNotFoundError: If the local data root has not been configured for the host machine, if the cached path
             record is empty, or if the currently configured directory does not exist at the expected path.
     """
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))
@@ -220,7 +220,7 @@ def get_task_templates_directory() -> Path:
         The path to the task templates directory.
 
     Raises:
-        FileNotFoundError: If the task templates directory path has not been configured for the host-machine, if the
+        FileNotFoundError: If the task templates directory path has not been configured for the host machine, if the
             cached path record is empty, or if the previously configured directory does not exist at the expected path.
     """
     application_directory = Path(platformdirs.user_data_dir(appname="sollertia_data", appauthor="sollertia"))

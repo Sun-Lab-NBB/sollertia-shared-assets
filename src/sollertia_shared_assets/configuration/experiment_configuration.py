@@ -1,8 +1,6 @@
-"""Provides system-agnostic experiment configuration building blocks.
-
-This module contains the ``ExperimentState`` dataclass that defines experiment phases independent of the specific
-data acquisition system. System-specific experiment configurations compose it into their own schema alongside the
-runtime trial classes each acquisition system defines in its own subpackage.
+"""Provides the system-agnostic ``ExperimentState`` dataclass that defines experiment phases independently of the data
+acquisition system. Each system-specific experiment configuration composes it into its own schema alongside the runtime
+trial classes that system defines.
 """
 
 from __future__ import annotations

@@ -47,16 +47,16 @@ class MesoscopeRawData:
     """
 
     zaber_positions_path: Path
-    """Captures the states of the Zaber motorized stages used by the Mesoscope-VR system, recorded at the end of the
-    session before the motors are reset."""
+    """The states of the Zaber motorized stages used by the Mesoscope-VR system, recorded at the end of the session
+    before the motors are reset."""
     mesoscope_positions_path: Path
-    """Records the 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window
-    during the session, allowing the same imaging field of view to be recovered in follow-up sessions."""
+    """The 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window during the
+    session, which allows the same imaging field of view to be recovered in follow-up sessions."""
     window_screenshot_path: Path
-    """Provides a visual reference of the cranial imaging window taken at the start of the session."""
+    """A visual reference of the cranial imaging window taken at the start of the session."""
     mesoscope_data_path: Path
-    """Holds the compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata
-    produced by sollertia-experiment's preprocessing."""
+    """The compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata produced
+    by sollertia-experiment's preprocessing."""
 
     @classmethod
     def build(cls, root: Path) -> MesoscopeRawData:

@@ -46,9 +46,9 @@ class TrialKind(StrEnum):
     """
 
     WATER = "water"
-    """Indicates a trial that delivers a water reward, which is a MesoscopeWaterRewardTrial."""
+    """A trial that delivers a water reward, which is a MesoscopeWaterRewardTrial."""
     PUFF = "puff"
-    """Indicates a trial that delivers a gas puff, which is a MesoscopeGasPuffTrial."""
+    """A trial that delivers a gas puff, which is a MesoscopeGasPuffTrial."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +56,8 @@ class MesoscopeWaterRewardTrial:
     """Defines a Mesoscope-VR trial that delivers a water reward (a reinforcing stimulus) when the animal meets the
     trial's success condition.
 
-    The reward is a configured volume of water accompanied by an auditory tone. The behavioral condition that earns
-    the reward is defined by the task, not by this class.
+    The reward is a configured volume of water accompanied by an auditory tone. The task defines the behavioral
+    condition that earns the reward.
     """
 
     reward_size_ul: float = 5.0
@@ -87,7 +87,7 @@ class MesoscopeGasPuffTrial:
     avoidance condition.
 
     The animal avoids the puff by satisfying the task's occupancy condition. Failing to do so delivers a puff of the
-    configured duration. The behavioral condition is defined by the task, not by this class.
+    configured duration. The task defines the behavioral condition.
     """
 
     puff_duration_ms: int = 100
@@ -120,7 +120,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial]
     """The trials the experiment runs, keyed by trial name. This contract field is required by every experiment
-    configuration. ``MesoscopeWaterRewardTrial`` and ``MesoscopeGasPuffTrial`` are Mesoscope-VR's trial classes."""
+    configuration."""
     experiment_states: dict[str, ExperimentState]
     """The experiment state machine, keyed by state name. This contract field is required by every experiment
     configuration."""
@@ -279,8 +279,8 @@ _TRIAL_CLASSES: tuple[tuple[TrialKind, type], ...] = (
     (TrialKind.WATER, MesoscopeWaterRewardTrial),
     (TrialKind.PUFF, MesoscopeGasPuffTrial),
 )
-"""Pairs each trial kind with the runtime trial class that declares it as its discriminator default. The pairs are
-declared below the classes they name, since a constant cannot reference a class defined after it."""
+"""The pairing of each trial kind with the runtime trial class that declares it as its discriminator default. The
+pairs are declared below the classes they name, since a constant cannot reference a class defined after it."""
 
 
 def _restore_trial_kind(trial_name: str, trial: Any) -> Any:

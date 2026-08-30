@@ -259,7 +259,8 @@ def read_dataset_column_descriptions_tool(dataset_path: str) -> dict[str, Any]:
     """
     instance, load_error = _load_dataset(dataset_path=dataset_path)
     if load_error is not None or instance is None:
-        return load_error if load_error is not None else error_response(message="Unresolved dataset path")
+        message = f"Unable to resolve the dataset root from {dataset_path}."
+        return load_error if load_error is not None else error_response(message=message)
 
     try:
         descriptions = instance.column_descriptions()
@@ -296,7 +297,8 @@ def validate_dataset_descriptions_tool(dataset_path: str) -> dict[str, Any]:
     """
     instance, load_error = _load_dataset(dataset_path=dataset_path)
     if load_error is not None or instance is None:
-        return load_error if load_error is not None else error_response(message="Unresolved dataset path")
+        message = f"Unable to resolve the dataset root from {dataset_path}."
+        return load_error if load_error is not None else error_response(message=message)
 
     dataset_root = str(instance.dataset_data_path.parent)
     try:

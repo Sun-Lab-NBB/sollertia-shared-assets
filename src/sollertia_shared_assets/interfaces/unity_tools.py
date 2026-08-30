@@ -1,10 +1,6 @@
-"""Provides MCP tools for interacting with the Unity Editor via the McpBridge HTTP relay.
-
-All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be running with the
-plugin active. On success each tool returns the McpBridge response payload verbatim. When the bridge is unreachable,
-leaves the request unanswered within the timeout, drops the connection mid-response, or returns a payload that is not
-decodable JSON or not a JSON object, the tool returns a ``{"success": False, "error": <message>}`` dict instead. A
-bridge-side tool rejection is forwarded verbatim as the bridge's own ``{"success": False, "error": ...}`` payload.
+"""Provides MCP tools that interact with the Unity Editor through the McpBridge HTTP relay, which requires the Editor
+to be running with the plugin active. Each tool returns the McpBridge response payload verbatim on success, and a
+``{"success": False, "error": <message>}`` dict when the relay itself fails.
 """
 
 from __future__ import annotations
@@ -506,9 +502,10 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         arguments: The tool arguments dictionary. Defaults to an empty dict when omitted.
 
     Returns:
-        The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable, leaves the
-        request unanswered within the timeout, drops the connection mid-response, or replies with a payload that is
-        not decodable JSON or not a JSON object.
+        The parsed JSON response from the Unity bridge. An error dict is returned instead when the bridge is
+        unreachable, leaves the request unanswered within the timeout, drops the connection mid-response, or replies
+        with a payload that is not decodable JSON or not a JSON object. A bridge-side tool rejection is forwarded
+        verbatim as the bridge's own ``{"success": False, "error": ...}`` payload.
     """
     relay_arguments = arguments if arguments is not None else {}
     payload = json.dumps({"tool": tool, "args": relay_arguments}).encode("utf-8")

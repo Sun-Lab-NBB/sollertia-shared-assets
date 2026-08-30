@@ -1,6 +1,5 @@
-"""Provides VR environment configuration classes for Unity task templates and experiment configurations.
-
-These classes define the schema for task template YAML files that Unity uses for prefab generation and runtime.
+"""Provides VR environment configuration classes for Unity task templates and experiment configurations. These classes
+define the schema for the task template YAML files Unity uses for prefab generation and runtime.
 """
 
 from __future__ import annotations
@@ -20,17 +19,17 @@ _PROBABILITY_SUM_TOLERANCE: float = 0.001
 """Tolerance for validating that trial transition probabilities sum to 1.0."""
 
 NAME_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
-"""Matches the trial and cue names that are safe to embed in Unity asset filenames.
+"""The pattern the trial and cue names must match to be safe to embed in Unity asset filenames.
 
 Restricts both names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName`` segment naming scheme
 and the ``Cue_Name_LengthCm`` cue naming scheme used by ``sollertia-virtual-reality`` cannot be corrupted by path
 separators, whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves of a segment name
 is what lets a segment filename split back to exactly one owning template. Barring whitespace from a cue name also keeps
-the space-joined cue sequence signature that Unity compares trials on unambiguous. ``ConfigLoader.cs`` compiles the same
-pattern and applies it independently to the template filename stem, to each cue name, and to each trial name. This
-module applies it to cue names and trial names only, because a ``TaskTemplate`` instance carries no filename of its
-own. The filename stem is checked at the authoring boundary instead, by ``write_template_tool``, so a template this
-library writes cannot carry a stem that ``ConfigLoader.cs`` would later refuse to load.
+the space-joined cue sequence signature unambiguous, since Unity compares trials on that signature. ``ConfigLoader.cs``
+compiles the same pattern and applies it independently to the template filename stem, to each cue name, and to each
+trial name. This module applies it to cue names and trial names only, because a ``TaskTemplate`` instance carries no
+filename of its own. The filename stem is checked at the authoring boundary instead, by ``write_template_tool``, so a
+template this library writes cannot carry a stem that ``ConfigLoader.cs`` would later refuse to load.
 """
 
 
@@ -46,19 +45,19 @@ class TriggerType(StrEnum):
     """
 
     INTERACTION = "interaction"
-    """Indicates an interaction-triggered trial where the animal must engage an interaction sensor (lick port, button,
+    """An interaction-triggered trial where the animal must engage an interaction sensor (lick port, button,
     lever, pressure plate) inside the stimulus trigger zone to elicit stimulus delivery."""
     COLLISION = "collision"
-    """Indicates a collision-triggered trial where crossing the invisible boundary wall elicits stimulus delivery
+    """A collision-triggered trial where crossing the invisible boundary wall elicits stimulus delivery
     unconditionally, with no sensor or occupancy requirement."""
     OCCUPANCY_DISARM = "occupancy_disarm"
-    """Indicates an occupancy-disarm trial where occupying the zone disarms the boundary. Colliding with the still-armed
+    """An occupancy-disarm trial where occupying the zone disarms the boundary. Colliding with the still-armed
     boundary (occupancy not met) elicits stimulus delivery."""
     OCCUPANCY_ARM = "occupancy_arm"
-    """Indicates an occupancy-arm trial where occupying the zone arms the boundary. Colliding with the now-armed
+    """An occupancy-arm trial where occupying the zone arms the boundary. Colliding with the now-armed
     boundary (occupancy met) elicits stimulus delivery."""
     OCCUPANCY_TRIGGER = "occupancy_trigger"
-    """Indicates an occupancy-trigger trial where occupying the zone for the required duration elicits stimulus
+    """An occupancy-trigger trial where occupying the zone for the required duration elicits stimulus
     delivery immediately, with no boundary collision."""
 
 
@@ -67,8 +66,7 @@ class Cue:
     """Defines a single visual cue used in the experiment task's Virtual Reality (VR) environment.
 
     Notes:
-        Each cue has a unique name (used in trial cue sequences) and a unique uint8 code (used during MQTT
-        communication and analysis). Cues are baked into segment prefabs.
+        Cues are baked into segment prefabs.
     """
 
     name: str
@@ -139,14 +137,14 @@ class VREnvironment:
     cm_per_unity_unit: float = 10.0
     """The conversion factor from centimeters to Unity units."""
     cue_offset_cm: float = 0.0
-    """Specifies the offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue
-    sequence origin, in centimeters."""
+    """The offset of the animal's starting position relative to the Virtual Reality (VR) environment's cue sequence
+    origin, in centimeters."""
 
     def __post_init__(self) -> None:
         """Validates corridor geometry parameters."""
         # The YAML loader does not enforce the field annotation, so a float depth reaches this check. NaN and positive
-        # infinity compare False against the lower bound, a fractional depth has no meaning to the maze generator, and
-        # bool would pass an isinstance check as an int, which is why the depth must be exactly an integer.
+        # infinity compare False against the lower bound, and a fractional depth has no meaning to the maze generator.
+        # A bool would also pass an isinstance check as an int, so the depth must be exactly an integer.
         if type(self.segments_per_corridor) is not int or self.segments_per_corridor < 1:
             message = (
                 "Unable to initialize VREnvironment. The segments_per_corridor must be an integer of at least 1, but "
@@ -181,9 +179,6 @@ class TrialStructure:
         This class contains only the spatial data needed by Unity for prefab generation and runtime zone
         configuration. Experiment-specific parameters (reward sizes, puff durations, etc.) live on the matching
         runtime trial classes defined by each acquisition system and are joined back by trial name.
-
-        The trigger_type field specifies the stimulus trigger zone behavior and determines which of the acquisition
-        system's runtime trial classes is created when loading this template for experiment configuration.
     """
 
     cue_sequence: list[str]
@@ -200,10 +195,10 @@ class TrialStructure:
     """Determines whether the stimulus collision boundary marker is visible to the animal during this trial type.
     When True, Unity enables the MeshRenderer on the trigger zone's root object, so the marker sits wherever the
     trigger type places that root. A collision trial anchors the boundary wall's leading edge on the stimulus
-    location, so the root itself sits half the fixed wall depth past it, an interaction trial places the root at the
+    location, so the root itself sits half the fixed wall depth past it. An interaction trial places the root at the
     trigger-zone midpoint, and an occupancy trial offsets it from the stimulus location by half the zone length."""
     trigger_type: str | TriggerType
-    """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
+    """The stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
     occupancy_duration_ms: float | None = None
     """The duration in milliseconds the animal must occupy the zone for occupancy trigger modes. Unity enforces this
     value, and the template is its single source of truth: no experiment configuration carries a copy. Set it to None on
@@ -279,11 +274,11 @@ class TaskTemplate(YamlConfig):
     """
 
     cues: list[Cue]
-    """Defines the Virtual Reality environment wall cues used in the task."""
+    """The Virtual Reality environment wall cues used in the task."""
     vr_environment: VREnvironment
-    """Defines the Virtual Reality corridor configuration."""
+    """The Virtual Reality corridor configuration."""
     trial_structures: dict[str, TrialStructure]
-    """Defines the spatial configuration for each trial type. Keys are trial names (e.g., 'ABC')."""
+    """The spatial configuration for each trial type. Keys are trial names (e.g., 'ABC')."""
 
     def __post_init__(self) -> None:
         """Validates task template configuration.
@@ -391,6 +386,9 @@ class TaskTemplate(YamlConfig):
 
         Args:
             trial_name: The name of the trial structure whose segment length to compute.
+
+        Returns:
+            The combined length of the trial's cue sequence, in centimeters.
         """
         trial = self.trial_structures[trial_name]
         cue_map = self._cue_by_name

@@ -115,9 +115,9 @@ class SurgeryData(YamlConfig):
     procedure: ProcedureData
     """The general parameters of the surgical intervention."""
     drugs: list[DrugData]
-    """Stores information about all medical substances (drugs) administered to the subject before, during, and
-    immediately after the surgical intervention."""
+    """All medical substances (drugs) administered to the subject before, during, and immediately after the surgical
+    intervention."""
     implants: list[ImplantData]
-    """Stores information about all implantation procedures performed during the surgical intervention."""
+    """All implantation procedures performed during the surgical intervention."""
     injections: list[InjectionData]
-    """Stores information about all injections (brain infusions) performed during the surgical intervention."""
+    """All injections (brain infusions) performed during the surgical intervention."""

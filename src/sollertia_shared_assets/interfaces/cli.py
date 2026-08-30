@@ -139,7 +139,7 @@ def configure_group() -> None:
     "--directory",
     type=click.Path(exists=False, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the directory where to cache Sollertia platform configuration and local runtime data.",
+    help="The absolute path to the directory in which to cache Sollertia platform configuration and runtime data.",
 )
 def configure_directory(directory: Path) -> None:
     """Sets the input directory as the local Sollertia platform working directory."""

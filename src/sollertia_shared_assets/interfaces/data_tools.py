@@ -8,9 +8,6 @@ from dataclasses import fields, dataclass
 
 from ataraxis_data_structures import index_marker_files
 
-if TYPE_CHECKING:
-    from ataraxis_data_structures import YamlConfig
-
 from ..enums import ReadAssets, SessionTypes, AcquisitionSystems
 from ..registries import (
     DESCRIPTOR_REGISTRY,
@@ -42,6 +39,9 @@ from ..data_hierarchy import (
     iter_project_animals,
     get_session_root_from_marker,
 )
+
+if TYPE_CHECKING:
+    from ataraxis_data_structures import YamlConfig
 
 _STATUS_KEYS: tuple[str, ...] = ("uninitialized", "incomplete", "acquired", "processed", "error")
 """Canonical lifecycle status keys used in ``counts`` dicts across the overview and inspection tools."""
@@ -97,8 +97,9 @@ def get_data_root_overview_tool(
         ``uninitialized``, ``incomplete``, and ``has_processed_data``. A marker that fails to load instead carries
         ``session_path``, ``marker``, ``status``, and ``error_detail``. A session that loads but whose descriptor
         cannot be read keeps the full entry above, with ``status`` set to ``"error"``, ``incomplete`` set to null, and
-        an added ``error_detail`` field, so consumers branch on the presence of the ``marker`` key to tell the two
-        error shapes apart. The top-level ``counts`` mapping holds the cross-project status tally, including errors.
+        an added ``error_detail`` field. Consumers therefore branch on the presence of the ``marker`` key to tell the
+        two error shapes apart. The top-level ``counts`` mapping holds the cross-project status tally, including
+        errors.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -196,9 +197,9 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
     same existence flag is reported for every ``processed_data`` subdirectory, together with the presence of the
     paired processing tracker. Finally, each report carries a ``required_assets`` check (descriptor and system
     configuration always required, experiment configuration required when the session declares an experiment name,
-    and VR configuration required for session types that use VR) and an ``issues`` list summarizing any missing
-    required assets. Paths that fail to resolve or load surface with ``status="error"`` and an ``error_detail``
-    field without aborting the batch.
+    and VR configuration required for session types that use VR). The report also carries an ``issues`` list
+    summarizing any missing required assets. Paths that fail to resolve or load surface with ``status="error"`` and an
+    ``error_detail`` field without aborting the batch.
 
     Args:
         session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a single-element list
