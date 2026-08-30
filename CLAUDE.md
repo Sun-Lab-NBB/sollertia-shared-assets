@@ -33,6 +33,9 @@ consumed by `sollertia-experiment` and `sollertia-forgery`. It also drives the `
 over HTTP localhost through `interfaces/unity_tools.py`. Local clones of all of these typically live alongside this
 repository, in its parent directory.
 
+Two constants additionally mirror `cindra` by value without importing it, `Directories.CINDRA` and
+`ProcessingTrackers.TWO_PHOTON`, so verify them against `../cindra/` whenever either is touched.
+
 **Before writing code that interacts with a cross-referenced library, you MUST:**
 
 1. **Check for local version**: Look for the library in the parent directory (e.g., `../ataraxis-base-utilities/`,
@@ -115,15 +118,15 @@ This library exposes an MCP server registered in the sollertia marketplace as pa
 runs through the `slsa mcp` CLI command and is consumed by AI agents working on Sollertia data. The server bootstrap,
 the CLI, and all tool implementations live in `src/sollertia_shared_assets/interfaces/`:
 
-| Module              | File                                | Surface                                                           |
-|---------------------|-------------------------------------|-------------------------------------------------------------------|
-| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands       |
-| Server bootstrap    | `interfaces/mcp_server.py`          | Auto-imports `*_tools.py` to register, exposes `run_server`       |
-| Shared MCP instance | `interfaces/mcp_instance.py`        | MCPServer instance, response helpers, serialization, validators   |
-| Configuration tools | `interfaces/configuration_tools.py` | working dir, data root, credentials, templates dir, experiments   |
-| Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, descriptors, hardware, data assets |
-| Dataset tools       | `interfaces/dataset_tools.py`       | dataset discovery, inspection, marker read/write, descriptions    |
-| Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                     |
+| Module              | File                                | Surface                                                                                       |
+|---------------------|-------------------------------------|-----------------------------------------------------------------------------------------------|
+| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands                                   |
+| Server bootstrap    | `interfaces/mcp_server.py`          | Auto-imports `*_tools.py` to register, exposes `run_server`                                   |
+| Shared MCP instance | `interfaces/mcp_instance.py`        | MCPServer instance, response helpers, serialization, validators                               |
+| Configuration tools | `interfaces/configuration_tools.py` | env status, working dir, data root, credentials, projects, templates, experiments, vocabulary |
+| Data tools          | `interfaces/data_tools.py`          | session discovery, inspection, markers, descriptors, hardware, data assets, trackers          |
+| Dataset tools       | `interfaces/dataset_tools.py`       | dataset discovery, inspection, marker read/write, descriptions                                |
+| Unity tools         | `interfaces/unity_tools.py`         | McpBridge HTTP relay (Editor must be running)                                                 |
 
 Project conventions for MCP tools:
 - MCP tool functions are excluded from unit tests by project convention. Do NOT write tests for `@mcp.tool()` functions.
@@ -201,7 +204,8 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 
 - **Vocabulary and wiring**: The keying enums live in the leaf `enums.py` module, and the dispatch registries live in
   the top-level `registries.py` module. The import graph is a strict DAG. `enums`, `data_classes`, and `configuration`
-  are leaves, `mesoscope_vr` imports `configuration`, and `registries` imports the leaves and the system subpackages.
+  are leaves, `mesoscope_vr` imports `configuration`, and `registries` imports `enums`, `data_classes`, and the
+  system subpackages.
   `credentials` and `data_hierarchy` sit above `registries`, and `interfaces` sits on top. Shared modules never import
   from a system subpackage. Only `registries.py` and the package `__init__.py` re-exports do.
 - **Configuration layer**: `TaskTemplate` (the Unity corridor template, in `configuration/`) and
