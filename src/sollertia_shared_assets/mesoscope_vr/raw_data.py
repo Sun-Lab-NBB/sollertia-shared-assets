@@ -21,7 +21,9 @@ class MesoscopeRawDataFiles(StrEnum):
     """The Zaber motor position snapshot written at session end by the Mesoscope-VR acquisition runtime, before the
     motors are returned to their parking position."""
     MESOSCOPE_POSITIONS = "mesoscope_positions.yaml"
-    """The Mesoscope objective position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
+    """The Mesoscope objective position snapshot seeded with a precursor at session start and rewritten with the
+    queried objective positions at session end by the Mesoscope-VR acquisition runtime. Written for experiment and
+    window-checking sessions only."""
     WINDOW_SCREENSHOT = "window_screenshot.png"
     """The cranial imaging window screenshot captured at session start by the Mesoscope-VR acquisition runtime."""
 
