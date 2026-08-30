@@ -52,6 +52,10 @@ from ..configuration import (
 )
 from ..data_hierarchy import ProjectData
 
+# Imported from the defining module rather than the subpackage __init__, so the pattern stays a module-public helper
+# shared with this authoring tool without becoming part of the configuration subpackage's exported surface.
+from ..configuration.vr_configuration import NAME_COMPONENT_PATTERN
+
 
 @mcp.tool()
 def get_platform_environment_status_tool() -> dict[str, Any]:
@@ -202,7 +206,9 @@ def create_project_tool(project_name: str, root_directory: str | None = None) ->
 
     Returns:
         A response dict with ``project_name``, ``project_path``, and ``configuration_directory`` containing the
-        created project's resolved paths.
+        created project's resolved paths. Returns the error envelope (``success`` false and ``error``) when the
+        project directories cannot be created, for example because a plain file already occupies the project path or
+        the data root is not writable.
     """
     if root_directory is None:
         try:
@@ -217,7 +223,13 @@ def create_project_tool(project_name: str, root_directory: str | None = None) ->
         message = f"Unable to resolve the data root from {root_directory}."
         return error_response(message=message)
 
-    project = ProjectData(root=root, project_name=project_name).create()
+    # mkdir(exist_ok=True) still raises when a non-directory occupies the path, and any unwritable root surfaces the
+    # same way, so the OSError family is converted into the error envelope every other tool in this module returns.
+    try:
+        project = ProjectData(root=root, project_name=project_name).create()
+    except OSError as exception:
+        message = f"Unable to create the project '{project_name}' under {root}: {exception}"
+        return error_response(message=message)
     return ok_response(
         project_name=project_name,
         project_path=str(project.path),
@@ -344,13 +356,16 @@ def read_template_tool(file_path: str) -> dict[str, Any]:
     """Loads a TaskTemplate YAML from either the live templates directory or a per-session frozen snapshot.
 
     Notes:
-        TaskTemplates live in two places. The **live** template at ``<templates-directory>/<name>.yaml`` is the
+        TaskTemplates live in three places. The **live** template at ``<templates-directory>/<name>.yaml`` is the
         authoring surface managed via ``write_template_tool`` under the directory configured by
         ``set_task_templates_directory_tool``, and is shared across projects. ``discover_templates_tool`` returns the
         absolute paths of every live template. The per-session **frozen snapshot** at
         ``<session>/raw_data/vr_configuration.yaml`` is the immutable copy cached by ``SessionData.create()`` at
-        acquisition time and records the exact template active when the session was acquired. This tool reads either.
-        The caller chooses by passing the corresponding absolute path.
+        acquisition time and records the exact template active when the session was acquired. The per-session
+        **forged-dataset copy** at ``<dataset_root>/<animal>/<session>/vr_configuration.yaml`` is the same snapshot
+        carried into a forged dataset by the sollertia-forgery pipeline, and is located via
+        ``inspect_datasets_tool``. This tool reads any of the three. The caller chooses by passing the corresponding
+        absolute path.
 
     Args:
         file_path: Absolute path to the template YAML file. Pass a path under the configured templates directory
@@ -383,17 +398,33 @@ def write_template_tool(
         tool at a session's ``vr_configuration.yaml``. If a snapshot is corrupted or out of sync, repair the live
         template and re-acquire, or restore the snapshot from a backup.
 
+        The destination filename stem is checked against ``NAME_COMPONENT_PATTERN`` before anything is written.
+        ``ConfigLoader.cs`` applies the same pattern to the stem when Unity loads the template, and the stem also
+        becomes the ``TemplateName`` half of every generated ``TemplateName-TrialName`` segment asset. Rejecting it
+        here means a template this tool writes cannot be one the Editor later refuses to load.
+
     Args:
         file_path: Absolute path to the destination template YAML file under the directory configured via
-            ``set_task_templates_directory_tool``.
+            ``set_task_templates_directory_tool``. The filename stem must contain only ASCII letters, digits, and
+            underscores.
         template_payload: The complete TaskTemplate payload as a JSON-friendly dict.
         overwrite: Determines whether to overwrite an existing template file.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` (the validated template payload).
+        A response dict with ``file_path`` and ``data`` (the validated template payload). Returns the error envelope
+        (``success`` false and ``error``) when the filename stem violates the name-component pattern.
     """
+    template_path = Path(file_path)
+    if not NAME_COMPONENT_PATTERN.match(template_path.stem):
+        message = (
+            f"Unable to write the task template to {template_path}. The template filename stem "
+            f"'{template_path.stem}' must contain only ASCII letters, digits, and underscores, because "
+            f"ConfigLoader.cs applies the same pattern when Unity loads the template and the stem is embedded in "
+            f"every generated segment asset filename."
+        )
+        return error_response(message=message)
     return write_yaml_validated(
-        file_path=Path(file_path),
+        file_path=template_path,
         payload=template_payload,
         validator_cls=TaskTemplate,
         overwrite=overwrite,
@@ -405,9 +436,12 @@ def validate_template_tool(file_path: str) -> dict[str, Any]:
     """Loads and validates a TaskTemplate against its schema and cross-reference constraints.
 
     Notes:
-        Accepts both live templates under the configured templates directory and per-session frozen snapshots at
-        ``<session>/raw_data/vr_configuration.yaml``. The validation logic is identical in either case. The schema and
-        cross-reference constraints belong to ``TaskTemplate``, not to a particular storage location.
+        Accepts live templates under the configured templates directory, per-session frozen snapshots at
+        ``<session>/raw_data/vr_configuration.yaml``, and the forged-dataset copies at
+        ``<dataset_root>/<animal>/<session>/vr_configuration.yaml``. The validation logic is identical in every case.
+        The schema and cross-reference constraints belong to ``TaskTemplate``, not to a particular storage location.
+        The template filename stem is not part of that schema, so this tool does not apply the name-component pattern
+        that ``write_template_tool`` enforces at authoring time.
 
     Args:
         file_path: Absolute path to the template YAML file (live template or session snapshot).
@@ -445,11 +479,11 @@ def describe_template_schema_tool() -> dict[str, Any]:
         ``nested_classes`` sub-mapping of each nested dataclass name (Cue, TrialStructure, VREnvironment) to its
         individual schema.
     """
-    schema = describe_dataclass(cls=TaskTemplate)
+    schema = describe_dataclass(dataclass_type=TaskTemplate)
     schema["nested_classes"] = {
-        "Cue": describe_dataclass(cls=Cue),
-        "TrialStructure": describe_dataclass(cls=TrialStructure),
-        "VREnvironment": describe_dataclass(cls=VREnvironment),
+        "Cue": describe_dataclass(dataclass_type=Cue),
+        "TrialStructure": describe_dataclass(dataclass_type=TrialStructure),
+        "VREnvironment": describe_dataclass(dataclass_type=VREnvironment),
     }
     return ok_response(schema=schema)
 
@@ -739,10 +773,10 @@ def describe_experiment_configuration_schema_tool(acquisition_system: str) -> di
     resolved = _resolve_experiment_configuration_class(acquisition_system=acquisition_system)
     if isinstance(resolved, dict):
         return resolved
-    schema = describe_dataclass(cls=resolved)
+    schema = describe_dataclass(dataclass_type=resolved)
     schema["nested_classes"] = {
-        name: describe_dataclass(cls=nested_class)
-        for name, nested_class in collect_field_dataclasses(cls=resolved).items()
+        name: describe_dataclass(dataclass_type=nested_class)
+        for name, nested_class in collect_field_dataclasses(dataclass_type=resolved).items()
     }
     return ok_response(acquisition_system=acquisition_system, schema=schema)
 
@@ -889,8 +923,10 @@ def list_supported_trial_types_tool(acquisition_system: str) -> dict[str, Any]:
     if isinstance(resolved, dict):
         return resolved
     entries: list[dict[str, Any]] = [
-        {"class_name": name, "schema": describe_dataclass(cls=trial_class)}
-        for name, trial_class in collect_field_dataclasses(cls=resolved, field_name="trial_structures").items()
+        {"class_name": name, "schema": describe_dataclass(dataclass_type=trial_class)}
+        for name, trial_class in collect_field_dataclasses(
+            dataclass_type=resolved, field_name="trial_structures"
+        ).items()
     ]
     return ok_response(acquisition_system=acquisition_system, trial_types=entries)
 

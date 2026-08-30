@@ -19,7 +19,7 @@ _UINT8_MAX: int = 255
 _PROBABILITY_SUM_TOLERANCE: float = 0.001
 """Tolerance for validating that trial transition probabilities sum to 1.0."""
 
-_NAME_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
+NAME_COMPONENT_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z0-9_]+$")
 """Matches the trial and cue names that are safe to embed in Unity asset filenames.
 
 Restricts both names to ASCII letters, digits, and underscores so the ``TemplateName-TrialName`` segment naming scheme
@@ -27,8 +27,10 @@ and the ``Cue_Name_LengthCm`` cue naming scheme used by ``sollertia-virtual-real
 separators, whitespace, or punctuation introduced in a template. Excluding the hyphen from both halves of a segment name
 is what lets a segment filename split back to exactly one owning template. Barring whitespace from a cue name also keeps
 the space-joined cue sequence signature that Unity compares trials on unambiguous. ``ConfigLoader.cs`` compiles the same
-pattern and applies it independently to the template filename stem, to each cue name, and to each trial name, so both
-repositories enforce all three.
+pattern and applies it independently to the template filename stem, to each cue name, and to each trial name. This
+module applies it to cue names and trial names only, because a ``TaskTemplate`` instance carries no filename of its
+own. The filename stem is checked at the authoring boundary instead, by ``write_template_tool``, so a template this
+library writes cannot carry a stem that ``ConfigLoader.cs`` would later refuse to load.
 """
 
 
@@ -84,7 +86,7 @@ class Cue:
         if not self.name:
             message = "Unable to initialize Cue. The name must be a non-empty string, but got an empty value."
             console.error(message=message, error=ValueError)
-        if not _NAME_COMPONENT_PATTERN.match(self.name):
+        if not NAME_COMPONENT_PATTERN.match(self.name):
             message = (
                 f"Unable to initialize Cue '{self.name}'. The name must contain only ASCII letters, digits, and "
                 f"underscores, because it is embedded in the generated cue asset filename and in the cue sequence "
@@ -197,9 +199,9 @@ class TrialStructure:
     show_stimulus_collision_boundary: bool
     """Determines whether the stimulus collision boundary marker is visible to the animal during this trial type.
     When True, Unity enables the MeshRenderer on the trigger zone's root object, so the marker sits wherever the
-    trigger type places that root. A collision trial anchors that root on the stimulus location, an interaction
-    trial places it at the trigger-zone midpoint, and an occupancy trial offsets it from the stimulus location by
-    half the zone length."""
+    trigger type places that root. A collision trial anchors the boundary wall's leading edge on the stimulus
+    location, so the root itself sits half the fixed wall depth past it, an interaction trial places the root at the
+    trigger-zone midpoint, and an occupancy trial offsets it from the stimulus location by half the zone length."""
     trigger_type: str | TriggerType
     """Specifies the stimulus trigger zone behavior. Must be one of the valid TriggerType enumeration members."""
     occupancy_duration_ms: float | None = None
@@ -318,7 +320,7 @@ class TaskTemplate(YamlConfig):
             # Rejects trial names containing characters other than ASCII letters, digits, and underscores.
             # Trial names are embedded verbatim in Unity segment prefab filenames, so any path separator or
             # whitespace would corrupt the generated filesystem layout.
-            if not _NAME_COMPONENT_PATTERN.match(trial_name):
+            if not NAME_COMPONENT_PATTERN.match(trial_name):
                 message = (
                     f"Unable to initialize TaskTemplate. Trial name '{trial_name}' is invalid. Trial names "
                     "must contain only ASCII letters, digits, and underscores (used in generated segment "

@@ -46,6 +46,7 @@ from ..configuration import (
     set_task_templates_directory as set_task_templates_directory,
 )
 from ..data_hierarchy import ProjectData as ProjectData
+from ..configuration.vr_configuration import NAME_COMPONENT_PATTERN as NAME_COMPONENT_PATTERN
 
 def get_platform_environment_status_tool() -> dict[str, Any]: ...
 def read_working_directory_tool() -> dict[str, Any]: ...

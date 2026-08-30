@@ -26,6 +26,7 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
+    collect_field_dataclasses,
     read_descriptor_incomplete,
 )
 from ..configuration import CONFIGURATION_DIRECTORY
@@ -206,7 +207,11 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
         ``incomplete``, ``has_processed_data``, ``raw_data_files`` (``{field, path, scope, kind, exists}`` entries),
         ``processed_data_subdirs`` (same shape), ``required_assets``
         (``{name, path, present, required_for_session_type}`` entries), ``issues``, and ``error_detail`` when a read
-        failed.
+        failed. ``status="error"`` covers two different report shapes. A session whose path could not be resolved or
+        whose marker could not be loaded yields a short report carrying only ``session_path``, ``status``, and
+        ``error_detail``, because there is no loaded ``SessionData`` to inventory. A session that loaded but whose
+        descriptor could not be read yields the full report above, with ``incomplete`` set to null. A consumer must
+        therefore branch on the presence of the ``identity`` key rather than on ``status`` alone.
     """
     reports: list[dict[str, Any]] = []
     counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
@@ -393,7 +398,7 @@ def describe_session_data_schema_tool() -> dict[str, Any]:
     Returns:
         A response dict with ``schema`` containing the SessionData field schema.
     """
-    return ok_response(schema=describe_dataclass(cls=SessionData))
+    return ok_response(schema=describe_dataclass(dataclass_type=SessionData))
 
 
 @mcp.tool()
@@ -509,7 +514,7 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
         return resolved
     return ok_response(
         session_type=session_type,
-        schema=describe_dataclass(cls=resolved),
+        schema=describe_dataclass(dataclass_type=resolved),
     )
 
 
@@ -597,7 +602,7 @@ def describe_session_hardware_state_schema_tool(acquisition_system: str) -> dict
         return resolved
     return ok_response(
         acquisition_system=acquisition_system,
-        schema=describe_dataclass(cls=resolved),
+        schema=describe_dataclass(dataclass_type=resolved),
     )
 
 
@@ -674,16 +679,24 @@ def describe_data_asset_schema_tool(data_asset: str) -> dict[str, Any]:
         data_asset: The ``ReadAssets`` value to describe.
 
     Returns:
-        A response dict with ``data_asset`` (the validated value), ``data_asset_class``, and ``schema``
-        (the read-asset schema, with nested dataclasses recursed inline).
+        A response dict with ``data_asset`` (the validated value), ``data_asset_class``, and ``schema`` (the
+        read-asset schema). A nested dataclass held directly by a field is recursed inline under that field's
+        ``nested`` key. The ``schema`` additionally carries a ``nested_classes`` sub-mapping of each nested dataclass
+        name to its individual schema, which resolves the dataclasses reachable only through a container annotation,
+        such as the ``DrugData``, ``ImplantData``, and ``InjectionData`` types held in ``SurgeryData``'s list fields.
     """
     resolved = _resolve_read_asset_class(data_asset=data_asset)
     if isinstance(resolved, dict):
         return resolved
+    schema = describe_dataclass(dataclass_type=resolved)
+    schema["nested_classes"] = {
+        name: describe_dataclass(dataclass_type=nested_class)
+        for name, nested_class in collect_field_dataclasses(dataclass_type=resolved).items()
+    }
     return ok_response(
         data_asset=data_asset,
         data_asset_class=resolved.__name__,
-        schema=describe_dataclass(cls=resolved),
+        schema=schema,
     )
 
 

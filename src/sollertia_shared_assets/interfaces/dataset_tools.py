@@ -234,10 +234,10 @@ def describe_dataset_data_schema_tool() -> dict[str, Any]:
         derives its animals from the session list rather than storing them. Use ``inspect_datasets_tool`` for
         animal-level facts.
     """
-    schema = describe_dataclass(cls=DatasetData)
+    schema = describe_dataclass(dataclass_type=DatasetData)
     schema["nested_classes"] = {
-        name: describe_dataclass(cls=nested_class)
-        for name, nested_class in collect_field_dataclasses(cls=DatasetData).items()
+        name: describe_dataclass(dataclass_type=nested_class)
+        for name, nested_class in collect_field_dataclasses(dataclass_type=DatasetData).items()
     }
     return ok_response(schema=schema)
 

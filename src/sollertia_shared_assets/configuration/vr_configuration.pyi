@@ -6,7 +6,7 @@ from ataraxis_data_structures import YamlConfig
 
 _UINT8_MAX: int
 _PROBABILITY_SUM_TOLERANCE: float
-_NAME_COMPONENT_PATTERN: re.Pattern[str]
+NAME_COMPONENT_PATTERN: re.Pattern[str]
 
 class TriggerType(StrEnum):
     INTERACTION = "interaction"
