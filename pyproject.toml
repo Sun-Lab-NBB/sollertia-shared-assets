@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 # Project metadata section. Provides the general ID information about the project.
 [project]
 name = "sollertia-shared-assets"
-version = "10.0.0rc3"
+version = "10.0.0"
 description = "Provides data acquisition and processing assets shared between Sollertia platform libraries."
 readme = "README.md"
 license = "Apache-2.0"
@@ -206,7 +206,7 @@ extra_checks = true
 pretty = true
 
 exclude = [
-    "sollertia-shared-assets-\\d+",  # The temporary folder created when building the sdist
+    "sollertia_shared_assets-\\d+",  # The temporary folder created when building the sdist
     "venv.*/",
     "build/",
     "dist/",

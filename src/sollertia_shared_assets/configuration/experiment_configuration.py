@@ -1,8 +1,6 @@
-"""Provides system-agnostic experiment configuration building blocks.
-
-This module contains the ``ExperimentState`` dataclass that defines experiment phases independent of the specific
-data acquisition system. System-specific experiment configurations compose it into their own schema alongside the
-runtime trial classes each acquisition system defines in its own subpackage.
+"""Provides the system-agnostic ``ExperimentState`` dataclass that defines experiment phases independently of the data
+acquisition system. Each system-specific experiment configuration composes it into its own schema alongside the runtime
+trial classes that system defines.
 """
 
 from __future__ import annotations
@@ -21,7 +19,9 @@ class ExperimentState:
     state_duration_s: float
     """The time, in seconds, to maintain the experiment state while executing the experiment."""
     supports_trials: bool = True
-    """Determines whether trials are executed during this experiment state."""
+    """Determines whether trials are executed during this experiment state. This is a declarative annotation: no
+    production code in sollertia-experiment or sollertia-forgery reads it, and a trial-free phase is realized by the
+    state's ``system_state_code`` alone."""
     reinforcing_initial_guided_trials: int = 0
     """The number of reinforcing trials after the onset of the experiment state that use the guidance mode."""
     reinforcing_recovery_failed_threshold: int = 0

@@ -1,4 +1,5 @@
 from .vr_configuration import (
+    NAME_COMPONENT_PATTERN as NAME_COMPONENT_PATTERN,
     Cue as Cue,
     TriggerType as TriggerType,
     TaskTemplate as TaskTemplate,
@@ -20,6 +21,7 @@ from .experiment_configuration import ExperimentState as ExperimentState
 __all__ = [
     "CONFIGURATION_DIRECTORY",
     "CREDENTIALS_DIRECTORY",
+    "NAME_COMPONENT_PATTERN",
     "Cue",
     "ExperimentState",
     "TaskTemplate",

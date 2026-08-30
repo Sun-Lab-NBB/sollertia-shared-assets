@@ -8,9 +8,6 @@ from dataclasses import fields, dataclass
 
 from ataraxis_data_structures import index_marker_files
 
-if TYPE_CHECKING:
-    from ataraxis_data_structures import YamlConfig
-
 from ..enums import ReadAssets, SessionTypes, AcquisitionSystems
 from ..registries import (
     DESCRIPTOR_REGISTRY,
@@ -26,6 +23,7 @@ from .mcp_instance import (
     describe_dataclass,
     write_yaml_validated,
     resolve_root_directory,
+    collect_field_dataclasses,
     read_descriptor_incomplete,
 )
 from ..configuration import CONFIGURATION_DIRECTORY
@@ -41,6 +39,9 @@ from ..data_hierarchy import (
     iter_project_animals,
     get_session_root_from_marker,
 )
+
+if TYPE_CHECKING:
+    from ataraxis_data_structures import YamlConfig
 
 _STATUS_KEYS: tuple[str, ...] = ("uninitialized", "incomplete", "acquired", "processed", "error")
 """Canonical lifecycle status keys used in ``counts`` dicts across the overview and inspection tools."""
@@ -69,9 +70,10 @@ def get_data_root_overview_tool(
 ) -> dict[str, Any]:
     """Walks the data root and groups loadable ``session_data.yaml`` markers into a project / animal / session tree.
 
-    Sessions are bucketed by their SessionData identity fields, not by directory structure, so stray directories cannot
-    surface as phantom projects. Markers that fail to load appear in the flat ``sessions`` list with ``status="error"``
-    and an ``error_detail`` field, but do not contribute to project or animal aggregation.
+    Under the default ``markers`` strategy, sessions are bucketed by their SessionData identity fields, not by
+    directory structure, so stray directories cannot surface as phantom projects. Markers that fail to load, and
+    sessions whose descriptor cannot be read, appear in the flat ``sessions`` list with ``status="error"`` and an
+    ``error_detail`` field, but do not contribute to project or animal aggregation.
 
     The ``strategy`` argument controls whether empty hierarchies surface. The ``markers`` strategy reports only
     projects and animals that hold at least one loadable session. The ``directories`` strategy additionally walks
@@ -93,8 +95,11 @@ def get_data_root_overview_tool(
         ``sessions`` entry carries ``session_name``, ``project``, ``animal``, ``session_type``, ``acquisition_system``,
         ``experiment_name``, ``session_path``, ``raw_data_path``, ``processed_data_path``, ``status``,
         ``uninitialized``, ``incomplete``, and ``has_processed_data``. A marker that fails to load instead carries
-        ``session_path``, ``marker``, ``status``, and ``error_detail``. The top-level ``counts`` mapping holds the
-        cross-project status tally, including errors.
+        ``session_path``, ``marker``, ``status``, and ``error_detail``. A session that loads but whose descriptor
+        cannot be read keeps the full entry above, with ``status`` set to ``"error"``, ``incomplete`` set to null, and
+        an added ``error_detail`` field. Consumers therefore branch on the presence of the ``marker`` key to tell the
+        two error shapes apart. The top-level ``counts`` mapping holds the cross-project status tally, including
+        errors.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -192,9 +197,9 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
     same existence flag is reported for every ``processed_data`` subdirectory, together with the presence of the
     paired processing tracker. Finally, each report carries a ``required_assets`` check (descriptor and system
     configuration always required, experiment configuration required when the session declares an experiment name,
-    and VR configuration required for session types that use VR) and an ``issues`` list summarizing any missing
-    required assets. Paths that fail to resolve or load surface with ``status="error"`` and an ``error_detail``
-    field without aborting the batch.
+    and VR configuration required for session types that use VR). The report also carries an ``issues`` list
+    summarizing any missing required assets. Paths that fail to resolve or load surface with ``status="error"`` and an
+    ``error_detail`` field without aborting the batch.
 
     Args:
         session_paths: Absolute paths to session roots or their ``raw_data`` subdirectories. Pass a single-element list
@@ -206,7 +211,11 @@ def inspect_sessions_tool(session_paths: list[str]) -> dict[str, Any]:
         ``incomplete``, ``has_processed_data``, ``raw_data_files`` (``{field, path, scope, kind, exists}`` entries),
         ``processed_data_subdirs`` (same shape), ``required_assets``
         (``{name, path, present, required_for_session_type}`` entries), ``issues``, and ``error_detail`` when a read
-        failed.
+        failed. ``status="error"`` covers two different report shapes. A session whose path could not be resolved or
+        whose marker could not be loaded yields a short report carrying only ``session_path``, ``status``, and
+        ``error_detail``, because there is no loaded ``SessionData`` to inventory. A session that loaded but whose
+        descriptor could not be read yields the full report above, with ``incomplete`` set to null. A consumer must
+        therefore branch on the presence of the ``identity`` key rather than on ``status`` alone.
     """
     reports: list[dict[str, Any]] = []
     counts: dict[str, int] = dict.fromkeys(_STATUS_KEYS, 0)
@@ -352,7 +361,9 @@ def read_session_data_tool(file_path: str) -> dict[str, Any]:
             ``<session>/raw_data/session_data.yaml``.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` (the full SessionData payload).
+        A response dict with ``file_path`` and ``data`` (the marker's SessionData payload, which omits the
+        runtime-only ``raw_data_path``, ``processed_data_path``, ``raw_data``, ``processed_data``, and
+        ``system_raw_data`` fields that ``describe_session_data_schema_tool`` still lists).
     """
     return read_yaml(file_path=Path(file_path), validator_cls=SessionData)
 
@@ -393,7 +404,7 @@ def describe_session_data_schema_tool() -> dict[str, Any]:
     Returns:
         A response dict with ``schema`` containing the SessionData field schema.
     """
-    return ok_response(schema=describe_dataclass(cls=SessionData))
+    return ok_response(schema=describe_dataclass(dataclass_type=SessionData))
 
 
 @mcp.tool()
@@ -509,7 +520,7 @@ def describe_session_descriptor_schema_tool(session_type: str) -> dict[str, Any]
         return resolved
     return ok_response(
         session_type=session_type,
-        schema=describe_dataclass(cls=resolved),
+        schema=describe_dataclass(dataclass_type=resolved),
     )
 
 
@@ -597,7 +608,7 @@ def describe_session_hardware_state_schema_tool(acquisition_system: str) -> dict
         return resolved
     return ok_response(
         acquisition_system=acquisition_system,
-        schema=describe_dataclass(cls=resolved),
+        schema=describe_dataclass(dataclass_type=resolved),
     )
 
 
@@ -674,16 +685,24 @@ def describe_data_asset_schema_tool(data_asset: str) -> dict[str, Any]:
         data_asset: The ``ReadAssets`` value to describe.
 
     Returns:
-        A response dict with ``data_asset`` (the validated value), ``data_asset_class``, and ``schema``
-        (the read-asset schema, with nested dataclasses recursed inline).
+        A response dict with ``data_asset`` (the validated value), ``data_asset_class``, and ``schema`` (the
+        read-asset schema). A nested dataclass held directly by a field is recursed inline under that field's
+        ``nested`` key. The ``schema`` additionally carries a ``nested_classes`` sub-mapping of each nested dataclass
+        name to its individual schema, which resolves the dataclasses reachable only through a container annotation,
+        such as the ``DrugData``, ``ImplantData``, and ``InjectionData`` types held in ``SurgeryData``'s list fields.
     """
     resolved = _resolve_read_asset_class(data_asset=data_asset)
     if isinstance(resolved, dict):
         return resolved
+    schema = describe_dataclass(dataclass_type=resolved)
+    schema["nested_classes"] = {
+        name: describe_dataclass(dataclass_type=nested_class)
+        for name, nested_class in collect_field_dataclasses(dataclass_type=resolved).items()
+    }
     return ok_response(
         data_asset=data_asset,
         data_asset_class=resolved.__name__,
-        schema=describe_dataclass(cls=resolved),
+        schema=schema,
     )
 
 
@@ -742,10 +761,10 @@ def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
 def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Groups flat session entries into the ``projects -> animals -> sessions`` hierarchy.
 
-    Error-status entries (whose identity could not be trusted from SessionData) are excluded from aggregation, as
-    are entries whose ``project`` or ``animal`` value is not a non-empty string. All of them remain in the
-    top-level flat ``sessions`` list only. The returned per-project dicts do not include filesystem-derived counts
-    such as ``experiment_count`` or ``dataset_count``.
+    Error-status entries are excluded from aggregation, whether the marker failed to load or the descriptor could not be
+    read, as are entries whose ``project`` or ``animal`` value is not a non-empty string. All of them remain in the
+    top-level flat ``sessions`` list only. The returned per-project dicts do not include filesystem-derived counts such
+    as ``experiment_count`` or ``dataset_count``.
 
     Args:
         root: The resolved data root path used to construct each project's reported ``path``.

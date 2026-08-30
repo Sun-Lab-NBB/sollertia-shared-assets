@@ -1,13 +1,7 @@
 """Provides the credentials toolset that copies per-category credentials files into the working directory's
-credentials subdirectory and resolves them back for downstream consumers.
-
-This toolset lives in its own top-level module, rather than next to the other persistent host settings in
-``configuration/configuration_utilities.py``, because its functions are the runtime consumers of
-``CREDENTIALS_FILE_REGISTRY``. Keeping the consumers downstream of the ``registries`` module preserves the
-library-wide rule that every dispatch registry is defined in ``registries`` while keeping the import graph acyclic:
-this module imports the registry, and the registry module never imports this one. The ``CREDENTIALS_DIRECTORY``
-constant remains part of the working-directory layout owned by the configuration package (``set_working_directory``
-pre-creates the subdirectory) and is imported from there.
+credentials subdirectory and resolves them back for downstream consumers. The toolset lives in its own top-level
+module because its functions consume ``CREDENTIALS_FILE_REGISTRY`` at runtime, which places them downstream of the
+``registries`` module.
 """
 
 from __future__ import annotations
@@ -87,7 +81,7 @@ def set_credentials(credentials: str | CredentialsTypes, path: Path) -> None:
     destination = credentials_directory.joinpath(file_name)
 
     # The source bytes are published atomically, so a process killed mid-copy leaves the previously configured
-    # credentials file intact instead of truncating the file every later service interaction authenticates with.
+    # credentials file intact, and every later service interaction still authenticates against a complete file.
     with atomic_write(file_path=destination, binary=True) as file:
         file.write(path.read_bytes())
 

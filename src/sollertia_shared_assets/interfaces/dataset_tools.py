@@ -234,10 +234,10 @@ def describe_dataset_data_schema_tool() -> dict[str, Any]:
         derives its animals from the session list rather than storing them. Use ``inspect_datasets_tool`` for
         animal-level facts.
     """
-    schema = describe_dataclass(cls=DatasetData)
+    schema = describe_dataclass(dataclass_type=DatasetData)
     schema["nested_classes"] = {
-        name: describe_dataclass(cls=nested_class)
-        for name, nested_class in collect_field_dataclasses(cls=DatasetData).items()
+        name: describe_dataclass(dataclass_type=nested_class)
+        for name, nested_class in collect_field_dataclasses(dataclass_type=DatasetData).items()
     }
     return ok_response(schema=schema)
 
@@ -259,7 +259,8 @@ def read_dataset_column_descriptions_tool(dataset_path: str) -> dict[str, Any]:
     """
     instance, load_error = _load_dataset(dataset_path=dataset_path)
     if load_error is not None or instance is None:
-        return load_error if load_error is not None else error_response(message="Unresolved dataset path")
+        message = f"Unable to resolve the dataset root from {dataset_path}."
+        return load_error if load_error is not None else error_response(message=message)
 
     try:
         descriptions = instance.column_descriptions()
@@ -288,14 +289,16 @@ def validate_dataset_descriptions_tool(dataset_path: str) -> dict[str, Any]:
 
     Returns:
         A response dict with ``dataset_path``, ``valid``, and either ``summary`` (carrying ``session_count`` and
-        ``described_column_count``) or ``issues`` (a list holding the verification failure, which names every
-        undescribed column together with the sessions that emit it). A dataset whose descriptions companion or whose
-        session data is missing reports ``valid`` false rather than the error envelope, since both are verification
-        verdicts. A path that does not resolve to a dataset instead returns the error envelope.
+        ``described_column_count``) or ``issues`` (a list holding the single verification failure, where an
+        undescribed-column failure names every undescribed column together with the sessions that emit it). A dataset
+        whose descriptions companion or whose session data is missing reports ``valid`` false rather than the error
+        envelope, since both are verification verdicts. A path that does not resolve to a dataset instead returns the
+        error envelope.
     """
     instance, load_error = _load_dataset(dataset_path=dataset_path)
     if load_error is not None or instance is None:
-        return load_error if load_error is not None else error_response(message="Unresolved dataset path")
+        message = f"Unable to resolve the dataset root from {dataset_path}."
+        return load_error if load_error is not None else error_response(message=message)
 
     dataset_root = str(instance.dataset_data_path.parent)
     try:

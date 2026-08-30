@@ -63,7 +63,7 @@ class ProjectData:
         """Returns a copy of this project anchored on a different data root.
 
         Args:
-            root: The data root to rebind the project under, such as a mounted remote storage root.
+            root: The data root under which the project is rebound, such as a mounted remote storage root.
 
         Returns:
             A new ``ProjectData`` with the same project name resolved under the input root.
@@ -111,7 +111,7 @@ class AnimalData:
     root: Path
     """The data root under which the project hierarchy is stored."""
     project_name: str
-    """The name of the project the animal belongs to."""
+    """The name of the project to which the animal belongs."""
     animal_id: str
     """The unique identifier of the animal, used as the animal directory name."""
 
@@ -145,7 +145,7 @@ class AnimalData:
         """Returns a copy of this animal anchored on a different data root.
 
         Args:
-            root: The data root to rebind the animal under, such as a mounted remote storage root.
+            root: The data root under which the animal is rebound, such as a mounted remote storage root.
 
         Returns:
             A new ``AnimalData`` with the same project and animal resolved under the input root.

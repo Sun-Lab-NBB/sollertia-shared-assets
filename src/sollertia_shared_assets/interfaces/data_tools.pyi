@@ -23,6 +23,7 @@ from .mcp_instance import (
     describe_dataclass as describe_dataclass,
     write_yaml_validated as write_yaml_validated,
     resolve_root_directory as resolve_root_directory,
+    collect_field_dataclasses as collect_field_dataclasses,
     read_descriptor_incomplete as read_descriptor_incomplete,
 )
 from ..configuration import CONFIGURATION_DIRECTORY as CONFIGURATION_DIRECTORY

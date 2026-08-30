@@ -28,20 +28,6 @@ _SERVER_ROOT: Path = Path("/mnt/server")
 """Sentinel server storage root used by the multi-root resolution tests. Never touched on disk."""
 
 
-def _write_session_marker(root: Path, project_name: str, animal_id: str, session_name: str) -> None:
-    """Writes a ``session_data.yaml`` marker for the given identity under the data root."""
-    raw_data_path = root.joinpath(project_name, animal_id, session_name, RAW_DATA_DIRECTORY)
-    raw_data_path.mkdir(parents=True, exist_ok=True)
-    SessionData(
-        project_name=project_name,
-        animal_id=animal_id,
-        session_name=session_name,
-        session_type=SessionTypes.LICK_TRAINING,
-        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        raw_data_path=raw_data_path,
-    ).save()
-
-
 def test_project_data_path_resolution() -> None:
     """Verifies that ProjectData resolves the project and configuration directory paths under the root."""
     project = ProjectData(root=_LOCAL_ROOT, project_name="alpha")
@@ -218,3 +204,17 @@ def test_iter_project_animals_orders_numeric_ids_naturally(tmp_path: Path) -> No
 
     # Natural sort keeps "10" last. A plain lexicographic sort would place it right after "1".
     assert [animal.animal_id for animal in animals] == ["1", "2", "9", "10"]
+
+
+def _write_session_marker(root: Path, project_name: str, animal_id: str, session_name: str) -> None:
+    """Writes a ``session_data.yaml`` marker for the given identity under the data root."""
+    raw_data_path = root.joinpath(project_name, animal_id, session_name, RAW_DATA_DIRECTORY)
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+    SessionData(
+        project_name=project_name,
+        animal_id=animal_id,
+        session_name=session_name,
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        raw_data_path=raw_data_path,
+    ).save()

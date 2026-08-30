@@ -23,7 +23,7 @@ _DEFAULT_STATE_DURATION_S: int = 60
 """Default duration in seconds for each runtime state seeded by ``from_task_template``."""
 
 _DEFAULT_INITIAL_GUIDED_TRIALS: int = 3
-"""Default number of guided trials issued at the start of each reinforcing or aversive runtime state."""
+"""Default number of guided reinforcing or aversive trials issued at the onset of each runtime state."""
 
 _DEFAULT_RECOVERY_FAILED_THRESHOLD: int = 9
 """Default number of consecutive failed trials that triggers recovery guided trial issuance."""
@@ -46,9 +46,9 @@ class TrialKind(StrEnum):
     """
 
     WATER = "water"
-    """Indicates a trial that delivers a water reward, which is a MesoscopeWaterRewardTrial."""
+    """A trial that delivers a water reward, which is a MesoscopeWaterRewardTrial."""
     PUFF = "puff"
-    """Indicates a trial that delivers a gas puff, which is a MesoscopeGasPuffTrial."""
+    """A trial that delivers a gas puff, which is a MesoscopeGasPuffTrial."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +56,8 @@ class MesoscopeWaterRewardTrial:
     """Defines a Mesoscope-VR trial that delivers a water reward (a reinforcing stimulus) when the animal meets the
     trial's success condition.
 
-    The reward is a configured volume of water accompanied by an auditory tone. The behavioral condition that earns
-    the reward is defined by the task, not by this class.
+    The reward is a configured volume of water accompanied by an auditory tone. The task defines the behavioral
+    condition that earns the reward.
     """
 
     reward_size_ul: float = 5.0
@@ -68,7 +68,11 @@ class MesoscopeWaterRewardTrial:
     """The discriminator that identifies this trial as a water reward trial when it is read back from a YAML file."""
 
     def __post_init__(self) -> None:
-        """Validates the trial kind discriminator."""
+        """Validates the trial kind discriminator.
+
+        Raises:
+            ValueError: If the ``trial_kind`` field does not hold ``TrialKind.WATER``.
+        """
         if self.trial_kind != TrialKind.WATER:
             message = (
                 f"Unable to initialize MesoscopeWaterRewardTrial. The trial_kind must be '{TrialKind.WATER.value}', "
@@ -83,7 +87,7 @@ class MesoscopeGasPuffTrial:
     avoidance condition.
 
     The animal avoids the puff by satisfying the task's occupancy condition. Failing to do so delivers a puff of the
-    configured duration. The behavioral condition is defined by the task, not by this class.
+    configured duration. The task defines the behavioral condition.
     """
 
     puff_duration_ms: int = 100
@@ -92,7 +96,11 @@ class MesoscopeGasPuffTrial:
     """The discriminator that identifies this trial as a gas puff trial when it is read back from a YAML file."""
 
     def __post_init__(self) -> None:
-        """Validates the trial kind discriminator."""
+        """Validates the trial kind discriminator.
+
+        Raises:
+            ValueError: If the ``trial_kind`` field does not hold ``TrialKind.PUFF``.
+        """
         if self.trial_kind != TrialKind.PUFF:
             message = (
                 f"Unable to initialize MesoscopeGasPuffTrial. The trial_kind must be '{TrialKind.PUFF.value}', but "
@@ -112,7 +120,7 @@ class MesoscopeExperimentConfiguration(YamlConfig):
 
     trial_structures: dict[str, MesoscopeWaterRewardTrial | MesoscopeGasPuffTrial]
     """The trials the experiment runs, keyed by trial name. This contract field is required by every experiment
-    configuration. ``MesoscopeWaterRewardTrial`` and ``MesoscopeGasPuffTrial`` are Mesoscope-VR's trial classes."""
+    configuration."""
     experiment_states: dict[str, ExperimentState]
     """The experiment state machine, keyed by state name. This contract field is required by every experiment
     configuration."""
@@ -271,8 +279,8 @@ _TRIAL_CLASSES: tuple[tuple[TrialKind, type], ...] = (
     (TrialKind.WATER, MesoscopeWaterRewardTrial),
     (TrialKind.PUFF, MesoscopeGasPuffTrial),
 )
-"""Pairs each trial kind with the runtime trial class that declares it as its discriminator default. The pairs are
-declared below the classes they name, since a constant cannot reference a class defined after it."""
+"""The pairing of each trial kind with the runtime trial class that declares it as its discriminator default. The
+pairs are declared below the classes they name, since a constant cannot reference a class defined after it."""
 
 
 def _restore_trial_kind(trial_name: str, trial: Any) -> Any:

@@ -1,10 +1,6 @@
-"""Provides MCP tools for interacting with the Unity Editor via the McpBridge HTTP relay.
-
-All tools in this module delegate to the Unity Editor's McpBridge plugin and require the Editor to be running with the
-plugin active. On success each tool returns the McpBridge response payload verbatim. When the bridge is unreachable,
-leaves the request unanswered within the timeout, or returns a payload that is not a JSON object, the tool returns a
-``{"success": False, "error": <message>}`` dict instead. A bridge-side tool rejection is forwarded verbatim as the
-bridge's own ``{"success": False, "error": ...}`` payload.
+"""Provides MCP tools that interact with the Unity Editor through the McpBridge HTTP relay, which requires the Editor
+to be running with the plugin active. Each tool returns the McpBridge response payload verbatim on success, and a
+``{"success": False, "error": <message>}`` dict when the relay itself fails.
 """
 
 from __future__ import annotations
@@ -42,7 +38,7 @@ def create_task_tool(template_name: str, unsaved_changes: Literal["save", "disca
     Before any mutation, the Unity-side ``CreateFromTemplate`` runs a cross-template cue-texture preflight that scans
     every YAML under ``Assets/InfiniteCorridorTask/Configurations/`` and aborts the call when two templates declare a
     cue with the same ``(name, length_cm)`` identity but different textures. The shared-cue keying scheme makes such
-    conflicts silently corrupt downstream prefabs, so the preflight failure surfaces as an ``error:`` response with the
+    conflicts silently corrupt downstream prefabs, so the preflight failure surfaces as an error response with the
     offending template pair(s) listed before any cue or segment is touched. Templates outside ``Configurations/`` are
     not visible to the MCP surface and are rejected by the Editor menu as well.
 
@@ -398,8 +394,9 @@ def write_task_parameters_tool(
     are flagged for save.
 
     Validation rejects values that fall outside the enumeration reported by :func:`read_task_parameters_tool`,
-    mismatched monitor indices, and writes targeting ``task.require_interaction`` / ``task.require_wait`` when the
-    corresponding zone is absent from the scene (mirroring the GUI's conditional rendering). The tightened
+    mismatched monitor indices, an out-of-range broker port, and writes targeting ``task.require_interaction`` /
+    ``task.require_wait`` when the corresponding zone is absent from the scene (mirroring the GUI's conditional
+    rendering). The tightened
     require-toggle contract guarantees that a successful write means the flag will actually take effect at runtime.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
@@ -407,7 +404,7 @@ def write_task_parameters_tool(
     Args:
         actor: Optional dict with ``model`` (str matching ``options.actor.model``) and/or ``controller`` (str matching
             ``options.actor.controller``).
-        mqtt: Optional dict with ``ip`` (str) and/or ``port`` (int).
+        mqtt: Optional dict with ``ip`` (str) and/or ``port`` (int, 0-65535).
         display: Optional dict with ``current_brightness`` (0-100 float), ``brightness`` (0-100 float), and/or
             ``height_in_vr`` (float, Unity units).
         camera_mapping: Optional list of per-monitor dicts. Each entry requires ``monitor`` (1-based index, matching the
@@ -505,8 +502,10 @@ def _unity_relay(tool: str, arguments: dict[str, Any] | None = None) -> dict[str
         arguments: The tool arguments dictionary. Defaults to an empty dict when omitted.
 
     Returns:
-        The parsed JSON response from the Unity bridge, or an error dict if the bridge is unreachable, leaves the
-        request unanswered within the timeout, or replies with a payload that is not a JSON object.
+        The parsed JSON response from the Unity bridge. An error dict is returned instead when the bridge is
+        unreachable, leaves the request unanswered within the timeout, drops the connection mid-response, or replies
+        with a payload that is not decodable JSON or not a JSON object. A bridge-side tool rejection is forwarded
+        verbatim as the bridge's own ``{"success": False, "error": ...}`` payload.
     """
     relay_arguments = arguments if arguments is not None else {}
     payload = json.dumps({"tool": tool, "args": relay_arguments}).encode("utf-8")

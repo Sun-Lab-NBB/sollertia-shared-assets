@@ -25,7 +25,7 @@ def test_experiment_state_initialization() -> None:
     assert state.experiment_state_code == 1
     assert state.system_state_code == 0
     assert state.state_duration_s == 600.0
-    assert state.supports_trials is True
+    assert state.supports_trials
     assert state.reinforcing_initial_guided_trials == 10
     assert state.reinforcing_recovery_failed_threshold == 5
     assert state.reinforcing_recovery_guided_trials == 3

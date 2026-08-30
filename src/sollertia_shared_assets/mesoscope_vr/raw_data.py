@@ -21,7 +21,9 @@ class MesoscopeRawDataFiles(StrEnum):
     """The Zaber motor position snapshot written at session end by the Mesoscope-VR acquisition runtime, before the
     motors are returned to their parking position."""
     MESOSCOPE_POSITIONS = "mesoscope_positions.yaml"
-    """The Mesoscope objective position snapshot written at session start by the Mesoscope-VR acquisition runtime."""
+    """The Mesoscope objective position snapshot seeded with a precursor at session start and rewritten with the
+    queried objective positions at session end by the Mesoscope-VR acquisition runtime. Written for experiment and
+    window-checking sessions only."""
     WINDOW_SCREENSHOT = "window_screenshot.png"
     """The cranial imaging window screenshot captured at session start by the Mesoscope-VR acquisition runtime."""
 
@@ -32,7 +34,7 @@ class MesoscopeDirectories(StrEnum):
     """
 
     MESOSCOPE_DATA = "mesoscope_data"
-    """Persistent mesoscope data directory under ``raw_data``. Stores LERC-compressed TIFF stacks and acquisition
+    """Raw mesoscope data directory under ``raw_data``. Stores LERC-compressed TIFF stacks and acquisition
     metadata written by sollertia-experiment's preprocessing."""
 
 
@@ -45,16 +47,16 @@ class MesoscopeRawData:
     """
 
     zaber_positions_path: Path
-    """Captures the states of the Zaber motorized stages used by the Mesoscope-VR system, recorded at the end of the
-    session before the motors are reset."""
+    """The states of the Zaber motorized stages used by the Mesoscope-VR system, recorded at the end of the session
+    before the motors are reset."""
     mesoscope_positions_path: Path
-    """Records the 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window
-    during the session, allowing the same imaging field of view to be recovered in follow-up sessions."""
+    """The 2-Photon Random Access Mesoscope (2P-RAM) objective position used to image the cranial window during the
+    session, which allows the same imaging field of view to be recovered in follow-up sessions."""
     window_screenshot_path: Path
-    """Provides a visual reference of the cranial imaging window taken at the start of the session."""
+    """A visual reference of the cranial imaging window taken at the start of the session."""
     mesoscope_data_path: Path
-    """Holds the compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata
-    produced by sollertia-experiment's preprocessing."""
+    """The compressed 2-Photon Random Access Mesoscope (2P-RAM) acquisition output and accompanying metadata produced
+    by sollertia-experiment's preprocessing."""
 
     @classmethod
     def build(cls, root: Path) -> MesoscopeRawData:

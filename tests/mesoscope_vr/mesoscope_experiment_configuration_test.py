@@ -244,7 +244,7 @@ def test_restore_excluded_fields_rejects_unrecognized_discriminator(tmp_path: Pa
 
 
 def test_restore_excluded_fields_rejects_discriminator_contradicting_fields(tmp_path: Path) -> None:
-    """Verifies that a trial whose trial_kind names a class its fields do not belong to is rejected."""
+    """Verifies that a trial whose trial_kind names a class to which its fields do not belong is rejected."""
     data = {"trial_structures": {"mislabelled": {"reward_size_ul": 9.9, "trial_kind": "puff"}}}
 
     with pytest.raises(ValueError, match=r"field names 'puff'"):
@@ -386,7 +386,7 @@ def test_from_task_template_seeds_water_reward_guided_states() -> None:
     state_1 = configuration.experiment_states["state_1"]
     assert state_1.experiment_state_code == 1
     assert state_1.state_duration_s == 60
-    assert state_1.supports_trials is True
+    assert state_1.supports_trials
     assert state_1.reinforcing_initial_guided_trials == 3
     assert state_1.aversive_initial_guided_trials == 0
 

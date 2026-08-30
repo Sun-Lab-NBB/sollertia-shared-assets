@@ -14,7 +14,7 @@ class SubjectData:
     id: int
     """The subject's unique identifier."""
     ear_punch: str
-    """The number and the locations of ear-tags used to distinguish the subject from its cage-mates."""
+    """The number and the locations of ear punches used to distinguish the subject from its cage-mates."""
     sex: str
     """The subject's sex."""
     genotype: str
@@ -115,9 +115,9 @@ class SurgeryData(YamlConfig):
     procedure: ProcedureData
     """The general parameters of the surgical intervention."""
     drugs: list[DrugData]
-    """Stores information about all medical substances (drugs) administered to the subject before, during, and
-    immediately after the surgical intervention."""
+    """All medical substances (drugs) administered to the subject before, during, and immediately after the surgical
+    intervention."""
     implants: list[ImplantData]
-    """Stores information about all implantation procedures performed during the surgical intervention."""
+    """All implantation procedures performed during the surgical intervention."""
     injections: list[InjectionData]
-    """Stores information about all injections (brain infusions) performed during the surgical intervention."""
+    """All injections (brain infusions) performed during the surgical intervention."""

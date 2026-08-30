@@ -73,14 +73,14 @@ def serialize(value: Any) -> Any:
     return value
 
 
-def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
+def describe_dataclass(dataclass_type: type, *, recurse: bool = True) -> dict[str, Any]:
     """Returns a structured schema description of a dataclass type.
 
     The recursion guard prevents infinite recursion when a dataclass references itself either directly or
     transitively.
 
     Args:
-        cls: The dataclass type to describe.
+        dataclass_type: The dataclass type to describe.
         recurse: Determines whether to recursively describe nested dataclass fields.
 
     Returns:
@@ -123,10 +123,10 @@ def describe_dataclass(cls: type, *, recurse: bool = True) -> dict[str, Any]:
 
         return schema
 
-    return _describe_inner(target=cls, seen=frozenset())
+    return _describe_inner(target=dataclass_type, seen=frozenset())
 
 
-def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> dict[str, type]:
+def collect_field_dataclasses(dataclass_type: type, *, field_name: str | None = None) -> dict[str, type]:
     """Returns the dataclass types referenced by a dataclass's fields, keyed by class name.
 
     Walks each field's type hint one level deep, unwrapping container and union arguments (for example, the value type
@@ -134,7 +134,7 @@ def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> di
     ``field_name`` is provided, only that field is inspected, and an absent field yields no types.
 
     Args:
-        cls: The dataclass type to inspect.
+        dataclass_type: The dataclass type to inspect.
         field_name: When provided, restricts the inspection to the single named field.
 
     Returns:
@@ -150,7 +150,7 @@ def collect_field_dataclasses(cls: type, *, field_name: str | None = None) -> di
             yield from _iterate_types(type_hint=argument)
 
     try:
-        hints = get_type_hints(cls)
+        hints = get_type_hints(dataclass_type)
     except Exception:
         return {}
     if field_name is not None:

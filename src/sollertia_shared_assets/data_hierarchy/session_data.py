@@ -1,4 +1,4 @@
-"""Provides assets for maintaining the Sollertia platform project data hierarchy across all data acquisition and
+"""Provides the per-session data hierarchy assets shared across all Sollertia platform data acquisition and
 processing machines.
 """
 
@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 import shutil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from pathlib import Path
 from dataclasses import field, dataclass
 
@@ -44,7 +44,8 @@ class RawDataFiles(StrEnum):
     """The session-embedded descriptor YAML written by the acquisition runtime. The concrete descriptor class is
     determined by the session's session_type, but the filename is flat across all session types."""
     SURGERY_METADATA = "surgery_metadata.yaml"
-    """The per-animal surgery metadata YAML cached into the session's raw_data at acquisition time."""
+    """The per-animal surgery metadata YAML cached into the session's raw_data by acquisition-system preprocessing
+    after the session ends. Absent until preprocessing runs."""
     HARDWARE_STATE = "hardware_state.yaml"
     """The hardware state snapshot YAML written at the start of acquisition."""
     EXPERIMENT_CONFIGURATION = "experiment_configuration.yaml"
@@ -87,8 +88,9 @@ class Directories(StrEnum):
     living in a dedicated raw-side directory."""
     CINDRA = "cindra"
     """Cindra output directory under ``processed_data``. The root of cindra's single-recording and multi-recording
-    outputs. Cindra is reusable by any photometry-data-generating acquisition system. The name mirrors cindra's own
-    ``OUTPUT_DIRECTORY_NAME`` constant, which cindra owns and which nothing here imports, so the two can drift."""
+    outputs. Cindra is reusable by any neural-imaging-data-generating acquisition system. The name mirrors cindra's
+    own ``OUTPUT_DIRECTORY_NAME`` constant, which cindra owns and which nothing here imports, so the two can
+    drift."""
 
 
 class ProcessingTrackers(StrEnum):
@@ -128,41 +130,42 @@ class RawData:
     """
 
     session_data_path: Path
-    """Stores the metadata that identifies the session and resolves the on-disk locations of all of its assets."""
+    """The metadata that identifies the session and resolves the on-disk locations of all of its assets."""
     session_descriptor_path: Path
-    """Stores the task parameters and outcome metadata captured during acquisition. The concrete descriptor class is
+    """The task parameters and outcome metadata captured during acquisition. The concrete descriptor class is
     determined by the session's session_type and is dispatched via DESCRIPTOR_REGISTRY."""
     surgery_metadata_path: Path
-    """Stores a frozen snapshot of the animal's surgical history (subject, procedure, drugs, implants, injections) as
-    it stood at the moment the session was acquired."""
+    """A frozen snapshot of the animal's surgical history (subject, procedure, drugs, implants, injections) as
+    it stood at the moment the session was acquired. The acquisition system writes it during post-session
+    preprocessing, so the path resolves before the file exists."""
     hardware_state_path: Path
-    """Records the configuration of every active hardware module on the acquisition system, used to interpret the raw
+    """The configuration of every active hardware module on the acquisition system, used to interpret the raw
     data during downstream processing. The concrete parsing class is determined by the session's acquisition_system
     and is dispatched via HARDWARE_STATE_REGISTRY."""
     system_configuration_path: Path
-    """Preserves the acquisition-system-level configuration in effect when the session was acquired. The concrete
+    """The acquisition-system-level configuration in effect when the session was acquired. The concrete
     parsing class is determined by the session's acquisition_system and is owned by sollertia-experiment."""
     experiment_configuration_path: Path
-    """Stores the experiment configuration in effect when the session was acquired. Only populated for experiment
+    """The experiment configuration in effect when the session was acquired. Only populated for experiment
     sessions. Callers should check ``.exists()`` before reading. The concrete parsing class is determined by the
     session's acquisition_system and is dispatched via EXPERIMENT_CONFIGURATION_REGISTRY."""
     vr_configuration_path: Path
-    """Stores the linear infinite corridor task template (cues, VR environment, trial structures) active when the
+    """The linear infinite corridor task template (cues, VR environment, trial structures) active when the
     session was acquired. Written only for session types listed in ``SESSION_TYPES_USING_VR_TASK``, so callers should
     check ``.exists()`` before reading. Parsed via ``TaskTemplate``."""
     checksum_path: Path
-    """Stores the ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
+    """The ataraxis data-integrity checksum used by the checksum verification pipeline to detect corruption or
     accidental modification of raw assets after acquisition."""
     checksum_tracker_path: Path
-    """Tracks the outcome of integrity checks performed by the checksum verification pipeline."""
+    """The tracker for the integrity checks performed by the checksum verification pipeline."""
     nk_path: Path
-    """Marks the session as uninitialized while the acquisition runtime is still creating snapshots and initializing
+    """The marker present while the acquisition runtime is still creating snapshots and initializing
     instruments. Removed by ``mark_runtime_initialized()`` once the session is ready to begin acquisition."""
     behavior_data_path: Path
-    """Holds the raw behavior data captured during acquisition, including the raw messages emitted by every
+    """The raw behavior data captured during acquisition, including the raw messages emitted by every
     microcontroller managed by ataraxis-communication-interface."""
     camera_data_path: Path
-    """Holds the raw camera recordings captured during acquisition."""
+    """The raw camera recordings captured during acquisition."""
 
     @classmethod
     def build(cls, root: Path) -> RawData:
@@ -192,37 +195,36 @@ class RawData:
 
 @dataclass(frozen=True, slots=True)
 class ProcessedData:
-    """Stores the absolute paths to all generic processed assets of a single data acquisition session.
+    """Stores the paths to all generic processed assets of a single data acquisition session, resolved against the
+    session's processed-data root, which is absolute once ``load()`` has finalized it.
 
     Notes:
-        Cindra fields live here because cindra is reusable by any photometry-data-generating acquisition system, not
-        Mesoscope-VR-specific. Future processing tools that apply across acquisition systems get added directly as new
-        fields here.
+        Cindra fields live here because cindra is reusable by any neural-imaging-data-generating acquisition system,
+        not Mesoscope-VR-specific. Future processing tools that apply across acquisition systems get added directly
+        as new fields here.
     """
 
     runtime_data_path: Path
-    """Holds the runtime-extracted behavior data produced by the sollertia-forgery runtime-processing pipeline."""
+    """The runtime-extracted behavior data produced by the sollertia-forgery runtime-processing pipeline."""
     runtime_tracker_path: Path
-    """Tracks the outcome of the sollertia-forgery runtime-processing pipeline. Resolves to
+    """The tracker for the sollertia-forgery runtime-processing pipeline. Resolves to
     ``runtime_data/runtime_processing_tracker.yaml``."""
     video_data_path: Path
-    """Holds the per-frame camera timestamps extracted from the camera log archives and the re-packaged pose-estimation
+    """The per-frame camera timestamps extracted from the camera log archives and the re-packaged pose-estimation
     output produced by the sollertia-forgery video-processing pipeline."""
     video_tracker_path: Path
-    """Tracks the outcome of the sollertia-forgery video-processing pipeline. Resolves to
+    """The tracker for the sollertia-forgery video-processing pipeline. Resolves to
     ``video_data/video_processing_tracker.yaml``."""
     microcontroller_data_path: Path
-    """Holds the extracted and parsed microcontroller data produced by the sollertia-forgery microcontroller-processing
+    """The extracted and parsed microcontroller data produced by the sollertia-forgery microcontroller-processing
     pipeline."""
     microcontroller_tracker_path: Path
-    """Tracks the outcome of the sollertia-forgery microcontroller-processing pipeline. Resolves to
+    """The tracker for the sollertia-forgery microcontroller-processing pipeline. Resolves to
     ``microcontroller_data/microcontroller_processing_tracker.yaml``."""
     cindra_data_path: Path
-    """Acts as the root for both single-recording and multi-recording cindra outputs. Cindra is reusable by any
-    photometry-data-generating acquisition system on the Sollertia platform, which is why these fields live on the
-    generic ProcessedData rather than on an acquisition-system-specific dataclass."""
+    """The root for both single-recording and multi-recording cindra outputs."""
     two_photon_tracker_path: Path
-    """Tracks the outcome of the two-photon (calcium-imaging) processing stage. The tracker file is written by cindra's
+    """The tracker for the two-photon (calcium-imaging) processing stage. The tracker file is written by cindra's
     single-recording pipeline and only read by sollertia-forgery. Resolves to
     ``cindra/single_recording_tracker.yaml``."""
 
@@ -234,7 +236,7 @@ class ProcessedData:
             root: The path to the session's ``processed_data`` directory.
 
         Returns:
-            A ProcessedData instance whose fields are absolute paths under the input root.
+            A ProcessedData instance whose fields are resolved under the input root.
         """
         runtime_data_path = root.joinpath(Directories.RUNTIME_DATA)
         video_data_path = root.joinpath(Directories.VIDEO_DATA)
@@ -256,9 +258,6 @@ class ProcessedData:
 class SessionData(YamlConfig):
     """Defines the structure and the metadata of a data acquisition session.
 
-    This class encapsulates the information necessary to access the session's data stored on disk and functions as the
-    entry point for all interactions with the session's data.
-
     Notes:
         Do not initialize this class directly. Instead, use the ``create()`` method when starting new data acquisition
         sessions or the ``load()`` method when accessing data for an existing session. Both methods build the
@@ -271,14 +270,6 @@ class SessionData(YamlConfig):
         When this class is used to create a new session, it generates the new session's name using the current UTC
         timestamp, accurate to microseconds. This ensures that each session 'name' is unique and preserves the overall
         session order.
-
-    Attributes:
-        raw_data: The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by
-            ``create()`` and ``load()``.
-        processed_data: The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated
-            by ``load()``.
-        system_raw_data: The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset
-            paths, populated by ``create()`` and ``load()``.
     """
 
     project_name: str
@@ -295,7 +286,7 @@ class SessionData(YamlConfig):
     """The name of the experiment performed during the session or Null (None), if the session is not an experiment
     session."""
     python_version: str = "3.14.6"
-    """The Python version used to acquire session's data."""
+    """The Python version used to acquire the session's data."""
     sollertia_experiment_version: str = "5.0.0"
     """The sollertia-experiment library version used to acquire the session's data."""
     raw_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
@@ -304,6 +295,24 @@ class SessionData(YamlConfig):
     processed_data_path: Path = field(default=Path(), metadata=YAML_EXCLUDE_METADATA)
     """The path to the root directory that stores the session's processed data. Kept out of the written marker, since
     ``load`` re-resolves it from the marker's own on-disk location."""
+
+    # The three runtime-only attributes that _build_sub_dataclasses() assigns. They are declared with init=False and
+    # no default, so they stay out of the constructor signature and remain genuinely unset until create() or load()
+    # populates them, and an early access still raises AttributeError as the class docstring promises. repr=False
+    # keeps repr() from touching them while they are unset, and the exclusion metadata keeps them out of the written
+    # marker. Declaring them here is what lets stubgen emit real annotations: left undeclared, the generated stub
+    # carries bare assignments that resolve to EllipsisType and break every downstream 'session.raw_data.<asset>'
+    # access under strict type checking.
+    raw_data: RawData = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
+    """The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by ``create()`` and
+    ``load()``."""
+    processed_data: ProcessedData = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
+    """The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated by ``create()``
+    and ``load()``, though ``create()`` leaves its root at the default until ``load()`` resolves it on the processing
+    host."""
+    system_raw_data: Any = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
+    """The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset paths, populated by
+    ``create()`` and ``load()``."""
 
     def __post_init__(self) -> None:
         """Resolves the session type and the acquisition system identifiers into their typed enumeration members.
@@ -331,7 +340,7 @@ class SessionData(YamlConfig):
         acquisition_system: str | AcquisitionSystems,
         experiment_name: str | None = None,
     ) -> SessionData:
-        """Initializes a new data acquisition session and creates its data structure on the host-machine's filesystem.
+        """Initializes a new data acquisition session and creates its data structure on the host machine's filesystem.
 
         Notes:
             To access the data of an already existing session, use the ``load()`` method.
@@ -459,7 +468,7 @@ class SessionData(YamlConfig):
 
             # Caches the corridor task template the experiment runs against alongside the experiment configuration.
             # Gated on SESSION_TYPES_USING_VR_TASK so the write matches the required_raw_assets() policy exactly: an
-            # experiment session whose type does not run the corridor task gets no VR snapshot it is never asked for.
+            # experiment session whose type does not run the corridor task needs no VR snapshot, so none is written.
             # unity_scene_name is a contract field, so every experiment names a task and its template is always cached.
             if session_type in SESSION_TYPES_USING_VR_TASK:
                 unity_scene_name = getattr(experiment_configuration, "unity_scene_name", None)
@@ -480,7 +489,7 @@ class SessionData(YamlConfig):
             To create a new session, use the ``create()`` method.
 
         Args:
-            session_path: The path to the directory where to search for the session_data.yaml file. Typically, this
+            session_path: The path to the directory in which to search for the session_data.yaml file. Typically, this
                 is the path to the root session's directory, e.g.: root/project/animal/session.
 
         Returns:
@@ -490,6 +499,8 @@ class SessionData(YamlConfig):
             FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input
                 directory.
             OSError: If the fallback scan encounters a directory it cannot read.
+            ValueError: If the loaded marker carries a session type or an acquisition system outside the platform
+                vocabulary.
         """
         # Resolves the marker at its canonical location first, so loading a session whose raw_data holds a large
         # number of acquisition files costs a single metadata query instead of a recursive walk of the whole session

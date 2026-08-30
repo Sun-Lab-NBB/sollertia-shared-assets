@@ -7,7 +7,10 @@ Invoke `assets:library-extension`.
 1. Read the relevant module: shared primitives live under `src/sollertia_shared_assets/configuration/`,
    system-specific experiment configurations under the system's subpackage (e.g.,
    `mesoscope_vr/experiment_configuration.py`)
-2. Preserve the `YamlConfig` inheritance, because downstream libraries serialize and deserialize these
+2. Preserve the `YamlConfig` inheritance on the classes that carry it (`TaskTemplate`,
+   `<System>ExperimentConfiguration`), because downstream libraries serialize and deserialize these. The nested
+   building blocks (`ExperimentState`, `Cue`, `VREnvironment`, `TrialStructure`, the runtime trial classes) are plain
+   frozen dataclasses
 3. Update `__post_init__` validation when adding fields with cross-field constraints
 4. Run `tox -e lint` and verify no field renames break sollertia-experiment or sollertia-forgery
 
@@ -17,7 +20,9 @@ Invoke `assets:library-extension`.
    `src/sollertia_shared_assets/data_hierarchy/`, per-system descriptors and raw-data layouts under the system's
    subpackage (e.g., `mesoscope_vr/runtime_data.py`, `mesoscope_vr/raw_data.py`)
 2. New canonical filenames require an entry in `RawDataFiles` (`data_hierarchy/session_data.py`) or a system-specific
-   `*RawDataFiles` enum (`<system>/raw_data.py`)
+   `*RawDataFiles` enum (`<system>/raw_data.py`). A new tracker filename belongs in `ProcessingTrackers`
+   (`data_hierarchy/session_data.py`), and a new dataset-hierarchy filename in `DatasetFiles`
+   (`data_hierarchy/dataset_data.py`)
 3. New canonical subdirectories require an entry in `Directories` or a system-specific `*Directories` enum
 4. New required `raw_data` assets require updating `SessionData.required_raw_assets` in `data_hierarchy/session_data.py`
    (for a session type that runs the corridor task, add it to the `SESSION_TYPES_USING_VR_TASK` gate in

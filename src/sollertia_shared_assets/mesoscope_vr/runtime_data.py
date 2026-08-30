@@ -16,8 +16,8 @@ class MesoscopeHardwareState(YamlConfig):
         All hardware parameters are stored using the appropriate datatypes and rounding methods that ensure
         their complete equivalence to the values used by the data acquisition system during runtime.
 
-        Any field set to ``None`` indicates that the corresponding hardware module was not used by the executed data
-        acquisition runtime.
+        Any hardware-parameter field set to ``None`` indicates that the corresponding hardware module was not used
+        by the executed data acquisition runtime.
     """
 
     cm_per_pulse: float | None = None
@@ -47,8 +47,8 @@ class MesoscopeHardwareState(YamlConfig):
     delivered_gas_puffs: bool | None = None
     """Determines whether the session delivered any gas puffs to the animal."""
     system_state_codes: dict[str, int] | None = None
-    """Maps the human-readable state names of the Mesoscope-VR system to the integer state-codes the system uses to
-    communicate those states (system states). Consumers that need a code-keyed lookup invert this mapping."""
+    """The mapping from the human-readable state names of the Mesoscope-VR system to the integer state-codes the system
+    uses to communicate those states (system states). Consumers that need a code-keyed lookup invert this mapping."""
 
 
 @dataclass
@@ -88,7 +88,7 @@ class LickTrainingDescriptor(YamlConfig):
     incomplete: bool = True
     """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
-    """Stores the experimenter's notes made during runtime."""
+    """The experimenter's notes made during runtime."""
 
 
 @dataclass
@@ -145,7 +145,7 @@ class RunTrainingDescriptor(YamlConfig):
     incomplete: bool = True
     """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
-    """Stores the experimenter's notes made during runtime."""
+    """The experimenter's notes made during runtime."""
 
 
 @dataclass
@@ -172,7 +172,7 @@ class MesoscopeExperimentDescriptor(YamlConfig):
     incomplete: bool = True
     """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
-    """Stores the experimenter's notes made during runtime."""
+    """The experimenter's notes made during runtime."""
 
 
 @dataclass
@@ -187,4 +187,4 @@ class WindowCheckingDescriptor(YamlConfig):
     incomplete: bool = True
     """Determines whether the session's data is complete and eligible for unsupervised data processing."""
     experimenter_notes: str = "Replace this with your notes."
-    """Stores the experimenter's notes made during runtime."""
+    """The experimenter's notes made during runtime."""

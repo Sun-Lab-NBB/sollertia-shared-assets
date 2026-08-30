@@ -20,7 +20,7 @@ acquisition and processing platform, built on the [Ataraxis](https://github.com/
 developed in the Sun (NeuroAI) lab at Cornell University. It keeps the two main Sollertia libraries used for data
 acquisition ([sollertia-experiment](https://github.com/Sun-Lab-NBB/sollertia-experiment)) and processing
 ([sollertia-forgery](https://github.com/Sun-Lab-NBB/sollertia-forgery)) independent of each other by providing the
-shared assets both depend on.
+shared assets that both require.
 
 The library stores dataclasses used to save data acquired with the Sollertia platform (sessions, subjects, hardware
 state) and configure data acquisition and processing runtimes. It also provides a CLI (`slsa`) for platform
@@ -49,6 +49,7 @@ ___
   - [Adding a New Trial Class](#adding-a-new-trial-class)
   - [Adding a New Trigger Type](#adding-a-new-trigger-type)
   - [Adding a New Read Asset](#adding-a-new-read-asset)
+  - [Adding a New Credentials Category](#adding-a-new-credentials-category)
   - [AI-Assisted Development](#ai-assisted-development)
   - [Automation Troubleshooting](#automation-troubleshooting)
 - [Versioning](#versioning)
@@ -63,7 +64,7 @@ ___
 - [Python](https://www.python.org/downloads/) **3.14** (the only currently supported interpreter version).
 - An optional [Google service account credentials JSON
   file](https://cloud.google.com/iam/docs/service-account-overview), required only when downstream Sollertia libraries
-  read subject metadata from, or write water-restriction logs to, Google Sheets.
+  read subject metadata from Google Sheets, or write water-restriction logs to them.
 - An optional running [Unity Editor](https://unity.com/download) instance with the McpBridge plugin from
   [sollertia-virtual-reality](https://github.com/Sun-Lab-NBB/sollertia-virtual-reality), required only by the MCP
   tools that generate task prefabs, manage scenes, and control Play Mode.
@@ -393,16 +394,16 @@ that order:
 2. `<system>/experiment_configuration.py` defines a `<System>ExperimentConfiguration` dataclass inheriting from
    `YamlConfig` that captures the runtime experiment parameters for the new system. Every
    `<System>ExperimentConfiguration` shares one contract of three fields and one classmethod. The `experiment_states`
-   field holds a mapping of `ExperimentState`, the experiment state machine that every experiment runs as, and the
-   `trial_structures` field holds the trials the experiment runs, whose concrete trial classes vary per system. The
-   `unity_scene_name` field names the linear infinite corridor task the experiment runs, and the `from_task_template`
-   classmethod builds the configuration from a task template. Fields beyond that contract are system-specific. Use
+   field holds a mapping of `ExperimentState`, the state machine every experiment runs, and the `trial_structures`
+   field holds the trials the experiment runs, whose concrete trial classes vary per system. The `unity_scene_name`
+   field names the linear infinite corridor task the experiment runs, and the `from_task_template` classmethod builds
+   the configuration from a task template. Fields beyond that contract are system-specific. Use
    `mesoscope_vr/experiment_configuration.py` as reference.
-3. `<system>/raw_data.py` defines a `<System>RawData` `@dataclass(slots=True)` that holds the absolute paths to all
-   system-specific raw assets and exposes a `build(cls, root: Path) -> <System>RawData` classmethod that resolves
-   every field against the session's `raw_data` directory. Optionally add `<System>RawDataFiles` and/or
-   `<System>Directories` `StrEnum` classes that enumerate any canonical filenames or subdirectories unique to the
-   new system's `raw_data`. Use `mesoscope_vr/raw_data.py` as reference.
+3. `<system>/raw_data.py` defines a `<System>RawData` `@dataclass(frozen=True, slots=True)` that holds the absolute
+   paths to all system-specific raw assets and exposes a `build(cls, root: Path) -> <System>RawData` classmethod
+   that resolves every field against the session's `raw_data` directory. Optionally add `<System>RawDataFiles`
+   and/or `<System>Directories` `StrEnum` classes that enumerate any canonical filenames or subdirectories unique
+   to the new system's `raw_data`. Use `mesoscope_vr/raw_data.py` as reference.
 
 Beyond the subpackage `__init__.py`, re-export the new system's classes from the top-level
 `src/sollertia_shared_assets/__init__.py` (and its `__all__`), mirroring the Mesoscope-VR exports, so downstream
@@ -571,6 +572,55 @@ it on disk for sollertia-forgery to consume. The experiment plugin's `experiment
 that reader. This is the only place that knows the source's storage-specific representation, and the dataclass keeps
 every downstream consumer storage-agnostic.
 
+### Adding a New Credentials Category
+
+A **credentials category** is a class of secret the platform stores on the local machine so every Sollertia library
+can resolve it by name instead of by path. `CredentialsTypes` (in `enums.py`) enumerates the supported categories and
+`CREDENTIALS_FILE_REGISTRY` (in `registries.py`) maps each to the canonical filename under which its credentials file
+is stored inside the working directory's `credentials/` subdirectory.
+
+Like `ReadAssets`, this is a contract surface curated by Sollertia platform maintainers rather than a routine
+extension: the canonical filename is a durable contract against which every consuming library resolves. The
+import-time parity check (`_assert_registry_coverage`) enforces that every `CredentialsTypes` member has a registered
+filename.
+
+**Step 1: Extend the CredentialsTypes enum**
+
+In `enums.py`, add a new member to `CredentialsTypes`, documenting the canonical filename in its docstring:
+
+```python
+class CredentialsTypes(StrEnum):
+    GOOGLE = "google"
+    NEW_SERVICE = "new_service"  # Add new credentials category here
+```
+
+**Step 2: Register the canonical filename**
+
+In `registries.py`, register it in `CREDENTIALS_FILE_REGISTRY` under the new `CredentialsTypes` key:
+
+```python
+CREDENTIALS_FILE_REGISTRY: dict[CredentialsTypes, str] = {
+    CredentialsTypes.GOOGLE: "google_credentials.json",
+    CredentialsTypes.NEW_SERVICE: "new_service_credentials.json",
+}
+```
+
+The parity check catches a forgotten registry entry at import time, naming the missing member.
+
+**Step 3: Verify the resolution surface**
+
+No further edits are required. `resolve_credentials_file`, `set_credentials`, and `get_credentials` (in
+`credentials.py`) all dispatch through the registry at runtime, and the CLI's `slsa configure credentials --category`
+and `slsa get credentials --category` choices are built from the enum. The MCP surface follows the same rule:
+`set_credentials_tool`, `read_credentials_tool`, and `list_supported_credentials_tool` derive their accepted values
+from `CredentialsTypes`, so the new category appears without a tool edit.
+
+**Step 4: Wire the consumer**
+
+Coordinate with whichever library reads the new secret, so it resolves the file through `get_credentials` rather than
+hard-coding a path. This keeps the canonical filename the single source of truth and lets an operator install the
+file with one `slsa configure credentials` call.
+
 ### AI-Assisted Development
 
 Claude Code skills and other AI development assets for this project are distributed through two marketplaces:
@@ -587,7 +637,7 @@ Claude Code skills and other AI development assets for this project are distribu
     assets. The **mesoscope** plugin also carries the Mesoscope-VR record schemas held in the `mesoscope_vr/`
     subpackage, and the **forging** plugin owns dataset composition and forging job state.
 - [ataraxis](https://github.com/Sun-Lab-NBB/ataraxis) marketplace:
-  - **automation** plugin, which provides shared development skills that enforce Sollertia Platform coding
+  - **automation** plugin, which provides shared development skills that enforce Sollertia platform coding
     conventions (Python style, README style, commit messages, pyproject.toml, tox configuration) and general-purpose
     codebase exploration tools.
 

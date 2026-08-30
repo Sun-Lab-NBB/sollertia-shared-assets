@@ -1,6 +1,7 @@
 """Provides configuration assets for data acquisition and processing runtimes in the Sollertia platform."""
 
 from .vr_configuration import (
+    NAME_COMPONENT_PATTERN,
     Cue,
     TriggerType,
     TaskTemplate,
@@ -22,6 +23,7 @@ from .experiment_configuration import ExperimentState
 __all__ = [
     "CONFIGURATION_DIRECTORY",
     "CREDENTIALS_DIRECTORY",
+    "NAME_COMPONENT_PATTERN",
     "Cue",
     "ExperimentState",
     "TaskTemplate",

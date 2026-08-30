@@ -1,5 +1,5 @@
 """Contains tests for the dataclasses and enumerations provided by the ``data_hierarchy.session_data`` module,
-together with the registry entries ``SessionData`` dispatches through."""
+together with the registry entries through which ``SessionData`` dispatches."""
 
 from __future__ import annotations
 
@@ -53,95 +53,9 @@ def sample_session_hierarchy(tmp_path: Path) -> Path:
     return session_path.parent
 
 
-def _write_session_marker(
-    session_root: Path,
-    *,
-    session_type: SessionTypes = SessionTypes.LICK_TRAINING,
-    acquisition_system: AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR,
-    experiment_name: str | None = None,
-) -> SessionData:
-    """Writes a ``session_data.yaml`` marker via ``SessionData.save`` and returns the constructed instance."""
-    raw_data_path = session_root / "raw_data"
-    raw_data_path.mkdir(parents=True, exist_ok=True)
-    session = SessionData(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_name=session_root.name,
-        session_type=session_type,
-        acquisition_system=acquisition_system,
-        experiment_name=experiment_name,
-        python_version=_DEFAULT_PYTHON_VERSION,
-        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
-        raw_data_path=raw_data_path,
-    )
-    session.save()
-    return session
-
-
-def _build_sample_task_template() -> TaskTemplate:
-    """Builds a minimal TaskTemplate suitable for testing the VR template caching behavior."""
-    return TaskTemplate(
-        cues=[
-            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
-            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
-        ],
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-            cue_offset_cm=0.0,
-        ),
-        trial_structures={
-            "trial1": TrialStructure(
-                cue_sequence=["A", "B"],
-                stimulus_trigger_zone_start_cm=80.0,
-                stimulus_trigger_zone_end_cm=100.0,
-                stimulus_location_cm=90.0,
-                show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.INTERACTION,
-            ),
-        },
-    )
-
-
-def _make_session_with_paths(raw: Path, processed: Path) -> SessionData:
-    """Builds a SessionData instance with explicit roots and the runtime sub-dataclasses populated."""
-    session = SessionData(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_name="2024-01-15-12-30-45-123456",
-        session_type=SessionTypes.LICK_TRAINING,
-        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        python_version=_DEFAULT_PYTHON_VERSION,
-        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
-        raw_data_path=raw,
-        processed_data_path=processed,
-    )
-    session._build_sub_dataclasses()
-    return session
-
-
-def _make_session(session_type: SessionTypes, experiment_name: str | None, raw: Path) -> SessionData:
-    """Builds a SessionData of the given type and experiment name with the runtime sub-dataclasses populated."""
-    session = SessionData(
-        project_name="test_project",
-        animal_id="test_animal",
-        session_name="2024-01-15-12-30-45-123456",
-        session_type=session_type,
-        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
-        experiment_name=experiment_name,
-        python_version=_DEFAULT_PYTHON_VERSION,
-        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
-        raw_data_path=raw,
-    )
-    session._build_sub_dataclasses()
-    return session
-
-
 def test_required_raw_assets_training_session(tmp_path: Path) -> None:
     """Verifies a non-experiment training session requires only the descriptor and the system configuration."""
-    session = _make_session(SessionTypes.LICK_TRAINING, None, tmp_path / "raw_data")
+    session = _make_session(session_type=SessionTypes.LICK_TRAINING, experiment_name=None, raw=tmp_path / "raw_data")
 
     names = [name for name, _ in session.required_raw_assets()]
 
@@ -150,7 +64,11 @@ def test_required_raw_assets_training_session(tmp_path: Path) -> None:
 
 def test_required_raw_assets_vr_experiment_session(tmp_path: Path) -> None:
     """Verifies a VR experiment session also requires the experiment and VR configuration snapshots."""
-    session = _make_session(SessionTypes.MESOSCOPE_EXPERIMENT, "visual_discrimination", tmp_path / "raw_data")
+    session = _make_session(
+        session_type=SessionTypes.MESOSCOPE_EXPERIMENT,
+        experiment_name="visual_discrimination",
+        raw=tmp_path / "raw_data",
+    )
 
     names = [name for name, _ in session.required_raw_assets()]
 
@@ -160,7 +78,9 @@ def test_required_raw_assets_vr_experiment_session(tmp_path: Path) -> None:
 
 def test_required_raw_assets_gates_experiment_and_vr_independently(tmp_path: Path) -> None:
     """Verifies the experiment-config gate (experiment_name) and the VR-config gate (session type) are independent."""
-    session = _make_session(SessionTypes.LICK_TRAINING, "some_experiment", tmp_path / "raw_data")
+    session = _make_session(
+        session_type=SessionTypes.LICK_TRAINING, experiment_name="some_experiment", raw=tmp_path / "raw_data"
+    )
 
     names = [name for name, _ in session.required_raw_assets()]
 
@@ -603,7 +523,7 @@ def test_session_data_load_rejects_marker_with_null_session_type(tmp_path: Path)
     session_root = tmp_path / "2024-01-15-12-30-45-123456"
     raw_data_path = session_root / "raw_data"
     raw_data_path.mkdir(parents=True)
-    marker = _write_session_marker(session_root).raw_data_path / RawDataFiles.SESSION_DATA
+    marker = _write_session_marker(session_root=session_root).raw_data_path / RawDataFiles.SESSION_DATA
     marker.write_text(marker.read_text().replace("session_type: lick training", "session_type: null"))
 
     with pytest.raises(ValueError, match="is not a valid SessionTypes"):
@@ -823,3 +743,89 @@ def test_processing_trackers_enum_is_string_enum() -> None:
     assert ProcessingTrackers.TWO_PHOTON == "single_recording_tracker.yaml"
     assert ProcessingTrackers.FORGING == "forging_tracker.yaml"
     assert ProcessingTrackers.MANIFEST == "manifest_processing_tracker.yaml"
+
+
+def _write_session_marker(
+    session_root: Path,
+    *,
+    session_type: SessionTypes = SessionTypes.LICK_TRAINING,
+    acquisition_system: AcquisitionSystems = AcquisitionSystems.MESOSCOPE_VR,
+    experiment_name: str | None = None,
+) -> SessionData:
+    """Writes a ``session_data.yaml`` marker via ``SessionData.save`` and returns the constructed instance."""
+    raw_data_path = session_root / "raw_data"
+    raw_data_path.mkdir(parents=True, exist_ok=True)
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name=session_root.name,
+        session_type=session_type,
+        acquisition_system=acquisition_system,
+        experiment_name=experiment_name,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        raw_data_path=raw_data_path,
+    )
+    session.save()
+    return session
+
+
+def _build_sample_task_template() -> TaskTemplate:
+    """Builds a minimal TaskTemplate suitable for testing the VR template caching behavior."""
+    return TaskTemplate(
+        cues=[
+            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
+        ],
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+            cue_offset_cm=0.0,
+        ),
+        trial_structures={
+            "trial1": TrialStructure(
+                cue_sequence=["A", "B"],
+                stimulus_trigger_zone_start_cm=80.0,
+                stimulus_trigger_zone_end_cm=100.0,
+                stimulus_location_cm=90.0,
+                show_stimulus_collision_boundary=False,
+                trigger_type=TriggerType.INTERACTION,
+            ),
+        },
+    )
+
+
+def _make_session_with_paths(raw: Path, processed: Path) -> SessionData:
+    """Builds a SessionData instance with explicit roots and the runtime sub-dataclasses populated."""
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=SessionTypes.LICK_TRAINING,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        raw_data_path=raw,
+        processed_data_path=processed,
+    )
+    session._build_sub_dataclasses()
+    return session
+
+
+def _make_session(session_type: SessionTypes, experiment_name: str | None, raw: Path) -> SessionData:
+    """Builds a SessionData of the given type and experiment name with the runtime sub-dataclasses populated."""
+    session = SessionData(
+        project_name="test_project",
+        animal_id="test_animal",
+        session_name="2024-01-15-12-30-45-123456",
+        session_type=session_type,
+        acquisition_system=AcquisitionSystems.MESOSCOPE_VR,
+        experiment_name=experiment_name,
+        python_version=_DEFAULT_PYTHON_VERSION,
+        sollertia_experiment_version=_DEFAULT_EXPERIMENT_VERSION,
+        raw_data_path=raw,
+    )
+    session._build_sub_dataclasses()
+    return session

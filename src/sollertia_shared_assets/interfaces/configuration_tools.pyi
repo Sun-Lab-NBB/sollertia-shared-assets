@@ -32,6 +32,7 @@ from .mcp_instance import (
     collect_field_dataclasses as collect_field_dataclasses,
 )
 from ..configuration import (
+    NAME_COMPONENT_PATTERN as NAME_COMPONENT_PATTERN,
     CONFIGURATION_DIRECTORY as CONFIGURATION_DIRECTORY,
     Cue as Cue,
     TriggerType as TriggerType,

@@ -112,18 +112,18 @@ class DatasetData(YamlConfig):
     """Defines the structure and the metadata of a forged dataset.
 
     A forged dataset aggregates multiple data acquisition sessions of the same type, recorded across different
-    animals by the same acquisition system. This class encapsulates the information necessary to access the dataset's
-    assembled (forged) data stored on disk and functions as the entry point for all interactions with the dataset.
+    animals by the same acquisition system.
 
     Notes:
         Do not initialize this class directly. Instead, use the create() method when creating new datasets or the
         load() method when accessing data for an existing dataset.
 
-        Datasets are created using a pre-filtered set of session + animal pairs, typically obtained through the
-        session filtering functionality in sollertia-forgery. The dataset stores only the assembled data, not raw or
-        processed data. Each created dataset carries a per-dataset ``data_descriptions.feather`` describing the
-        meaning of every column its acquisition system can emit. Use column_descriptions() and get_column_description()
-        to read it.
+        Datasets are created using a pre-filtered set of session + animal pairs, typically obtained through the session
+        filtering functionality in sollertia-forgery. The dataset stores the assembled data together with the raw-data
+        snapshots re-exported alongside it, leaving the sessions' ``raw_data`` and ``processed_data`` trees in place,
+        because a dataset carries the forged output rather than a copy of its sources. Each created dataset carries a
+        per-dataset ``data_descriptions.feather`` describing the meaning of every column its acquisition system can
+        emit. Use column_descriptions() and get_column_description() to read it.
     """
 
     name: str
@@ -189,7 +189,7 @@ class DatasetData(YamlConfig):
             sessions: The set of DatasetSession instances that identify the sessions whose data should be included in
                 the dataset. The session_path attribute of each input instance is ignored and replaced with the
                 resolved path inside the dataset hierarchy.
-            datasets_root: The path to the root directory where to create the dataset's hierarchy.
+            datasets_root: The path to the root directory in which to create the dataset's hierarchy.
             column_descriptions: The mapping from each column name the dataset's acquisition system can emit into
                 ``data.feather`` to its human-readable description. Written to the dataset root as
                 ``data_descriptions.feather`` so consumers can interpret the assembled data. Every entry must bind a
@@ -200,11 +200,11 @@ class DatasetData(YamlConfig):
             An initialized DatasetData instance that stores the structure and the metadata of the created dataset.
 
         Raises:
-            ValueError: If the specified name does not name a single directory, if the specified session_type or
-                acquisition_system is not a valid enumeration member, if no sessions are provided, if the same animal
-                and session pair is named more than once in the provided collection, if any animal or session
-                identifier does not name a single directory, or if any column_descriptions entry binds a column name
-                or a description that is not a non-empty string.
+            ValueError: If the specified name does not name a single directory, or if the specified session_type or
+                acquisition_system is not a valid enumeration member. Also raised if no sessions are provided, if the
+                same animal and session pair is named more than once in the provided collection, or if any animal or
+                session identifier does not name a single directory. Finally, raised if any column_descriptions entry
+                binds a column name or a description that is not a non-empty string.
             FileExistsError: If a dataset with the same name already exists.
             OSError: If the dataset hierarchy cannot be materialized on disk. The part of the hierarchy this call has
                 already built is removed before the error propagates.
@@ -212,8 +212,8 @@ class DatasetData(YamlConfig):
                 name then stays held by a tree no consumer can load.
         """
         # Screens the dataset name before it is joined onto the datasets root, since a name that carries a path
-        # separator places the dataset somewhere other than directly under that root and leaves the intermediate
-        # directories behind when the rollback below removes the dataset directory alone.
+        # separator places the dataset somewhere other than directly under that root. Such a name also leaves the
+        # intermediate directories behind when the rollback below removes the dataset directory alone.
         if not _is_path_component(value=name):
             message = (
                 f"Unable to create a forged dataset. The name must be a non-empty string naming a single directory, "
@@ -239,9 +239,9 @@ class DatasetData(YamlConfig):
             console.error(message=message, error=ValueError)
 
         # Materializes the request before any screen reads it. A lazily evaluated iterable is truthy even when it
-        # yields nothing, so it clears the emptiness guard below, is drained by the duplicate screen, and leaves the
-        # materialization loop with nothing to create, persisting a dataset that holds no session at all. A tuple
-        # input pays nothing for the guarantee, since tuple() returns an existing tuple unchanged.
+        # yields nothing, so it clears the emptiness guard below and is drained by the duplicate screen. The
+        # materialization loop is then left with nothing to create, persisting a dataset that holds no session at all.
+        # A tuple input pays nothing for the guarantee, since tuple() returns an existing tuple unchanged.
         sessions = tuple(sessions)
 
         if not sessions:
@@ -260,8 +260,8 @@ class DatasetData(YamlConfig):
         )
 
         # Screens every identifier the hierarchy turns into a directory name, since an identifier that carries a path
-        # separator or names the parent directory places its directory outside the dataset root, where the rollback
-        # below cannot reach it and where remove_animal() would later delete whatever the joined path names.
+        # separator or names the parent directory places its directory outside the dataset root. The rollback below
+        # cannot reach such a directory, and remove_animal() would later delete whatever the joined path names.
         _screen_session_identifiers(sessions=sessions, action=f"create the '{name}' forged dataset")
 
         # Screens every description binding while the request is still pure, since the mapping becomes the dataset's
@@ -294,8 +294,8 @@ class DatasetData(YamlConfig):
 
         # Materializes the whole hierarchy under a single rollback, so the request either reaches its marker or
         # releases the dataset name it claimed. Only the mutations belong inside the block, since every screen above
-        # runs against a destination this call does not own yet and a rejected request must never delete the dataset
-        # it collided with.
+        # runs against a destination this call does not own yet and a rejected request must never delete the
+        # dataset with which it collided.
         try:
             # Creates the dataset root directory. Downstream consumers populate it with their own files. The kind of
             # the target is stated explicitly, since a dataset whose name carries a dot would otherwise be read as a
@@ -337,8 +337,8 @@ class DatasetData(YamlConfig):
             # when the root directory never came to be.
             if dataset_path.is_dir():
                 # Discards an OSError raised by the removal itself, so the caller still meets the failure that
-                # interrupted the creation rather than a rollback-internal one, and so both of delete_directory's
-                # failure modes are judged by the state of the destination below instead of by which one it took.
+                # interrupted the creation rather than a rollback-internal one. Both of delete_directory's failure
+                # modes are then judged by the state of the destination below instead of by which one it took.
                 with suppress(OSError):
                     delete_directory(directory_path=dataset_path)
 
@@ -364,7 +364,7 @@ class DatasetData(YamlConfig):
             To create a new dataset, use the create() method.
 
         Args:
-            dataset_path: The path to the directory where to search for the dataset.yaml file. Typically, this
+            dataset_path: The path to the directory in which to search for the dataset.yaml file. Typically, this
                 is the path to the root dataset directory.
 
         Returns:
@@ -373,6 +373,8 @@ class DatasetData(YamlConfig):
         Raises:
             FileNotFoundError: If multiple or no 'dataset.yaml' file instances are found under the input directory.
             OSError: If the fallback scan encounters a directory it cannot read.
+            ValueError: If the loaded marker carries a session type or an acquisition system outside the platform
+                vocabulary.
         """
         # Resolves the marker at its canonical location first, so loading a dataset that holds many assembled session
         # feathers costs a single metadata query instead of a recursive walk of the whole dataset tree. The scan below
@@ -424,8 +426,8 @@ class DatasetData(YamlConfig):
             The append counterpart to create(). Each added session's directory is created under the dataset root and
             the updated dataset marker is written to disk, so the hierarchy and the marker stay consistent. A failure
             that lands before the marker write, an interrupt included, removes the directories this call created and
-            restores the instance's session list to the state the marker on disk still describes, so the identical
-            call can be retried once the cause of the failure is resolved. The session_path attribute of each input
+            restores the instance's session list to the state the marker on disk still describes. The identical call
+            can therefore be retried once the cause of the failure is resolved. The session_path attribute of each input
             instance is ignored and replaced with the resolved path inside the dataset hierarchy, matching how
             create() treats its input.
 
@@ -502,12 +504,12 @@ class DatasetData(YamlConfig):
         Notes:
             The removal counterpart to create(), which materializes the per-animal directories this method deletes.
             The animal's directory is removed from the dataset tree together with everything under it, including the
-            assembled data of every session it holds and the per-animal artifacts co-located there, and the updated
-            dataset marker is written to disk once the directory is confirmed to be gone. An animal directory that is
-            a symlink is unlinked in place, so the tree it points at stays whole and only the dataset's reference to
-            it is dropped. Pairing this method with add_sessions() rebuilds one animal while every other animal in the
-            dataset keeps its data. A failed marker write restores the instance's session list to the state the marker
-            on disk still describes, so the identical call can be retried once the cause of the failure is resolved.
+            assembled data of every session it holds and the per-animal artifacts co-located there. The updated dataset
+            marker is written to disk once the directory is confirmed to be gone. An animal directory that is a symlink
+            is unlinked in place, so the tree at which it points stays whole and only the dataset's reference to it is
+            dropped. Pairing this method with add_sessions() rebuilds one animal while every other animal in the dataset
+            keeps its data. A failed marker write restores the instance's session list to the state the marker on disk
+            still describes, so the identical call can be retried once the cause of the failure is resolved.
 
         Args:
             animal: The unique identifier of the animal to remove from the dataset.
@@ -520,6 +522,9 @@ class DatasetData(YamlConfig):
                 single directory.
             RuntimeError: If the animal's directory survives the removal attempt, since dropping the animal from the
                 marker would stop the dataset from describing data that is still on disk.
+            OSError: If the animal's directory tree cannot be read or removed, or if the dataset marker cannot be
+                written. The instance's session list is restored to the state the marker on disk describes before the
+                error propagates.
         """
         removed = self.get_sessions_for_animal(animal=animal)
         if not removed:
@@ -531,7 +536,7 @@ class DatasetData(YamlConfig):
 
         # Screens the identifier before it is joined onto the dataset root, since a marker written by a version that
         # predates the creation-time screen can still carry an identifier that resolves outside the animal's own
-        # directory, and the removal below deletes whatever the joined path names.
+        # directory. The removal below deletes whatever the joined path names.
         if not _is_path_component(value=animal):
             message = (
                 f"Unable to remove the animal '{animal}' from the '{self.name}' forged dataset. The animal "
@@ -547,9 +552,9 @@ class DatasetData(YamlConfig):
             delete_directory(directory_path=animal_path)
 
         # Verifies the removal outside the guard above, since delete_directory reports an exhausted removal as a
-        # warning and returns with the directory in place, and since a path the guard skips while it still holds an
-        # entry would otherwise be dropped from the marker unexamined. Aborting before the marker is rewritten is
-        # what keeps the marker describing the tree that is still on disk, and it leaves the call retryable.
+        # warning and returns with the directory in place. A path the guard skips while it still holds an entry would
+        # otherwise be dropped from the marker unexamined. Aborting before the marker is rewritten is what keeps the
+        # marker describing the tree that is still on disk, and it leaves the call retryable.
         if animal_path.exists() or animal_path.is_symlink():
             message = (
                 f"Unable to remove the animal '{animal}' from the '{self.name}' forged dataset. The animal's "
@@ -675,9 +680,8 @@ class DatasetData(YamlConfig):
 
     @property
     def animals(self) -> tuple[DatasetAnimal, ...]:
-        """Returns a tuple of DatasetAnimal instances, one per unique animal in the dataset, each carrying the animal
-        identifier and the resolved path to the animal's directory under the dataset root, anchored on the
-        ``dataset.yaml`` file's filesystem location so the result remains portable across processing machines.
+        """Returns one DatasetAnimal per unique animal in the dataset, each anchored on the ``dataset.yaml`` file's
+        filesystem location so the result remains portable across processing machines.
         """
         dataset_root = self.dataset_data_path.parent
         unique_animals = sorted({session.animal for session in self.sessions})
@@ -795,8 +799,8 @@ def _is_path_component(value: object) -> bool:
 
     Notes:
         Every dataset name, animal identifier, and session identifier becomes one directory name under the datasets
-        root, so a value that is empty, that names the current or the parent directory, or that carries a path
-        separator would place its directory somewhere other than where the dataset marker records it. The check is
+        root. A value that is empty, that names the current or the parent directory, or that carries a path separator
+        would therefore place its directory somewhere other than where the dataset marker records it. The check is
         delegated to Path, since it recognizes the separators and the drive syntax of the host platform rather than
         the POSIX ones alone. Path drops the current-directory reference from its parts, so only the parent-directory
         reference needs naming here.
@@ -815,9 +819,9 @@ def _screen_session_identifiers(sessions: tuple[DatasetSession, ...], action: st
 
     Notes:
         Screens the whole request before any directory is created, so a rejected request leaves the filesystem
-        untouched. The screen is what keeps every session directory inside the dataset root, which is in turn what
-        lets create() roll its hierarchy back by removing that one root and what keeps remove_animal() from deleting
-        a path outside the animal's own directory.
+        untouched. The screen is what keeps every session directory inside the dataset root. That containment is in
+        turn what lets create() roll its hierarchy back by removing that one root, and what keeps remove_animal() from
+        deleting a path outside the animal's own directory.
 
     Args:
         sessions: The DatasetSession instances the request adds to the dataset.
