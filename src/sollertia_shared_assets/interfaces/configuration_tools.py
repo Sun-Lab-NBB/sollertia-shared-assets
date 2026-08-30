@@ -5,11 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from pathlib import Path
 
-if TYPE_CHECKING:
-    from collections.abc import Sized
-
-    from ataraxis_data_structures import YamlConfig
-
 from ..enums import (
     ReadAssets,
     SessionTypes,
@@ -37,6 +32,7 @@ from .mcp_instance import (
     collect_field_dataclasses,
 )
 from ..configuration import (
+    NAME_COMPONENT_PATTERN,
     CONFIGURATION_DIRECTORY,
     Cue,
     TriggerType,
@@ -52,9 +48,10 @@ from ..configuration import (
 )
 from ..data_hierarchy import ProjectData
 
-# Imported from the defining module rather than the subpackage __init__, so the pattern stays a module-public helper
-# shared with this authoring tool without becoming part of the configuration subpackage's exported surface.
-from ..configuration.vr_configuration import NAME_COMPONENT_PATTERN
+if TYPE_CHECKING:
+    from collections.abc import Sized
+
+    from ataraxis_data_structures import YamlConfig
 
 
 @mcp.tool()
