@@ -122,9 +122,9 @@ class VREnvironment:
     """Defines the Unity Virtual Reality (VR) corridor system configuration.
 
     Notes:
-        Every field divides or sizes downstream corridor geometry, so the validation below rejects a value that would
-        leave Unity with an infinite segment length, a zero-depth corridor, or a maze generation loop that never
-        terminates.
+        Every numeric field divides or sizes downstream corridor geometry, so the validation below rejects a value
+        that would leave Unity with an infinite segment length, a zero-depth corridor, or a maze generation loop that
+        never terminates. The ``padding_prefab_name`` field names a Unity prefab and carries no geometric validation.
 
         Each default matches the one the Unity ``VREnvironment`` class declares for the same field, so a template that
         omits the key loads here with the geometry Unity would apply to it.
@@ -210,9 +210,9 @@ class TrialStructure:
     a non-occupancy trial, because None is how a template communicates that the field is unused, while 0 is a real
     duration and is rejected on every trial whatever its trigger type."""
     transitions: dict[str, float] | None = None
-    """Transition probabilities to other trials that make up the task's corridor environment. Keys must reference
-    other trial names defined on the same TaskTemplate. If provided and non-empty, values must sum to 1.0. Set to
-    null in the YAML file if not used."""
+    """Transition probabilities to the trials that make up the task's corridor environment. Keys must reference
+    trial names defined on the same TaskTemplate, including this trial itself. If provided and non-empty, values must
+    sum to 1.0. Set to null in the YAML file if not used."""
 
     def __post_init__(self) -> None:
         """Validates trial structure definition parameters."""
@@ -226,7 +226,8 @@ class TrialStructure:
         if self.transitions:
             for target_name, probability in self.transitions.items():
                 # A negative weight lets the set sum to 1.0 while removing its target from the sampled distribution,
-                # and a non-finite weight passes every ordered comparison including the sum tolerance below.
+                # and a NaN weight compares False against every ordered comparison, so it also slips past the sum
+                # tolerance below. The chained form rejects both, along with either infinity.
                 if not 0.0 <= probability <= 1.0:
                     message = (
                         f"Unable to initialize TrialStructure. The transition probability for '{target_name}' must be "

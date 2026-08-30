@@ -40,7 +40,7 @@ def slsa_cli() -> None:
     help="The MCP transport type to use.",
 )
 def run_mcp_server(transport: Literal["stdio", "streamable-http"]) -> None:
-    """Starts the MCP server for agentic configuration management."""
+    """Starts the MCP server for agentic management of configuration, session, dataset, and Unity assets."""
     # The stdio transport carries the JSON-RPC message stream over stdout, which is also where the console writes
     # every message up to the WARNING level. Silencing the console keeps library output out of that stream, as a
     # single logged line renders the message it interleaves with unparsable for the connected client.
@@ -186,7 +186,8 @@ def configure_credentials(category: str, file: Path) -> None:
     "--directory",
     type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path),
     required=True,
-    help="The absolute path to the sollertia-virtual-reality project's Configurations (Template) directory.",
+    help="The absolute path to the sollertia-virtual-reality project's Assets/InfiniteCorridorTask/Configurations "
+    "directory.",
 )
 def configure_task_templates_directory(directory: Path) -> None:
     """Sets the path to the sollertia-virtual-reality task templates directory."""

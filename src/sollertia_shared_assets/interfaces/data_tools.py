@@ -70,9 +70,10 @@ def get_data_root_overview_tool(
 ) -> dict[str, Any]:
     """Walks the data root and groups loadable ``session_data.yaml`` markers into a project / animal / session tree.
 
-    Sessions are bucketed by their SessionData identity fields, not by directory structure, so stray directories cannot
-    surface as phantom projects. Markers that fail to load appear in the flat ``sessions`` list with ``status="error"``
-    and an ``error_detail`` field, but do not contribute to project or animal aggregation.
+    Under the default ``markers`` strategy, sessions are bucketed by their SessionData identity fields, not by
+    directory structure, so stray directories cannot surface as phantom projects. Markers that fail to load, and
+    sessions whose descriptor cannot be read, appear in the flat ``sessions`` list with ``status="error"`` and an
+    ``error_detail`` field, but do not contribute to project or animal aggregation.
 
     The ``strategy`` argument controls whether empty hierarchies surface. The ``markers`` strategy reports only
     projects and animals that hold at least one loadable session. The ``directories`` strategy additionally walks
@@ -94,8 +95,10 @@ def get_data_root_overview_tool(
         ``sessions`` entry carries ``session_name``, ``project``, ``animal``, ``session_type``, ``acquisition_system``,
         ``experiment_name``, ``session_path``, ``raw_data_path``, ``processed_data_path``, ``status``,
         ``uninitialized``, ``incomplete``, and ``has_processed_data``. A marker that fails to load instead carries
-        ``session_path``, ``marker``, ``status``, and ``error_detail``. The top-level ``counts`` mapping holds the
-        cross-project status tally, including errors.
+        ``session_path``, ``marker``, ``status``, and ``error_detail``. A session that loads but whose descriptor
+        cannot be read keeps the full entry above, with ``status`` set to ``"error"``, ``incomplete`` set to null, and
+        an added ``error_detail`` field, so consumers branch on the presence of the ``marker`` key to tell the two
+        error shapes apart. The top-level ``counts`` mapping holds the cross-project status tally, including errors.
     """
     root, error = resolve_root_directory(root_directory=root_directory)
     if error is not None:
@@ -357,7 +360,9 @@ def read_session_data_tool(file_path: str) -> dict[str, Any]:
             ``<session>/raw_data/session_data.yaml``.
 
     Returns:
-        A response dict with ``file_path`` and ``data`` (the full SessionData payload).
+        A response dict with ``file_path`` and ``data`` (the marker's SessionData payload, which omits the
+        runtime-only ``raw_data_path``, ``processed_data_path``, ``raw_data``, ``processed_data``, and
+        ``system_raw_data`` fields that ``describe_session_data_schema_tool`` still lists).
     """
     return read_yaml(file_path=Path(file_path), validator_cls=SessionData)
 
@@ -755,10 +760,10 @@ def _compute_session_status(instance: SessionData) -> _SessionStatusInfo:
 def _aggregate_projects(root: Path, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Groups flat session entries into the ``projects -> animals -> sessions`` hierarchy.
 
-    Error-status entries (whose identity could not be trusted from SessionData) are excluded from aggregation, as
-    are entries whose ``project`` or ``animal`` value is not a non-empty string. All of them remain in the
-    top-level flat ``sessions`` list only. The returned per-project dicts do not include filesystem-derived counts
-    such as ``experiment_count`` or ``dataset_count``.
+    Error-status entries are excluded from aggregation, whether the marker failed to load or the descriptor could not be
+    read, as are entries whose ``project`` or ``animal`` value is not a non-empty string. All of them remain in the
+    top-level flat ``sessions`` list only. The returned per-project dicts do not include filesystem-derived counts such
+    as ``experiment_count`` or ``dataset_count``.
 
     Args:
         root: The resolved data root path used to construct each project's reported ``path``.

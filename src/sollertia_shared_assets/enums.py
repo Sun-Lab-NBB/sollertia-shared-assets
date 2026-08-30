@@ -23,8 +23,8 @@ class AcquisitionSystems(StrEnum):
 
 
 class SessionTypes(StrEnum):
-    """Defines the data acquisition session types supported by all data acquisition systems in the Sollertia
-    platform.
+    """Defines the data acquisition session types used across the Sollertia platform. Each acquisition system
+    declares the subset it can run in ``SYSTEM_SESSION_TYPES``.
     """
 
     LICK_TRAINING = "lick training"

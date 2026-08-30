@@ -119,7 +119,7 @@ def test_get_working_directory_preserves_trailing_whitespace(clean_working_direc
 
 
 def test_get_working_directory_raises_error_if_record_is_whitespace(clean_working_directory: Path) -> None:
-    """Verifies that get_working_directory raises FileNotFoundError for a whitespace-only path record."""
+    """Verifies that get_working_directory raises FileNotFoundError for a newline-only path record."""
     set_working_directory(path=clean_working_directory)
 
     path_file = clean_working_directory.parent / "app_data" / "working_directory_path.txt"
@@ -187,7 +187,7 @@ def test_get_data_root_preserves_trailing_whitespace(clean_working_directory: Pa
 
 
 def test_get_data_root_raises_error_if_record_is_whitespace(clean_working_directory: Path) -> None:
-    """Verifies that get_data_root raises FileNotFoundError for a whitespace-only path record."""
+    """Verifies that get_data_root raises FileNotFoundError for a newline-only path record."""
     set_data_root(path=clean_working_directory)
 
     path_file = clean_working_directory.parent / "app_data" / "data_root_path.txt"
@@ -299,7 +299,7 @@ def test_get_task_templates_directory_raises_error_if_record_is_whitespace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verifies that get_task_templates_directory raises FileNotFoundError for a whitespace-only path record."""
+    """Verifies that get_task_templates_directory raises FileNotFoundError for a newline-only path record."""
     application_directory = tmp_path / "app_data"
     application_directory.mkdir()
     monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))

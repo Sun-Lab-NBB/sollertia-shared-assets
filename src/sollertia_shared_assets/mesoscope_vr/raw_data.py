@@ -34,7 +34,7 @@ class MesoscopeDirectories(StrEnum):
     """
 
     MESOSCOPE_DATA = "mesoscope_data"
-    """Persistent mesoscope data directory under ``raw_data``. Stores LERC-compressed TIFF stacks and acquisition
+    """Raw mesoscope data directory under ``raw_data``. Stores LERC-compressed TIFF stacks and acquisition
     metadata written by sollertia-experiment's preprocessing."""
 
 

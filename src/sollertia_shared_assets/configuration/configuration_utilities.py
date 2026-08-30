@@ -10,8 +10,8 @@ from ataraxis_data_structures import atomic_write
 
 CONFIGURATION_DIRECTORY: str = "configuration"
 """The name of the directory that stores configuration files. Used both under the local working directory (where it
-holds the host's system configuration) and under each project directory (where it holds the project's experiment
-configuration YAML files)."""
+holds the host's system configuration and the forgery server configuration) and under each project directory (where it
+holds the project's experiment configuration YAML files)."""
 
 CREDENTIALS_DIRECTORY: str = "credentials"
 """The name of the working-directory subdirectory that stores all platform credentials files. The constant lives with
@@ -25,8 +25,8 @@ def set_working_directory(path: Path) -> None:
     Notes:
         This function caches the path to the working directory in the user's data directory.
 
-        If the input path does not point to an existing directory, the function creates the requested directory
-        along with its ``configuration`` and ``credentials`` subdirectories.
+        The function creates the requested directory and its ``configuration`` and ``credentials`` subdirectories,
+        whether or not the input path already exists.
 
     Args:
         path: The path to the directory to set as the local Sollertia platform working directory.
@@ -172,13 +172,15 @@ def get_data_root() -> Path:
 
 
 def set_task_templates_directory(path: Path) -> None:
-    """Sets the path to the sollertia-virtual-reality project's Configurations (Template) directory.
+    """Sets the path to the sollertia-virtual-reality project's ``Assets/InfiniteCorridorTask/Configurations``
+    directory.
 
     Persists the path under ``platformdirs``-managed application data so it is reused by subsequent ``slsa mcp``
     sessions on the same local machine (PC).
 
     Args:
-        path: The path to the sollertia-virtual-reality project's Configurations (Template) directory.
+        path: The path to the sollertia-virtual-reality project's ``Assets/InfiniteCorridorTask/Configurations``
+            directory.
 
     Raises:
         FileNotFoundError: If the specified directory does not exist at the provided path.
@@ -194,8 +196,8 @@ def set_task_templates_directory(path: Path) -> None:
     if not path.is_dir():
         message = (
             f"Unable to set the task templates directory path. The specified path ({path}) does not point to a "
-            f"directory. Provide the path to the sollertia-virtual-reality project's Configurations "
-            f"(Template) directory."
+            f"directory. Provide the path to the sollertia-virtual-reality project's "
+            f"Assets/InfiniteCorridorTask/Configurations directory."
         )
         console.error(message=message, error=ValueError)
 
@@ -211,7 +213,8 @@ def set_task_templates_directory(path: Path) -> None:
 
 
 def get_task_templates_directory() -> Path:
-    """Resolves and returns the path to the sollertia-virtual-reality project's Configurations (Template) directory.
+    """Resolves and returns the path to the sollertia-virtual-reality project's
+    ``Assets/InfiniteCorridorTask/Configurations`` directory.
 
     Returns:
         The path to the task templates directory.

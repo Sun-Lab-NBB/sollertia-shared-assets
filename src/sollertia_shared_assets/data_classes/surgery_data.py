@@ -14,7 +14,7 @@ class SubjectData:
     id: int
     """The subject's unique identifier."""
     ear_punch: str
-    """The number and the locations of ear-tags used to distinguish the subject from its cage-mates."""
+    """The number and the locations of ear punches used to distinguish the subject from its cage-mates."""
     sex: str
     """The subject's sex."""
     genotype: str

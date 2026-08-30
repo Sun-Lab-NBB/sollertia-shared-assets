@@ -1,4 +1,4 @@
-"""Provides assets for maintaining the Sollertia platform project data hierarchy across all data acquisition and
+"""Provides the per-session data hierarchy assets shared across all Sollertia platform data acquisition and
 processing machines.
 """
 
@@ -88,8 +88,9 @@ class Directories(StrEnum):
     living in a dedicated raw-side directory."""
     CINDRA = "cindra"
     """Cindra output directory under ``processed_data``. The root of cindra's single-recording and multi-recording
-    outputs. Cindra is reusable by any photometry-data-generating acquisition system. The name mirrors cindra's own
-    ``OUTPUT_DIRECTORY_NAME`` constant, which cindra owns and which nothing here imports, so the two can drift."""
+    outputs. Cindra is reusable by any neural-imaging-data-generating acquisition system. The name mirrors cindra's
+    own ``OUTPUT_DIRECTORY_NAME`` constant, which cindra owns and which nothing here imports, so the two can
+    drift."""
 
 
 class ProcessingTrackers(StrEnum):
@@ -194,12 +195,13 @@ class RawData:
 
 @dataclass(frozen=True, slots=True)
 class ProcessedData:
-    """Stores the absolute paths to all generic processed assets of a single data acquisition session.
+    """Stores the paths to all generic processed assets of a single data acquisition session, resolved against the
+    session's processed-data root, which is absolute once ``load()`` has finalized it.
 
     Notes:
-        Cindra fields live here because cindra is reusable by any photometry-data-generating acquisition system, not
-        Mesoscope-VR-specific. Future processing tools that apply across acquisition systems get added directly as new
-        fields here.
+        Cindra fields live here because cindra is reusable by any neural-imaging-data-generating acquisition system,
+        not Mesoscope-VR-specific. Future processing tools that apply across acquisition systems get added directly
+        as new fields here.
     """
 
     runtime_data_path: Path
@@ -221,8 +223,8 @@ class ProcessedData:
     ``microcontroller_data/microcontroller_processing_tracker.yaml``."""
     cindra_data_path: Path
     """Acts as the root for both single-recording and multi-recording cindra outputs. Cindra is reusable by any
-    photometry-data-generating acquisition system on the Sollertia platform, which is why these fields live on the
-    generic ProcessedData rather than on an acquisition-system-specific dataclass."""
+    neural-imaging-data-generating acquisition system on the Sollertia platform, which is why these fields live on
+    the generic ProcessedData rather than on an acquisition-system-specific dataclass."""
     two_photon_tracker_path: Path
     """Tracks the outcome of the two-photon (calcium-imaging) processing stage. The tracker file is written by cindra's
     single-recording pipeline and only read by sollertia-forgery. Resolves to
@@ -236,7 +238,7 @@ class ProcessedData:
             root: The path to the session's ``processed_data`` directory.
 
         Returns:
-            A ProcessedData instance whose fields are absolute paths under the input root.
+            A ProcessedData instance whose fields are resolved under the input root.
         """
         runtime_data_path = root.joinpath(Directories.RUNTIME_DATA)
         video_data_path = root.joinpath(Directories.VIDEO_DATA)
@@ -278,7 +280,8 @@ class SessionData(YamlConfig):
         raw_data: The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by
             ``create()`` and ``load()``.
         processed_data: The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated
-            by ``load()``.
+            by ``create()`` and ``load()``, though ``create()`` leaves its root at the default until ``load()``
+            resolves it on the processing host.
         system_raw_data: The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset
             paths, populated by ``create()`` and ``load()``.
     """
@@ -318,7 +321,9 @@ class SessionData(YamlConfig):
     """The runtime-only sub-dataclass exposing the session's raw-data asset paths, populated by ``create()`` and
     ``load()``."""
     processed_data: ProcessedData = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
-    """The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated by ``load()``."""
+    """The runtime-only sub-dataclass exposing the session's processed-data asset paths, populated by ``create()``
+    and ``load()``, though ``create()`` leaves its root at the default until ``load()`` resolves it on the processing
+    host."""
     system_raw_data: Any = field(init=False, repr=False, metadata=YAML_EXCLUDE_METADATA)
     """The runtime-only sub-dataclass exposing the acquisition-system-specific raw-data asset paths, populated by
     ``create()`` and ``load()``."""
@@ -508,6 +513,8 @@ class SessionData(YamlConfig):
             FileNotFoundError: If multiple or no 'session_data.yaml' file instances are found under the input
                 directory.
             OSError: If the fallback scan encounters a directory it cannot read.
+            ValueError: If the loaded marker carries a session type or an acquisition system outside the platform
+                vocabulary.
         """
         # Resolves the marker at its canonical location first, so loading a session whose raw_data holds a large
         # number of acquisition files costs a single metadata query instead of a recursive walk of the whole session

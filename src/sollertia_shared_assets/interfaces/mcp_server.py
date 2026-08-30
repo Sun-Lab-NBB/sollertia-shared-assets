@@ -1,8 +1,8 @@
 """Provides the MCP server for agentic management of Sollertia platform configuration and runtime data assets.
 
-Exposes the canonical MCP tool surface that all sibling Sollertia libraries (sollertia-experiment,
-sollertia-virtual-reality, sollertia-forgery, and downstream agents) use to discover, read, write, validate, and
-introspect the configuration and runtime data files defined in this library.
+Exposes the canonical MCP tool surface that agents working on Sollertia data use to discover, read, write,
+validate, and introspect the configuration and runtime data files defined in this library, together with the relay
+tools that drive the sollertia-virtual-reality Unity Editor bridge.
 """
 
 from __future__ import annotations

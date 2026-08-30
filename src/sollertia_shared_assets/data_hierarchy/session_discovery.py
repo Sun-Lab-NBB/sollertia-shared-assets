@@ -1,4 +1,4 @@
-"""Provides helpers for discovering and filtering Sollertia sessions under a project root."""
+"""Provides helpers for discovering and filtering Sollertia projects, animals, and sessions under a data root."""
 
 from __future__ import annotations
 
@@ -59,6 +59,12 @@ def iterate_sessions(root_path: Path) -> Iterator[SessionData]:
 
     Yields:
         Each ``SessionData`` instance loaded from a session marker found under ``root_path``.
+
+    Raises:
+        OSError: If the search encounters a directory it cannot read.
+        FileNotFoundError: If a discovered marker no longer resolves to exactly one ``session_data.yaml`` file.
+        ValueError: If a discovered marker carries a session type or an acquisition system outside the platform
+            vocabulary.
     """
     for session_root in discover_sessions(root_path=root_path):
         yield SessionData.load(session_path=session_root)
@@ -119,6 +125,13 @@ def discover_projects(root_path: Path, strategy: Literal["markers", "directories
 
     Returns:
         A list of ``ProjectData`` views anchored on the data root, naturally sorted by project name.
+
+    Raises:
+        OSError: If the scan encounters a directory it cannot read.
+        FileNotFoundError: If the ``markers`` strategy discovers a marker that no longer resolves to exactly one
+            ``session_data.yaml`` file.
+        ValueError: If the ``markers`` strategy loads a marker carrying a session type or an acquisition system
+            outside the platform vocabulary.
     """
     if strategy == "directories":
         return _discover_projects_by_directory(root_path=root_path)
@@ -180,6 +193,12 @@ def get_projects_for_animal(root_path: Path, animal_id: str) -> tuple[str, ...]:
 
     Returns:
         A naturally-sorted tuple of project names that include the animal.
+
+    Raises:
+        OSError: If the scan encounters a directory it cannot read.
+        FileNotFoundError: If a discovered marker no longer resolves to exactly one ``session_data.yaml`` file.
+        ValueError: If a discovered marker carries a session type or an acquisition system outside the platform
+            vocabulary.
     """
     matching_projects = {
         session.project_name for session in iterate_sessions(root_path=root_path) if session.animal_id == animal_id
@@ -228,6 +247,9 @@ def filter_sessions(
 
     Returns:
         A set of ``(session_name, animal)`` tuples matching every filter.
+
+    Raises:
+        ValueError: If ``start_date`` or ``end_date`` cannot be parsed as a date or a datetime.
     """
     filtered: set[tuple[str, str]] = set(sessions)
 
@@ -373,6 +395,9 @@ def _parse_date_boundary(date_string: str, *, is_end_date: bool = False, utc_tim
 
     Returns:
         A timezone-aware datetime constructed from the input string.
+
+    Raises:
+        ValueError: If the input string cannot be parsed as a date or a datetime.
     """
     parsed = parser.parse(timestr=date_string)
 

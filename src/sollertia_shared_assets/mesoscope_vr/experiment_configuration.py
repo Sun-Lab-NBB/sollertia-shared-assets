@@ -23,7 +23,7 @@ _DEFAULT_STATE_DURATION_S: int = 60
 """Default duration in seconds for each runtime state seeded by ``from_task_template``."""
 
 _DEFAULT_INITIAL_GUIDED_TRIALS: int = 3
-"""Default number of guided trials issued at the start of each reinforcing or aversive runtime state."""
+"""Default number of guided reinforcing or aversive trials issued at the onset of each runtime state."""
 
 _DEFAULT_RECOVERY_FAILED_THRESHOLD: int = 9
 """Default number of consecutive failed trials that triggers recovery guided trial issuance."""
@@ -68,7 +68,11 @@ class MesoscopeWaterRewardTrial:
     """The discriminator that identifies this trial as a water reward trial when it is read back from a YAML file."""
 
     def __post_init__(self) -> None:
-        """Validates the trial kind discriminator."""
+        """Validates the trial kind discriminator.
+
+        Raises:
+            ValueError: If the ``trial_kind`` field does not hold ``TrialKind.WATER``.
+        """
         if self.trial_kind != TrialKind.WATER:
             message = (
                 f"Unable to initialize MesoscopeWaterRewardTrial. The trial_kind must be '{TrialKind.WATER.value}', "
@@ -92,7 +96,11 @@ class MesoscopeGasPuffTrial:
     """The discriminator that identifies this trial as a gas puff trial when it is read back from a YAML file."""
 
     def __post_init__(self) -> None:
-        """Validates the trial kind discriminator."""
+        """Validates the trial kind discriminator.
+
+        Raises:
+            ValueError: If the ``trial_kind`` field does not hold ``TrialKind.PUFF``.
+        """
         if self.trial_kind != TrialKind.PUFF:
             message = (
                 f"Unable to initialize MesoscopeGasPuffTrial. The trial_kind must be '{TrialKind.PUFF.value}', but "

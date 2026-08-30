@@ -17,9 +17,9 @@ from sollertia_shared_assets import (
 )
 from sollertia_shared_assets.data_hierarchy import dataset_data as dataset_data_module
 
-# A representative column-description binding, passed to nearly every create() call. The empty-mapping test passes {}
-# instead. The mapping is intentionally small. The assembly worker that produces the real mapping lives in the
-# acquisition-system packages.
+# A representative column-description binding, passed to nearly every create() call. The empty-mapping test and the
+# two invalid-mapping tests pass their own mappings instead. The mapping is intentionally small. The real mapping is
+# donated by the acquisition-system packages, alongside the assembly worker whose columns it describes.
 COLUMN_DESCRIPTIONS: dict[str, str] = {
     "time_us": "Microsecond-precision sample timestamps from the acquisition reference clock.",
     "lick": "Lick sensor state at each sample.",

@@ -288,10 +288,11 @@ def validate_dataset_descriptions_tool(dataset_path: str) -> dict[str, Any]:
 
     Returns:
         A response dict with ``dataset_path``, ``valid``, and either ``summary`` (carrying ``session_count`` and
-        ``described_column_count``) or ``issues`` (a list holding the verification failure, which names every
-        undescribed column together with the sessions that emit it). A dataset whose descriptions companion or whose
-        session data is missing reports ``valid`` false rather than the error envelope, since both are verification
-        verdicts. A path that does not resolve to a dataset instead returns the error envelope.
+        ``described_column_count``) or ``issues`` (a list holding the single verification failure, where an
+        undescribed-column failure names every undescribed column together with the sessions that emit it). A dataset
+        whose descriptions companion or whose session data is missing reports ``valid`` false rather than the error
+        envelope, since both are verification verdicts. A path that does not resolve to a dataset instead returns the
+        error envelope.
     """
     instance, load_error = _load_dataset(dataset_path=dataset_path)
     if load_error is not None or instance is None:

@@ -119,11 +119,11 @@ class DatasetData(YamlConfig):
         Do not initialize this class directly. Instead, use the create() method when creating new datasets or the
         load() method when accessing data for an existing dataset.
 
-        Datasets are created using a pre-filtered set of session + animal pairs, typically obtained through the
-        session filtering functionality in sollertia-forgery. The dataset stores only the assembled data, not raw or
-        processed data. Each created dataset carries a per-dataset ``data_descriptions.feather`` describing the
-        meaning of every column its acquisition system can emit. Use column_descriptions() and get_column_description()
-        to read it.
+        Datasets are created using a pre-filtered set of session + animal pairs, typically obtained through the session
+        filtering functionality in sollertia-forgery. The dataset stores the assembled data together with the raw-data
+        snapshots re-exported alongside it, and not the sessions' ``raw_data`` or ``processed_data`` trees. Each created
+        dataset carries a per-dataset ``data_descriptions.feather`` describing the meaning of every column its
+        acquisition system can emit. Use column_descriptions() and get_column_description() to read it.
     """
 
     name: str
@@ -373,6 +373,8 @@ class DatasetData(YamlConfig):
         Raises:
             FileNotFoundError: If multiple or no 'dataset.yaml' file instances are found under the input directory.
             OSError: If the fallback scan encounters a directory it cannot read.
+            ValueError: If the loaded marker carries a session type or an acquisition system outside the platform
+                vocabulary.
         """
         # Resolves the marker at its canonical location first, so loading a dataset that holds many assembled session
         # feathers costs a single metadata query instead of a recursive walk of the whole dataset tree. The scan below
@@ -520,6 +522,9 @@ class DatasetData(YamlConfig):
                 single directory.
             RuntimeError: If the animal's directory survives the removal attempt, since dropping the animal from the
                 marker would stop the dataset from describing data that is still on disk.
+            OSError: If the animal's directory tree cannot be read or removed, or if the dataset marker cannot be
+                written. The instance's session list is restored to the state the marker on disk describes before the
+                error propagates.
         """
         removed = self.get_sessions_for_animal(animal=animal)
         if not removed:

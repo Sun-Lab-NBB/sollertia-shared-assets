@@ -715,8 +715,8 @@ def validate_experiment_configuration_tool(file_path: str, acquisition_system: s
             to validate against.
 
     Returns:
-        A response dict with ``file_path``, ``acquisition_system``, ``valid``, and either ``summary`` (carrying the
-        configuration's trial, state, and scene fields when present) or ``issues`` (a list of validation errors).
+        A response dict with ``file_path``, ``acquisition_system``, ``valid``, and either ``summary`` (carrying
+        ``trial_count``, ``state_count``, and ``unity_scene_name``) or ``issues`` (a list of validation errors).
         When the file does not exist, the tool instead returns the error envelope (``success`` false and ``error``)
         rather than a ``valid`` verdict.
     """

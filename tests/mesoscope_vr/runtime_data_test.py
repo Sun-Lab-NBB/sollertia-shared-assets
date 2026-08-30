@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def test_mesoscope_hardware_state_defaults_to_none() -> None:
-    """Verifies that MesoscopeHardwareState fields default to None to mark unused hardware modules."""
+    """Verifies that MesoscopeHardwareState fields default to None, marking every unused hardware module."""
     state = MesoscopeHardwareState()
 
     assert state.cm_per_pulse is None
