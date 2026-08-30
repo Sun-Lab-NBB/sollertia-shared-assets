@@ -42,7 +42,7 @@ def clean_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     # Isolates platformdirs from the host machine to avoid polluting real user state.
     application_directory = tmp_path / "app_data"
     application_directory.mkdir()
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
+    monkeypatch.setattr(target=platformdirs, name="user_data_dir", value=lambda **_kwargs: str(application_directory))
 
     working_directory = tmp_path / "working_directory"
     working_directory.mkdir()

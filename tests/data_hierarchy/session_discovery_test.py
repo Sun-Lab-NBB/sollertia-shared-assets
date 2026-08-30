@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-_SESSION_YAML_TEMPLATE = """\
+_SESSION_YAML_TEMPLATE: str = """\
 project_name: {project}
 animal_id: {animal}
 session_name: {session}
@@ -40,23 +40,7 @@ sollertia_experiment_version: "5.0.0"
 raw_data: null
 processed_data: null
 """
-
-
-def _write_session(
-    root: Path,
-    project: str,
-    animal: str,
-    session: str,
-    session_type: str = "lick training",
-) -> Path:
-    """Writes a minimal ``session_data.yaml`` marker and returns the session root directory."""
-    session_root = root / project / animal / session
-    raw_data = session_root / "raw_data"
-    raw_data.mkdir(parents=True)
-    (raw_data / "session_data.yaml").write_text(
-        _SESSION_YAML_TEMPLATE.format(project=project, animal=animal, session=session, session_type=session_type)
-    )
-    return session_root
+"""Session marker body the discovery tests format and write under a temporary data root."""
 
 
 @pytest.fixture
@@ -189,7 +173,7 @@ def test_iter_animal_sessions_missing_animal_directory_yields_nothing(tmp_path: 
 
 
 def test_get_projects_for_animal_returns_sorted_membership(tmp_path: Path) -> None:
-    """Verifies that get_projects_for_animal returns every project an animal has sessions in, sorted, and no others."""
+    """Verifies that get_projects_for_animal returns exactly the projects in which an animal has sessions, sorted."""
     root = tmp_path / "data"
     _write_session(root=root, project="proj_b", animal="shared", session="2026-03-01-12-00-00-000000")
     _write_session(root=root, project="proj_a", animal="shared", session="2026-03-02-12-00-00-000000")
@@ -381,3 +365,20 @@ def test_parse_date_boundary_respects_utc_flag() -> None:
     assert utc_parsed.tzinfo == ZoneInfo("UTC")
     # The local boundary carries the host machine's UTC offset for the parsed date.
     assert local_parsed.utcoffset() == datetime(2026, 3, 15).astimezone().utcoffset()
+
+
+def _write_session(
+    root: Path,
+    project: str,
+    animal: str,
+    session: str,
+    session_type: str = "lick training",
+) -> Path:
+    """Writes a minimal ``session_data.yaml`` marker and returns the session root directory."""
+    session_root = root / project / animal / session
+    raw_data = session_root / "raw_data"
+    raw_data.mkdir(parents=True)
+    (raw_data / "session_data.yaml").write_text(
+        _SESSION_YAML_TEMPLATE.format(project=project, animal=animal, session=session, session_type=session_type)
+    )
+    return session_root

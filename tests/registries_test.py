@@ -65,28 +65,30 @@ def test_assert_registry_coverage_passes_for_current_state() -> None:
 
 def test_assert_registry_coverage_raises_on_missing_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies the coverage check raises and names the registry when a session type lacks a descriptor entry."""
-    monkeypatch.setattr(registries, "DESCRIPTOR_REGISTRY", {})
+    monkeypatch.setattr(target=registries, name="DESCRIPTOR_REGISTRY", value={})
     with pytest.raises(RuntimeError, match=r"DESCRIPTOR_REGISTRY is missing"):
         registries._assert_registry_coverage()
 
 
 def test_assert_registry_coverage_raises_on_missing_credentials_entry(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies the coverage check raises when a credentials category lacks a canonical filename entry."""
-    monkeypatch.setattr(registries, "CREDENTIALS_FILE_REGISTRY", {})
+    monkeypatch.setattr(target=registries, name="CREDENTIALS_FILE_REGISTRY", value={})
     with pytest.raises(RuntimeError, match=r"CREDENTIALS_FILE_REGISTRY is missing"):
         registries._assert_registry_coverage()
 
 
 def test_assert_registry_coverage_raises_on_missing_system_session_types(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies the coverage check raises when an acquisition system declares no session types."""
-    monkeypatch.setattr(registries, "SYSTEM_SESSION_TYPES", {})
+    monkeypatch.setattr(target=registries, name="SYSTEM_SESSION_TYPES", value={})
     with pytest.raises(RuntimeError, match=r"SYSTEM_SESSION_TYPES is missing"):
         registries._assert_registry_coverage()
 
 
 def test_assert_registry_coverage_raises_on_empty_system_session_types(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies the coverage check raises when an acquisition system is paired with an empty session-type set."""
-    monkeypatch.setattr(registries, "SYSTEM_SESSION_TYPES", {AcquisitionSystems.MESOSCOPE_VR: frozenset()})
+    monkeypatch.setattr(
+        target=registries, name="SYSTEM_SESSION_TYPES", value={AcquisitionSystems.MESOSCOPE_VR: frozenset()}
+    )
     with pytest.raises(RuntimeError, match=r"SYSTEM_SESSION_TYPES is missing"):
         registries._assert_registry_coverage()
 
@@ -94,9 +96,9 @@ def test_assert_registry_coverage_raises_on_empty_system_session_types(monkeypat
 def test_assert_registry_coverage_raises_on_orphan_session_type(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verifies the coverage check raises when a session type is claimed by no acquisition system."""
     monkeypatch.setattr(
-        registries,
-        "SYSTEM_SESSION_TYPES",
-        {AcquisitionSystems.MESOSCOPE_VR: frozenset({SessionTypes.LICK_TRAINING})},
+        target=registries,
+        name="SYSTEM_SESSION_TYPES",
+        value={AcquisitionSystems.MESOSCOPE_VR: frozenset({SessionTypes.LICK_TRAINING})},
     )
     with pytest.raises(RuntimeError, match=r"SYSTEM_SESSION_TYPES does not claim"):
         registries._assert_registry_coverage()
@@ -114,7 +116,9 @@ def test_assert_descriptor_contract_raises_on_missing_incomplete(monkeypatch: py
     class _DescriptorMissingIncomplete:
         experimenter: str = ""
 
-    monkeypatch.setattr(registries, "DESCRIPTOR_REGISTRY", {SessionTypes.LICK_TRAINING: _DescriptorMissingIncomplete})
+    monkeypatch.setattr(
+        target=registries, name="DESCRIPTOR_REGISTRY", value={SessionTypes.LICK_TRAINING: _DescriptorMissingIncomplete}
+    )
     with pytest.raises(RuntimeError, match=r"missing the required 'incomplete' field"):
         registries._assert_descriptor_contract()
 
@@ -139,9 +143,9 @@ def test_assert_experiment_configuration_contract_raises_on_missing_field(monkey
             return cls(experiment_states={}, trial_structures={})
 
     monkeypatch.setattr(
-        registries,
-        "EXPERIMENT_CONFIGURATION_REGISTRY",
-        {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingScene},
+        target=registries,
+        name="EXPERIMENT_CONFIGURATION_REGISTRY",
+        value={AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingScene},
     )
     with pytest.raises(RuntimeError, match=r"do not satisfy the experiment-configuration contract"):
         registries._assert_experiment_configuration_contract()
@@ -157,9 +161,9 @@ def test_assert_experiment_configuration_contract_raises_on_missing_builder(monk
         unity_scene_name: str
 
     monkeypatch.setattr(
-        registries,
-        "EXPERIMENT_CONFIGURATION_REGISTRY",
-        {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingBuilder},
+        target=registries,
+        name="EXPERIMENT_CONFIGURATION_REGISTRY",
+        value={AcquisitionSystems.MESOSCOPE_VR: _ConfigurationMissingBuilder},
     )
     with pytest.raises(RuntimeError, match=r"from_task_template builder"):
         registries._assert_experiment_configuration_contract()
@@ -239,9 +243,9 @@ def test_assert_experiment_configuration_contract_raises_on_incompatible_builder
             return cls(experiment_states={}, trial_structures={}, unity_scene_name="")
 
     monkeypatch.setattr(
-        registries,
-        "EXPERIMENT_CONFIGURATION_REGISTRY",
-        {AcquisitionSystems.MESOSCOPE_VR: _ConfigurationIncompatibleBuilder},
+        target=registries,
+        name="EXPERIMENT_CONFIGURATION_REGISTRY",
+        value={AcquisitionSystems.MESOSCOPE_VR: _ConfigurationIncompatibleBuilder},
     )
     with pytest.raises(RuntimeError, match=r"parameter on from_task_template"):
         registries._assert_experiment_configuration_contract()

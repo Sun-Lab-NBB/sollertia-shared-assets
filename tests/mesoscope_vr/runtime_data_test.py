@@ -157,7 +157,7 @@ def test_descriptor_defaults_mark_session_incomplete() -> None:
     experiment = MesoscopeExperimentDescriptor(experimenter="ik", animal_weight_g=24.0)
     window = WindowCheckingDescriptor(experimenter="ik")
 
-    assert lick.incomplete is True
-    assert run.incomplete is True
-    assert experiment.incomplete is True
-    assert window.incomplete is True
+    assert lick.incomplete
+    assert run.incomplete
+    assert experiment.incomplete
+    assert window.incomplete

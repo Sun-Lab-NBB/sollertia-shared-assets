@@ -19,56 +19,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _create_base_task_template(
-    cues: list[Cue] | None = None,
-    trial_structures: dict[str, TrialStructure] | None = None,
-) -> TaskTemplate:
-    """Builds a TaskTemplate populated with defaults suitable for tests."""
-    if cues is None:
-        cues = [
-            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
-            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
-        ]
-    if trial_structures is None:
-        trial_structures = {
-            "trial1": TrialStructure(
-                cue_sequence=["A", "B"],
-                stimulus_trigger_zone_start_cm=80.0,
-                stimulus_trigger_zone_end_cm=100.0,
-                stimulus_location_cm=90.0,
-                show_stimulus_collision_boundary=False,
-                trigger_type=TriggerType.INTERACTION,
-            ),
-        }
-    return TaskTemplate(
-        cues=cues,
-        vr_environment=VREnvironment(
-            corridor_spacing_cm=100.0,
-            segments_per_corridor=3,
-            padding_prefab_name="Padding",
-            cm_per_unity_unit=10.0,
-            cue_offset_cm=0.0,
-        ),
-        trial_structures=trial_structures,
-    )
-
-
-def _create_vr_environment(
-    corridor_spacing_cm: float = 100.0,
-    segments_per_corridor: float = 3,
-    cm_per_unity_unit: float = 10.0,
-    cue_offset_cm: float = 0.0,
-) -> VREnvironment:
-    """Builds a VREnvironment with valid defaults so a test overrides only the field it exercises."""
-    return VREnvironment(
-        corridor_spacing_cm=corridor_spacing_cm,
-        segments_per_corridor=segments_per_corridor,
-        padding_prefab_name="Padding",
-        cm_per_unity_unit=cm_per_unity_unit,
-        cue_offset_cm=cue_offset_cm,
-    )
-
-
 def test_trigger_type_values() -> None:
     """Verifies the supported TriggerType enumeration values."""
     assert TriggerType.INTERACTION == "interaction"
@@ -704,3 +654,53 @@ def test_task_template_yaml_round_trip(tmp_path: Path) -> None:
     assert len(loaded.cues) == len(template.cues)
     assert list(loaded.trial_structures.keys()) == list(template.trial_structures.keys())
     assert loaded.vr_environment.cue_offset_cm == template.vr_environment.cue_offset_cm
+
+
+def _create_base_task_template(
+    cues: list[Cue] | None = None,
+    trial_structures: dict[str, TrialStructure] | None = None,
+) -> TaskTemplate:
+    """Builds a TaskTemplate populated with defaults suitable for tests."""
+    if cues is None:
+        cues = [
+            Cue(name="A", code=1, length_cm=50.0, texture="Cue.png"),
+            Cue(name="B", code=2, length_cm=50.0, texture="Cue.png"),
+        ]
+    if trial_structures is None:
+        trial_structures = {
+            "trial1": TrialStructure(
+                cue_sequence=["A", "B"],
+                stimulus_trigger_zone_start_cm=80.0,
+                stimulus_trigger_zone_end_cm=100.0,
+                stimulus_location_cm=90.0,
+                show_stimulus_collision_boundary=False,
+                trigger_type=TriggerType.INTERACTION,
+            ),
+        }
+    return TaskTemplate(
+        cues=cues,
+        vr_environment=VREnvironment(
+            corridor_spacing_cm=100.0,
+            segments_per_corridor=3,
+            padding_prefab_name="Padding",
+            cm_per_unity_unit=10.0,
+            cue_offset_cm=0.0,
+        ),
+        trial_structures=trial_structures,
+    )
+
+
+def _create_vr_environment(
+    corridor_spacing_cm: float = 100.0,
+    segments_per_corridor: float = 3,
+    cm_per_unity_unit: float = 10.0,
+    cue_offset_cm: float = 0.0,
+) -> VREnvironment:
+    """Builds a VREnvironment with valid defaults so a test overrides only the field it exercises."""
+    return VREnvironment(
+        corridor_spacing_cm=corridor_spacing_cm,
+        segments_per_corridor=segments_per_corridor,
+        padding_prefab_name="Padding",
+        cm_per_unity_unit=cm_per_unity_unit,
+        cue_offset_cm=cue_offset_cm,
+    )

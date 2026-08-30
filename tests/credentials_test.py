@@ -119,7 +119,7 @@ def test_set_credentials_raises_error_working_directory_not_set(
 ) -> None:
     """Verifies that set_credentials raises an error when the working directory is not configured."""
     application_directory = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
+    monkeypatch.setattr(target=platformdirs, name="user_data_dir", value=lambda **_kwargs: str(application_directory))
 
     credentials_file = tmp_path / "service_account.json"
     credentials_file.write_text('{"type": "service_account"}')
@@ -166,7 +166,7 @@ def test_get_credentials_raises_error_working_directory_not_set(
 ) -> None:
     """Verifies that get_credentials raises an error when the working directory is not configured."""
     application_directory = tmp_path / "empty_app_data"
-    monkeypatch.setattr(platformdirs, "user_data_dir", lambda **_kwargs: str(application_directory))
+    monkeypatch.setattr(target=platformdirs, name="user_data_dir", value=lambda **_kwargs: str(application_directory))
 
     with pytest.raises(FileNotFoundError, match=r"working directory"):
         get_credentials(credentials=CredentialsTypes.GOOGLE)

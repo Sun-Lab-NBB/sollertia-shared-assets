@@ -17,68 +17,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _make_subject() -> SubjectData:
-    """Returns a fully populated SubjectData instance suitable for round-trip tests."""
-    return SubjectData(
-        id=42,
-        ear_punch="left-1",
-        sex="F",
-        genotype="C57BL/6J",
-        date_of_birth_us=1_700_000_000_000_000,
-        weight_g=24.5,
-        cage=7,
-        location_housed="Vivarium A, Room 12",
-        status="alive",
-    )
-
-
-def _make_procedure() -> ProcedureData:
-    """Returns a fully populated ProcedureData instance suitable for round-trip tests."""
-    return ProcedureData(
-        surgery_start_us=1_700_001_000_000_000,
-        surgery_end_us=1_700_001_005_400_000,
-        surgeon="Dr. K. Gupta",
-        protocol="2024-MESOSCOPE-001",
-        surgery_notes="Bilateral implantation; minor bleeding controlled with gelfoam.",
-        post_op_notes="Animal recovered within 60 minutes; ambulatory next morning.",
-        surgery_quality=2,
-    )
-
-
-def _make_drug() -> DrugData:
-    """Returns a fully populated DrugData instance suitable for round-trip tests."""
-    return DrugData(
-        drug="Lactated Ringer's Solution",
-        drug_volume_ml=1.5,
-        drug_code="LRS-001",
-    )
-
-
-def _make_implant() -> ImplantData:
-    """Returns a fully populated ImplantData instance suitable for round-trip tests."""
-    return ImplantData(
-        implant="5mm cranial window",
-        implant_target="primary visual cortex",
-        implant_code="WIN-5MM-001",
-        implant_ap_coordinate_mm=-3.5,
-        implant_ml_coordinate_mm=2.5,
-        implant_dv_coordinate_mm=0.0,
-    )
-
-
-def _make_injection() -> InjectionData:
-    """Returns a fully populated InjectionData instance suitable for round-trip tests."""
-    return InjectionData(
-        injection="AAV9-GCaMP6s",
-        injection_target="primary visual cortex layer 2/3",
-        injection_volume_nl=200.0,
-        injection_code="AAV-GCAMP6S-2024",
-        injection_ap_coordinate_mm=-3.5,
-        injection_ml_coordinate_mm=2.5,
-        injection_dv_coordinate_mm=-0.4,
-    )
-
-
 def test_subject_data_initialization() -> None:
     """Verifies that SubjectData stores every supplied field verbatim."""
     subject = _make_subject()
@@ -200,3 +138,65 @@ def test_surgery_data_round_trips_multi_implant_multi_injection(tmp_path: Path) 
     assert len(loaded.implants) == 2
     assert len(loaded.injections) == 2
     assert loaded == surgery
+
+
+def _make_subject() -> SubjectData:
+    """Returns a fully populated SubjectData instance suitable for round-trip tests."""
+    return SubjectData(
+        id=42,
+        ear_punch="left-1",
+        sex="F",
+        genotype="C57BL/6J",
+        date_of_birth_us=1_700_000_000_000_000,
+        weight_g=24.5,
+        cage=7,
+        location_housed="Vivarium A, Room 12",
+        status="alive",
+    )
+
+
+def _make_procedure() -> ProcedureData:
+    """Returns a fully populated ProcedureData instance suitable for round-trip tests."""
+    return ProcedureData(
+        surgery_start_us=1_700_001_000_000_000,
+        surgery_end_us=1_700_001_005_400_000,
+        surgeon="Dr. K. Gupta",
+        protocol="2024-MESOSCOPE-001",
+        surgery_notes="Bilateral implantation; minor bleeding controlled with gelfoam.",
+        post_op_notes="Animal recovered within 60 minutes; ambulatory next morning.",
+        surgery_quality=2,
+    )
+
+
+def _make_drug() -> DrugData:
+    """Returns a fully populated DrugData instance suitable for round-trip tests."""
+    return DrugData(
+        drug="Lactated Ringer's Solution",
+        drug_volume_ml=1.5,
+        drug_code="LRS-001",
+    )
+
+
+def _make_implant() -> ImplantData:
+    """Returns a fully populated ImplantData instance suitable for round-trip tests."""
+    return ImplantData(
+        implant="5mm cranial window",
+        implant_target="primary visual cortex",
+        implant_code="WIN-5MM-001",
+        implant_ap_coordinate_mm=-3.5,
+        implant_ml_coordinate_mm=2.5,
+        implant_dv_coordinate_mm=0.0,
+    )
+
+
+def _make_injection() -> InjectionData:
+    """Returns a fully populated InjectionData instance suitable for round-trip tests."""
+    return InjectionData(
+        injection="AAV9-GCaMP6s",
+        injection_target="primary visual cortex layer 2/3",
+        injection_volume_nl=200.0,
+        injection_code="AAV-GCAMP6S-2024",
+        injection_ap_coordinate_mm=-3.5,
+        injection_ml_coordinate_mm=2.5,
+        injection_dv_coordinate_mm=-0.4,
+    )
