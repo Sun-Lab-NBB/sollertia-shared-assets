@@ -12,7 +12,12 @@ from dataclasses import field, dataclass
 
 from ataraxis_time import TimestampFormats, get_timestamp
 from ataraxis_base_utilities import console, ensure_directory_exists
-from ataraxis_data_structures import YAML_EXCLUDE_METADATA, YamlConfig, discover_marker_files
+from ataraxis_data_structures import (
+    YAML_EXCLUDE_METADATA,
+    YamlConfig,
+    ProcessingTracker,
+    discover_marker_files,
+)
 
 from ..enums import SessionTypes, AcquisitionSystems
 from ..registries import (
@@ -119,6 +124,21 @@ class ProcessingTrackers(StrEnum):
     """Tracker for the sollertia-forgery dataset-forging pipeline. Lives at the forged dataset root."""
     MANIFEST = "manifest_processing_tracker.yaml"
     """Tracker for the project manifest generation pipeline. Lives at the project root."""
+
+
+CHECKSUM_EXCLUDED_FILES: set[str] = {
+    str(RawDataFiles.CHECKSUM),
+    str(ProcessingTrackers.CHECKSUM),
+    Path(ProcessingTracker(file_path=Path(ProcessingTrackers.CHECKSUM)).lock_path).name,
+}
+"""The filenames stored under a session's ``raw_data`` directory that are not part of the session record, and that
+every checksum computed over that directory therefore excludes.
+
+The checksum tracker is the one ProcessingTrackers member living at the ``raw_data`` root, so its file and the lock it
+derives sit inside the directory whose integrity they describe. The lock name comes from the tracker's own derivation,
+which keeps this set from disagreeing with the file the tracker locks. Every producer and every verifier of the
+``raw_data`` digest passes this set, so a tracker left by an earlier verification cannot change the digest a later
+verification recomputes."""
 
 
 @dataclass(frozen=True, slots=True)

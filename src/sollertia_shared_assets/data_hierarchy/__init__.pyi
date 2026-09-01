@@ -6,6 +6,7 @@ from .dataset_data import (
 )
 from .session_data import (
     RAW_DATA_DIRECTORY as RAW_DATA_DIRECTORY,
+    CHECKSUM_EXCLUDED_FILES as CHECKSUM_EXCLUDED_FILES,
     PROCESSED_DATA_DIRECTORY as PROCESSED_DATA_DIRECTORY,
     RawData as RawData,
     Directories as Directories,
@@ -37,6 +38,7 @@ __all__ = [
     "DATASET_MARKER_FILENAME",
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
+    "CHECKSUM_EXCLUDED_FILES",
     "RAW_DATA_DIRECTORY",
     "AnimalData",
     "DatasetAnimal",

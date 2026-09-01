@@ -69,6 +69,7 @@ from .configuration import (
 )
 from .data_hierarchy import (
     RAW_DATA_DIRECTORY,
+    CHECKSUM_EXCLUDED_FILES,
     DATASET_MARKER_FILENAME,
     PROCESSED_DATA_DIRECTORY,
     PERSISTENT_DATA_DIRECTORY,
@@ -103,6 +104,7 @@ if not console.enabled:  # pragma: no branch
     console.enable()
 
 __all__ = [
+    "CHECKSUM_EXCLUDED_FILES",
     "CONFIGURATION_DIRECTORY",
     "CREDENTIALS_DIRECTORY",
     "CREDENTIALS_FILE_REGISTRY",

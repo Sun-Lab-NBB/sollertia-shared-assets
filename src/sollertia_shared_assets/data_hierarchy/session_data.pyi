@@ -49,6 +49,8 @@ class ProcessingTrackers(StrEnum):
     FORGING = "forging_tracker.yaml"
     MANIFEST = "manifest_processing_tracker.yaml"
 
+CHECKSUM_EXCLUDED_FILES: set[str]
+
 @dataclass(frozen=True, slots=True)
 class RawData:
     session_data_path: Path
