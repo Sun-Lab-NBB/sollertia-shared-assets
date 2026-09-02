@@ -120,7 +120,7 @@ the CLI, and all tool implementations live in `src/sollertia_shared_assets/inter
 
 | Module              | File                                | Surface                                                                                       |
 |---------------------|-------------------------------------|-----------------------------------------------------------------------------------------------|
-| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` subcommands                                   |
+| CLI entry point     | `interfaces/cli.py`                 | `slsa` Click group: `mcp` + `get` + `configure` + `delete` subcommands                        |
 | Server bootstrap    | `interfaces/mcp_server.py`          | Auto-imports `*_tools.py` to register, exposes `run_server`                                   |
 | Shared MCP instance | `interfaces/mcp_instance.py`        | MCPServer instance, response helpers, serialization, validators                               |
 | Configuration tools | `interfaces/configuration_tools.py` | env status, working dir, data root, credentials, projects, templates, experiments, vocabulary |
@@ -144,6 +144,9 @@ Project conventions for MCP tools:
   Non-Sollertia MCP servers (`cindra`, `ataraxis-video-system`, `ataraxis-communication-interface`) do not consume
   `session_paths`, so pass them concrete paths or recordings instead. `discover_datasets_tool` produces the matching
   `dataset_paths` list, which sollertia-forgery's `generate_dataset_state_tool` and `plan_dataset_jobs_tool` accept.
+- `delete_project_tool` refuses to act until the caller passes an explicit `confirm_deletion` value, because the
+  removal takes every animal, session, and experiment configuration stored under the project with it. You MUST
+  warn the user about the consequences and obtain a decision before retrying the tool with `yes`.
 
 For server connectivity issues, invoke `/assets-mcp-environment-setup`.
 
@@ -249,9 +252,10 @@ processing platform, built on the Ataraxis framework, and developed in the Sun (
 - **Interface layer**: A single `MCPServer` instance lives in `interfaces/mcp_instance.py` with shared serialization,
   validation, and dataclass-introspection helpers. Tool modules import the instance and register `@mcp.tool()`
   functions. `run_server()` enables JSON responses when it starts the streamable-http transport. The CLI (`slsa`)
-  starts the server and exposes `configure {directory,data-root,credentials,templates,project}` and
-  `get {directory,data-root,credentials,templates,projects,experiments}` command groups. The `mcp` command disables
-  the console on the stdio transport, since the console writes to the stdout stream that carries JSON-RPC traffic.
+  starts the server and exposes `configure {directory,data-root,credentials,templates,project}`,
+  `get {directory,data-root,credentials,templates,projects,experiments}`, and `delete {template,experiment,project}`
+  command groups. The `mcp` command disables the console on the stdio transport, since the console writes to the stdout
+  stream that carries JSON-RPC traffic.
 - **Persistent host settings**: `configuration/configuration_utilities.py` manages three independent
   `platformdirs`-backed settings: the working directory, the data root, and the templates directory. The credentials
   toolset that copies each category's credentials file into the working directory's `credentials/` subdirectory under
