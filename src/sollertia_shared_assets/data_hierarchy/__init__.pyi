@@ -35,10 +35,10 @@ from .session_discovery import (
 )
 
 __all__ = [
+    "CHECKSUM_EXCLUDED_FILES",
     "DATASET_MARKER_FILENAME",
     "PERSISTENT_DATA_DIRECTORY",
     "PROCESSED_DATA_DIRECTORY",
-    "CHECKSUM_EXCLUDED_FILES",
     "RAW_DATA_DIRECTORY",
     "AnimalData",
     "DatasetAnimal",
