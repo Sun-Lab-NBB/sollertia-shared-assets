@@ -75,8 +75,8 @@ def delete_task_tool(template_name: str) -> dict[str, Any]:
     ``create_task_tool``. The two tools cover the full lifecycle of a task's generated artifacts. Cue prefabs and cue
     materials are intentionally not removed because they are shared across every template that declares a matching
     ``(name, length_cm)`` identity. Deleting them would corrupt sibling tasks. Use ``delete_asset_tool`` for individual
-    cue cleanup. The template YAML is also preserved as the source of truth. To remove the template itself, edit the
-    file system directly or use a templates-side tool.
+    cue cleanup. The template YAML is also preserved as the source of truth. To remove the template itself, call
+    ``delete_template_tool`` after this tool, so the Unity artifacts go first and the template second.
 
     Requires the Unity Editor to be running with the McpBridge plugin active.
 

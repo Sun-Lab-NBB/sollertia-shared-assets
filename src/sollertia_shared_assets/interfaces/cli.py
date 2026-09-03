@@ -7,11 +7,13 @@ from pathlib import Path
 
 import click
 from ataraxis_base_utilities import LogLevel, console, ensure_directory_exists
+from ataraxis_data_structures import delete_directory
 
 from ..enums import CredentialsTypes
 from .mcp_server import run_server
 from ..credentials import get_credentials, set_credentials
 from ..configuration import (
+    NAME_COMPONENT_PATTERN,
     get_data_root,
     set_data_root,
     get_working_directory,
@@ -23,6 +25,10 @@ from ..data_hierarchy import ProjectData, discover_projects
 
 _CONTEXT_SETTINGS: dict[str, int] = {"max_content_width": 120}
 """Ensures that displayed Click help messages are formatted according to the lab standard."""
+
+_TEMPLATE_SUFFIXES: tuple[str, str] = (".yaml", ".yml")
+"""The filename suffixes that make a YAML file a task template. The Unity catalog preflight scans both suffixes and
+the Editor's template picker offers both as its file filter, so both name a live catalog member."""
 
 
 @click.group("slsa", context_settings=_CONTEXT_SETTINGS)
@@ -206,3 +212,162 @@ def configure_project(project: str) -> None:
     """Creates the data structure for a new project under the configured Sollertia platform data root."""
     ProjectData(root=get_data_root(), project_name=project).create()
     console.echo(message=f"Project {project} data structure: generated.", level=LogLevel.SUCCESS)
+
+
+@slsa_cli.group("delete", context_settings=_CONTEXT_SETTINGS)
+def delete_group() -> None:
+    """Removes Sollertia platform configuration assets from the local data hierarchy."""
+
+
+@delete_group.command("template", context_settings=_CONTEXT_SETTINGS)
+@click.option(
+    "-f",
+    "--file",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="The absolute path to the sollertia-virtual-reality task template file to remove. The file must be stored "
+    "under the configured task templates directory.",
+)
+def delete_template(file: Path) -> None:
+    """Removes the target sollertia-virtual-reality task template file from the local filesystem.
+
+    The removal is confined to a task template file stored under the configured task templates directory, which keeps
+    the per-session frozen vr_configuration.yaml snapshot, an immutable acquisition record, out of reach.
+    """
+    templates_directory = get_task_templates_directory().resolve()
+
+    # Both sides are resolved before the containment test, because Path.is_relative_to compares path components
+    # without normalizing the '..' entries away while the kernel resolves the removal itself.
+    template_path = file.resolve()
+    if template_path == templates_directory or not template_path.is_relative_to(templates_directory):
+        message = (
+            f"Unable to remove the task template at {template_path}. The path must name a live template nested under "
+            f"the configured task templates directory {templates_directory}, because a per-session "
+            f"vr_configuration.yaml snapshot is an immutable acquisition record."
+        )
+        console.error(message=message, error=ValueError)
+
+    if template_path.suffix not in _TEMPLATE_SUFFIXES:
+        message = (
+            f"Unable to remove the task template at {template_path}. The path must carry one of the task template "
+            f"suffixes {', '.join(_TEMPLATE_SUFFIXES)}, but got '{template_path.suffix}'."
+        )
+        console.error(message=message, error=ValueError)
+
+    if not template_path.is_file():
+        message = f"Unable to remove the task template at {template_path}. No file is found at the resolved path."
+        console.error(message=message, error=FileNotFoundError)
+
+    template_path.unlink()
+    console.echo(message=f"Task template {template_path.stem}: removed.", level=LogLevel.SUCCESS)
+
+
+@delete_group.command("experiment", context_settings=_CONTEXT_SETTINGS)
+@click.option(
+    "-p",
+    "--project",
+    type=str,
+    required=True,
+    help="The name of the project that stores the experiment configuration to remove.",
+)
+@click.option(
+    "-e",
+    "--experiment",
+    type=str,
+    required=True,
+    help="The name of the experiment configuration to remove.",
+)
+def delete_experiment(project: str, experiment: str) -> None:
+    """Removes the target experiment configuration from the project's configuration directory.
+
+    Both names are joined onto the configured data root as path components, so each is required to be a single
+    component, which confines the removal to the project's own configuration directory.
+    """
+    _verify_name_component(name=project, role="project name")
+    _verify_name_component(name=experiment, role="experiment configuration name")
+
+    configuration_path = ProjectData(root=get_data_root(), project_name=project).configuration_directory.joinpath(
+        f"{experiment}.yaml"
+    )
+    if not configuration_path.is_file():
+        message = (
+            f"Unable to remove the '{experiment}' experiment configuration of the '{project}' project. The "
+            f"configuration must be stored as a .yaml file under the project's configuration directory, but no file "
+            f"is found at {configuration_path}."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    configuration_path.unlink()
+    console.echo(
+        message=f"Experiment configuration {experiment} of the {project} project: removed.", level=LogLevel.SUCCESS
+    )
+
+
+@delete_group.command("project", context_settings=_CONTEXT_SETTINGS)
+@click.option(
+    "-p",
+    "--project",
+    type=str,
+    required=True,
+    help="The name of the project to remove.",
+)
+def delete_project(project: str) -> None:
+    """Removes the target project directory and all of its contents from the Sollertia platform data root.
+
+    The removal is irreversible and takes every animal, session, and experiment configuration stored under the project
+    with it, so the command blocks on an interactive confirmation prompt before it deletes anything. The project name
+    is joined onto the configured data root as a path component, so it is required to be a single component, which
+    keeps the removal on a project directory rather than an animal or session subtree nested inside one.
+    """
+    _verify_name_component(name=project, role="project name")
+
+    project_data = ProjectData(root=get_data_root(), project_name=project)
+    if not project_data.exists():
+        message = (
+            f"Unable to remove the '{project}' project. The project directory must exist under the configured "
+            f"Sollertia platform data root, but no directory is found at {project_data.path}."
+        )
+        console.error(message=message, error=FileNotFoundError)
+
+    click.confirm(
+        text=(
+            f"Deleting the '{project}' project irreversibly removes the {project_data.path} directory with every "
+            f"animal, session, and experiment configuration stored under it. Continue?"
+        ),
+        default=False,
+        abort=True,
+    )
+
+    delete_directory(directory_path=project_data.path)
+
+    # Verifies the removal, since delete_directory reports an exhausted removal attempt as a warning and returns with
+    # the directory still in place.
+    if project_data.path.exists() or project_data.path.is_symlink():
+        message = (
+            f"Unable to remove the '{project}' project. The project directory must no longer exist once it is "
+            f"deleted, but it is still present at {project_data.path}."
+        )
+        console.error(message=message, error=RuntimeError)
+
+    console.echo(message=f"Project {project} data structure: removed.", level=LogLevel.SUCCESS)
+
+
+def _verify_name_component(name: str, role: str) -> None:
+    """Verifies that the input name is usable as a single directory or file name component.
+
+    A name carrying a path separator or a parent-directory entry resolves to a location other than the one the
+    command reports, so it is refused before any path is built from it.
+
+    Args:
+        name: The name supplied on the command line.
+        role: The role the name plays in the command, used to build the error message.
+
+    Raises:
+        ValueError: If the name carries any character outside the ASCII letters, digits, and underscores.
+    """
+    if not NAME_COMPONENT_PATTERN.match(name):
+        message = (
+            f"Unable to resolve the {role} '{name}'. The name must be a single path component containing only ASCII "
+            f"letters, digits, and underscores, because it is joined onto the data root as a directory or file name."
+        )
+        console.error(message=message, error=ValueError)

@@ -126,8 +126,12 @@ This library provides the `slsa` CLI that exposes the following commands and com
 | `configure credentials` | Copies a credentials file into the platform credentials directory         |
 | `configure templates`   | Sets the path to the sollertia-virtual-reality task templates directory   |
 | `configure project`     | Creates a project directory structure for data acquisition                |
+| `delete template`       | Removes a sollertia-virtual-reality task template file                    |
+| `delete experiment`     | Removes an experiment configuration from a project                        |
+| `delete project`        | Removes a project directory and every asset stored under it               |
 
-Use `slsa --help`, `slsa get --help`, `slsa configure --help`, or `slsa COMMAND --help` for detailed usage information.
+Use `slsa --help`, `slsa get --help`, `slsa configure --help`, `slsa delete --help`, or `slsa COMMAND --help`
+for detailed usage information.
 
 ### MCP Server
 
@@ -156,7 +160,10 @@ The server defaults to the `stdio` transport. Use the `-t/--transport` flag to s
 | `create_project_tool`                           | Creates the on-disk directory structure for a new project         |
 | `create_task_tool`                              | Creates a Unity task end-to-end from a YAML task template         |
 | `delete_asset_tool`                             | Deletes a non-scene Unity asset and refreshes the AssetDatabase   |
+| `delete_experiment_configuration_tool`          | Removes an experiment configuration YAML from a project           |
+| `delete_project_tool`                           | Removes a project directory and every asset stored under it       |
 | `delete_task_tool`                              | Removes every Unity artifact created for a given task template    |
+| `delete_template_tool`                          | Removes a task template YAML from the templates directory         |
 | `describe_dataset_data_schema_tool`             | Returns the DatasetData and nested DatasetSession schemas         |
 | `describe_experiment_configuration_schema_tool` | Returns the experiment configuration schema for a system          |
 | `describe_session_data_schema_tool`             | Returns the schema for the SessionData dataclass                  |
